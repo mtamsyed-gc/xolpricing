@@ -1,7 +1,7 @@
-# Methodology — deterministic per-person XoL (stages 02–03)
+# Methodology — per-person XoL (stages 02–04)
 
-Version 0.1 · 2026-10-14. Every formula below is implemented in `tools/alteryx/build_stage02.py` /
-`build_stage03.py` and independently re-implemented in `tests/test_stage02.py` / `test_stage03.py`.
+Version 0.2 · 2026-10-14. Every formula below is implemented in `tools/alteryx/build_stage02.py`–`build_stage04.py`
+and independently re-implemented in `tests/test_stage02.py`–`test_stage04.py`.
 Notation: TY = treaty year, Q = quote year, AP = attachment point, L = layer limit.
 
 ## 1. Treaty year and accumulation (stage 02)
@@ -56,7 +56,7 @@ user's selections in the Control workbook (D3), whose caveat about portfolio dev
 | Limit | `L` (AMOUNT) or `benefit limit − AP` (TO_BENEFIT_LIMIT; no limit if the benefit limit is unknown) |
 | Layer loss | `xl = max(0, min(L, adj − AP)) · (1 − co-participation)` |
 | Post-AP completion | `xl_c = xl · IBNR_AMT · UNEARNED_AMT · UNWRITTEN_AMT`; `n_c = 1[xl > 0] · IBNR_CNT · UNEARNED_CNT · UNWRITTEN_CNT` |
-| AAD / AAL | On each TY's total: `xl_aa = min(max(xl_c − AAD, 0), AAL)`, split pro rata between non-outlier and outlier. Deterministic approximation only (B03): the stochastic result prices these |
+| AAD / AAL | On each TY's total: `xl_aa = min(max(xl_c − AAD, 0), AAL)`, split pro rata between non-outlier and outlier. AAL = given value, else (1 + reinstatements) × limit when reinstatements are limited. Deterministic approximation only (B03): the stochastic result prices these |
 
 ## 6. Burning cost by TY and in total
 
@@ -83,7 +83,28 @@ the stochastic stage (scope §7).
 `out_bc_by_year.csv`, `out_bc_summary.csv`, `out_large_claims.csv`, `out_annualisation.csv` (reported → + IBNR →
 + unearned → + unwritten, for layer amount and count), `checks/out_completion_indicated.csv`.
 
-## 8. Not yet in this version
+## 8. Stochastic model (stage 04, native Alteryx)
 
-Scenario overrides (sensitivity runs), AP-band completion factors, the expiring-rate comparison, and per-event / stop
-loss covers (phases 2–4).
+| Item | Rule |
+|---|---|
+| Fitting threshold u | `fit_cutoff`, else the lowest active per-person AP |
+| Fitting data | Adjusted units (stage 03: trended, pre-AP completed, capped) with `adj > u`, all experience years |
+| Severity | Single-parameter Pareto above u: `S(x) = (u/x)^α`. MLE with right-censoring at each unit's cap (a unit is censored when its uncapped amount reaches its cap): `α = n_uncensored / Σ ln(adj/u)`, standard error `α/√n_uncensored` |
+| Fit diagnostics | `out_fit.csv`: empirical vs fitted exceedances at every AP, exhaustion point and 250k/500k/1m/2m; check S05 flags a layer whose deterministic / stochastic ratio (below the largest observed claim) is outside 0.8–1.25 |
+| Frequency | Poisson. `λ = Σ_ty w_ty · (units > u in ty × POST_AP_COUNT(ty)) / full-year exposure_ty × lives_Q × incidence_adj`, weights as in §6. NEGBIN is not available natively (S03) |
+| Claim count | Inverse CDF: `N = #{k : CDF(k) < U}` from a Poisson table k = 0…⌈λ + 10√λ + 20⌉ (λ > 700 stops: S02) |
+| Claim | `X = u · U^(−1/α)`; cap drawn uniformly from the fitted units' caps (benefit / policy limit, preserving the plan mix); `claim = min(X, cap)` |
+| Layer loss | As §5 on each simulated claim (TO_BENEFIT_LIMIT uses the drawn cap); annual `recovery = min(max(Σ xl − AAD, 0), AAL)`, AAL as in §5 |
+| Reinstatements | Usage per iteration `r = cost% · min(recovery, n·L)/L` (unlimited: `recovery/L`), as a fraction of the upfront premium P. Excel solves P from the target: `P = target / (1 + E[r])`. Pro rata as to time not modelled (S06) |
+| Unused capacity | Each claim is also limited to M = largest observed adjusted claim; `recovery_aboveM` is the part of the layer the experience cannot see |
+| Blend | `E[L] = Z · E_det + (1 − Z) · E_stoch(below M) + E_stoch(above M)` (Z, E_det from stage 03) |
+| RNG | MINSTD (Lehmer, a = 48271, m = 2³¹ − 1), state `s0 = 1 + seed mod (m − 1)`; three non-overlapping streams started at `s0 · a^(j·2²⁹) mod m` (j = 1 Poisson draws, 2 severity, 3 cap), computed with 16-bit splitting so every product stays below 2⁵³. The same seed gives identical results in Designer and the simulator |
+| Outputs | `out_sim_summary.csv` (λ, α, mean, SD, CoV, P(0), P50–P99.5, above-M, reinstatement usage, blend), `out_sim_quantiles.csv` (q = 0.001, 0.005 … 0.995, 0.999, nearest rank), `out_sim_iterations.csv` (per iteration and layer: recovery, above-M, reinstatement usage, large-claim gross), `out_fit.csv` |
+
+Independence of severity and cap is an approximation (higher-limit plans may also have higher severities); the
+lognormal / GPD candidates and negative binomial frequency need the Python tool (D6) and are not in this version.
+
+## 9. Not yet in this version
+
+Scenario overrides (sensitivity runs), AP-band completion factors, the expiring-rate comparison, the attritional
+model (needed for the net-claims-budget exhibit and stop loss: phase 3) and per-event cover (phase 4).

@@ -503,6 +503,24 @@ def make_func(name, args):
     if n in ("datetimeyear", "datetimemonth", "datetimeday"):
         attr = n[8:]
         return lambda c: None if _dt(a(0, c)) is None else getattr(_dt(a(0, c)), attr)
+    if n in ("log", "exp"):     # XOL: Designer Log (natural) / Exp
+        def le(c, f=(math.log if n == "log" else math.exp)):
+            x = a(0, c)
+            if x is None:
+                return None
+            if n == "log" and x <= 0:
+                raise SimError("Log of a non-positive number")
+            return f(x)
+        return le
+    if n == "pow":              # XOL: Designer Pow(x, e)
+        def pw(c):
+            x, y = a(0, c), a(1, c)
+            if x is None or y is None:
+                return None
+            return math.pow(x, y)
+        return pw
+    if n == "ceil":             # XOL: Designer Ceil(x)
+        return lambda c: None if a(0, c) is None else int(math.ceil(a(0, c)))
     if n == "sqrt":             # XOL: Designer Sqrt(x)
         def sq(c):
             x = a(0, c)

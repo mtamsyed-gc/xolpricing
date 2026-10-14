@@ -98,9 +98,11 @@ def build(v):
     lay = wf.formula(lay, [("lim_basis", X.STR, 'IIF(IsNull([limit_basis]), "AMOUNT", [limit_basis])'),
                            ("cop", X.DBL, "IIF(IsNull([co_participation_pct]), 0, [co_participation_pct])"),
                            ("l_label", X.STR, 'IIF(IsNull([label]), "PP option " + ToString([option_id]), [label])'),
-                           ("kl", X.INT, "1")], label="layer fields")
-    lay = wf.select(lay, keep=["kl", "option_id", "layer", "l_label", "lim_basis", "ap", "limit", "aal", "aad", "cop"],
-                    keep_unknown=False, label="layers")
+                           ("aal_eff", X.DBL, "IIF(!IsNull([aal]), [aal], IIF(IsNull([reinstatements_n]) OR "
+                                              "IsNull([limit]), Null(), (1 + [reinstatements_n]) * [limit]))"),
+                           ("kl", X.INT, "1")], label="layer fields; AAL = (1 + reinstatements) x limit if not given")
+    lay = wf.select(lay, keep=["kl", "option_id", "layer", "l_label", "lim_basis", "ap", "limit", "aal_eff", "aad", "cop"],
+                    rename={"aal_eff": "aal"}, keep_unknown=False, label="layers")
     minap = wf.summarize(lay, [("kl", "GroupBy", "kmin"), ("ap", "Min", "min_ap")], label="lowest AP")
     par = C.params_stream(wf, v, PARAMS, key="kp", label="parameters")
 
@@ -155,6 +157,9 @@ def build(v):
                         ("q3", "Max", "q3")], label="threshold (fallback if none)")
     u = C.append(wf, u, tha, "ku", "kth", "+ outlier threshold")
     u = wf.formula(u, [("outlier", X.INT, "IIF([adj] > [outlier_thr], 1, 0)")], label="outlier flag")
+    adjo = wf.select(u, keep=["acc_key", "ty", "amount_q", "adj", "adj_uncapped", "cap", "annual_limit", "pre_f_",
+                              "post_cnt_f_", "post_amt_f_", "outlier"], keep_unknown=False, label="bc_adjusted fields")
+    wf.output_yxdb(adjo, C.stage(v, "bc_adjusted"), label="bc_adjusted")
     lc, _ = wf.filter(u, "[adj] >= [out_thr]", label="large-claim listing")
     lc = wf.select(lc, keep=["acc_key", "member_id", "ty", "segment", "scheme_id", "first_treatment", "amount_q",
                              "trend_f", "trended", "pre_f_", "adj_uncapped", "cap", "adj", "outlier", "outlier_thr"],
@@ -244,6 +249,7 @@ def build(v):
                                              "IIF(IsNull([custom_weight]), 0, [custom_weight]), [w_raw] / [w_sum]))"),
                            ("weight_out", X.DBL, "1 / [n_years]")], label="final weights")
     yrw = wf.select(yrw, keep=["g_ty", "weight", "weight_out", "n_years"], keep_unknown=False, label="weights by TY")
+    wf.output_yxdb(yrw, C.stage(v, "bc_weights"), label="bc_weights")
     by = wf.join(by, yrw, ["ty"], ["g_ty"], label="+ weights")["J"]
     byo = wf.select(by, keep=["option_id", "layer", "l_label", "ty", "months_elapsed", "exposure_ly_full",
                               "exposure_prem_full", "prem_trend_f", "n_xl", "n_c", "freq_per_1000", "xl", "xl_c",

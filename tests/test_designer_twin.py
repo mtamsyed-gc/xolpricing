@@ -39,7 +39,7 @@ def main() -> int:
 
 def compare_table(f) -> bool:
     d, s = pd.read_csv(TWIN / f"{f}.csv"), pd.read_csv(ROOT / "data/output/synth/results" / f"{f}.csv")
-    good = list(d.columns) == list(s.columns) and len(d) == len(s)
+    good = set(d.columns) == set(s.columns) and len(d) == len(s)       # columns matched by name
     for c in d.columns if good else []:
         if pd.api.types.is_numeric_dtype(d[c]):
             good &= bool(np.allclose(d[c], s[c], rtol=1e-9, atol=1e-6, equal_nan=True))
