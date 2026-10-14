@@ -1,4 +1,4 @@
-# Running the tool (Designer 2025.2)
+# Running the tool (Designer 2025.2 format; tested on 2026.2)
 
 ## One-off setup
 1. Clone or download the repo. Keep the folder structure: workflows find their files by relative path.
@@ -28,7 +28,11 @@ The same workflows in `alteryx/workflows/synth/` read `data/synthetic/` and writ
 `00_read_control.yxmd` then `01a_adapter_line.yxmd`; `checks_01a.csv` should hold only the `OK` row and
 `recon_01a.csv` should show 55,370 lines in, 1,455 rejected, 0 unmatched, 53,915 out.
 
-## Twin check (first run on the GC machine)
+## Twin check
+Done on the owner's laptop (Designer 2026.2, 2026-10-14): stages 00, 01a and 01b match the simulator; the
+Designer outputs are stored in `tests/reconciliation/designer_twin/`. Repeat on the GC machine before first live use.
+
+### Procedure
 The simulator outputs for the synthetic run are reproducible with `python tests/run_all.py`. After running the SYNTH
 workflows in Designer, compare `data/output/synth/checks/recon_01a.csv` with the values above; any difference
 points to a Designer behaviour the simulator does not model, and should be reported back before relying on the
@@ -37,3 +41,7 @@ LIVE variant.
 ## Rebuilding (developers)
 Workflows are generated, never edited by hand: change `tools/alteryx/build_stage*.py`, then
 `python tools/alteryx/build_all.py` and `python tests/run_all.py`.
+
+## Designer notes (from the laptop runs)
+- Designer opens each workflow from the launcher in a new window; opening a large workflow can take minutes.
+- A run's Results window should show 0 Errors; read `checks_NN.csv` for FLAGs.

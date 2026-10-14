@@ -1,0 +1,13 @@
+stage,table,measure,value
+S01a,claims_lines,rows_in,55370
+S01a,int_exposure,earned_ly,31891.76986301379
+S01a,int_exposure,written_premium,225211385.99089998
+S01a,int_claims_aggregate,amount_paid,108600281.23972511
+S01a,claims_lines,rows_rejected_excluded,1455
+S01a,claims_lines,rows_unmatched_excluded,0
+S01a,int_claims,rows_out,53915
+S01a,int_claims,amount_paid_q,108600281.23972568
+S01a,int_claims,amount_os_q,4731481.268525001
+S01a,members,rows_in,37588
+S01a,int_members,rows_out,37588
+S01a,int_members,written_premium_q,225211385.990905

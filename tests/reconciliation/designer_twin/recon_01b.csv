@@ -1,0 +1,8 @@
+stage,table,measure,value
+S01b,claimants,rows_in,549
+S01b,int_claims,rows_out,549
+S01b,int_claims,amount_paid_q,55561457.750000015
+S01b,int_claims,amount_os_q,3797201.57
+S01b,int_exposure,earned_ly,31870.88024999998
+S01b,int_exposure,written_premium,225211385.97000006
+S01b,int_claims_aggregate,amount_paid,108600281.20999992
