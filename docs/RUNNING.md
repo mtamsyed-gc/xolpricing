@@ -37,7 +37,8 @@ The same workflows in `alteryx/workflows/synth/` read `data/synthetic/` and writ
 
 ## Twin check
 Done on the owner's laptop (Designer 2026.2, 2026-10-14): stages 00, 01a and 01b match the simulator; the
-Designer outputs are stored in `tests/reconciliation/designer_twin/`. Repeat on the GC machine before first live use.
+Designer outputs are stored in `tests/reconciliation/designer_twin/`. Stages 02-05 also match (04 and 05 at
+10,000 iterations against the numpy oracles). Repeat on the GC machine before first live use.
 
 ### Procedure
 The simulator outputs for the synthetic run are reproducible with `python tests/run_all.py`. After running the SYNTH

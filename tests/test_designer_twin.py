@@ -34,6 +34,7 @@ def main() -> int:
     for f in ("checks_01b", "recon_01b"):
         ok &= compare(f)
     ok &= stage04()
+    ok &= stage05()
     print("PASS" if ok else "FAIL")
     return 0 if ok else 1
 
@@ -53,6 +54,26 @@ def stage04() -> bool:
     r = subprocess.run([sys.executable, str(ROOT / "tests/twin_stage04.py"), str(tmp)], capture_output=True, text=True)
     good = r.returncode == 0
     print(f"{'PASS' if good else 'FAIL'}  stage 04, 10,000 iterations (Designer 2026.2 vs oracle)")
+    return good
+
+
+def stage05() -> bool:
+    """Designer's 10,000-iteration stage-05 run (after stage 04 at 10,000) vs the numpy oracle."""
+    import subprocess
+    import gzip
+    import shutil
+    d = TWIN / "stage05"
+    tmp = ROOT / "data/output/twin05"
+    tmp.mkdir(parents=True, exist_ok=True)
+    for f in d.iterdir():
+        if f.suffix == ".gz":
+            with gzip.open(f, "rb") as a, open(tmp / f.stem, "wb") as b:
+                shutil.copyfileobj(a, b)
+        elif f.suffix == ".csv":
+            shutil.copy(f, tmp / f.name)
+    r = subprocess.run([sys.executable, str(ROOT / "tests/twin_stage05.py"), str(tmp)], capture_output=True, text=True)
+    good = r.returncode == 0
+    print(f"{'PASS' if good else 'FAIL'}  stage 05, 10,000 iterations (Designer 2026.2 vs oracle)")
     return good
 
 
