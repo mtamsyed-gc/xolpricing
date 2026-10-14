@@ -125,6 +125,8 @@ Each historical year, and the expiring year in particular, is brought to a full-
 
 ## 5. Calculation chain (Alteryx stages)
 
+Built so far as workflows `00_read_control`, `01a/01b` adapters, `02_experience` (stages 02–04 below) and `03_burning_cost` (stages 05–07, per-person deterministic). Formulas: `docs/methodology.md`.
+
 Each stage writes control totals, and the next stage reconciles to them. An unexplained movement stops the run. Expected exclusions are logged, not flagged.
 
 | Stage | Workflow | Logic |

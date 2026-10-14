@@ -503,6 +503,15 @@ def make_func(name, args):
     if n in ("datetimeyear", "datetimemonth", "datetimeday"):
         attr = n[8:]
         return lambda c: None if _dt(a(0, c)) is None else getattr(_dt(a(0, c)), attr)
+    if n == "sqrt":             # XOL: Designer Sqrt(x)
+        def sq(c):
+            x = a(0, c)
+            if x is None:
+                return None
+            if x < 0:
+                raise SimError("Sqrt of a negative number")
+            return math.sqrt(x)
+        return sq
     if n == "floor":
         return lambda c: None if a(0, c) is None else int(math.floor(a(0, c)))
     if n == "abs":
