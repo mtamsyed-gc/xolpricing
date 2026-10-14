@@ -1,12 +1,14 @@
 # XoL Pricing Tool
 
-Excess-of-loss reinsurance pricing tool for Life & Health (medical) business.
-**Alteryx** handles data preparation (raw cedant/TPA claims and exposure → clean, capped, trended
-loss and exposure tables); **Excel** handles the pricing engine, assumptions and presentation of
-layer results.
+Broker-side excess-of-loss pricing tool for medical (health) portfolios. For each candidate
+structure it produces (A) expected layer claims cost, (B) an indicative RI premium on high-level
+loadings, and (C) cedant impact — recoveries vs premium and retained-claims volatility.
 
-> Status: repository scaffold only. Pricing methodology and data contracts are still to be agreed —
-> see [`docs/scope.md`](docs/scope.md).
+**Alteryx** does all data preparation, burning cost, distribution fitting and simulation.
+**Excel** holds the inputs (Control workbook) and the loadings, cedant-impact exhibits and charts
+(Results workbook).
+
+> Status: scope drafted — see [`docs/scope.md`](docs/scope.md). Capital and risk transfer are out of scope.
 
 ## Structure
 
