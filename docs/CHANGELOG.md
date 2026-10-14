@@ -3,6 +3,7 @@
 Methodology and data-contract changes, newest first.
 
 ## 2026-10-14
+- Designer twin run of 02_experience and 03_burning_cost (Designer 2026.2): 0 errors, every output cell matches the simulator (max rel diff 2e-14). Baseline extended in tests/reconciliation/designer_twin.
 - Stage 02 (02_experience: treaty-year allocation, run-off, accumulation units, RA/LO exposure, months elapsed, indicated UNEARNED/UNWRITTEN factors) and stage 03 (03_burning_cost: trend indices, completion, benefit/policy limits, IQR or value outliers, per-person layering incl. TO_BENEFIT_LIMIT, post-AP completion, AAD/AAL, default/custom weights, credibility, sensitivities, leveraged trend, quote-year expected cost, annualisation and large-claim exhibits). Simulator vs pandas oracle: all checks pass. docs/methodology.md added. Simulator: Sqrt added.
 - Designer twin run complete (Designer 2026.2, owner's laptop): stages 00, 01a, 01b all clean and identical to the simulator (recon diffs ≤ 5e-6). Designer outputs stored in tests/reconciliation/designer_twin and guarded by tests/test_designer_twin.py.
 - First Designer run (26.1, owner's laptop): stage 00 failed on `True` (not a Designer constant). Builders now use 1=1 / 1=0 and the simulator rejects True/False. Re-run: stage 00 clean (0 errors, 0 warnings, 27 files) and matches the simulator. Designer 26.1 opens the 2025.2-format workflows without conversion.

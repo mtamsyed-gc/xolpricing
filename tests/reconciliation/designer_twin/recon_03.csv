@@ -1,0 +1,9 @@
+stage,table,measure,value
+S03,units,rows_in,22020
+S03,units,amount_q,98475180.55779973
+S03,units,adj,124397459.11921422
+S03,out_large_claims,rows,544
+S03,bc_units,rows,1548
+S03,bc_units,xl_c,91254862.51268882
+S03,out_bc_by_year,xl_aa,91254862.5126888
+S03,out_bc_summary,rows,4

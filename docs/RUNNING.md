@@ -18,7 +18,9 @@
 |---|---|---|
 | 1 | `00_read_control.yxmd` | `data/output/live/stage/ctl_*.yxdb`, `checks/checks_00.csv` |
 | 2 | `01a_adapter_line.yxmd` **or** `01b_adapter_claimant.yxmd` | `stage/int_*.yxdb`, `checks/checks_01a.csv`, `checks/recon_01a.csv` |
-| … | later stages (02–10) as they are built | |
+| 3 | `02_experience.yxmd` | `stage/exp_claimants`, `stage/exp_exposure_ty`, `checks/out_completion_indicated.csv` (copy the indicated factors into the Control workbook if you accept them) |
+| 4 | `03_burning_cost.yxmd` | `results/out_bc_summary.csv`, `out_bc_by_year.csv`, `out_large_claims.csv`, `out_annualisation.csv` |
+| … | later stages (stochastic, results workbook) as they are built | |
 
 A STOP check raises an Error in the Results window and cancels the run (workflow setting *Cancel running workflow on
 error*). FLAG checks are written to the checks CSV only. Read `checks_NN.csv` after every step.

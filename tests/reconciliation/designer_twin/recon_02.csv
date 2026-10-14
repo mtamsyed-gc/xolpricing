@@ -1,0 +1,9 @@
+stage,table,measure,value
+S02,int_claims,rows_in,53915
+S02,int_claims,amount_q_in,113331762.50825079
+S02,excluded,late_paid_amount_q,0
+S02,excluded,outside_years_amount_q,14856581.950449996
+S02,exp_claimants,rows_out,22020
+S02,exp_claimants,amount_q,98475180.55780046
+S02,exp_exposure_ty,exposure_ly,34957.830136986304
+S02,exp_exposure_ty,exposure_prem,225211385.9909
