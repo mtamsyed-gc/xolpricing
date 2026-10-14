@@ -21,3 +21,7 @@
 *.md  text
 *.csv text
 *.json text
+
+# Generated synthetic data: keep out of diffs (regenerate with tools/synth/generate.py)
+data/synthetic/** -diff linguist-generated
+tests/reconciliation/synthetic_*.json -diff linguist-generated

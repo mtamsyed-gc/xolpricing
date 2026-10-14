@@ -1,0 +1,71 @@
+{
+ "seed": 20261014,
+ "valuation_date": "2025-09-30",
+ "files": {
+  "data/synthetic/claimant/claimants.csv": {
+   "rows": 549,
+   "sha256": "516608e112aa7a63e8309a275ae85eb34f07579d7a877ccc11c551510b433a7f",
+   "sum_paid_amount": 55561457.75,
+   "sum_os_amount": 3797201.57
+  },
+  "data/synthetic/claimant/claims_aggregate_monthly.csv": {
+   "rows": 1494,
+   "sha256": "ba9e884ecbd2908b35d4e8fef7dabe2fac79b1c628d25e352bcfcde94f5f87a0",
+   "sum_paid_amount": 108600281.21,
+   "sum_os_amount": 4731481.26
+  },
+  "data/synthetic/claimant/exposure_monthly.csv": {
+   "rows": 138,
+   "sha256": "014597f1fb5c3b68a4f1313443dbb72d536751cdfc7acf985559813de873107a",
+   "sum_written_premium": 225211385.97,
+   "sum_earned_premium": 203454372.02,
+   "sum_lives_inforce": 382450.56
+  },
+  "data/synthetic/claimant/run_meta.csv": {
+   "rows": 1,
+   "sha256": "af6dd7ce03d5dded82c4b472afa6bcb0b52af487f3722bceab07f4f403577bac"
+  },
+  "data/synthetic/ete/dim_life.csv": {
+   "rows": 427,
+   "sha256": "e1c887248879b889379f957e1c95c30d2ae509a40517a5e0bf875195a2ed5688"
+  },
+  "data/synthetic/ete/fact_claims.csv": {
+   "rows": 594,
+   "sha256": "b36703d7301d3f80c9a58d14cee54adbcc306b954a99ae345660cdfa63d20e37",
+   "sum_PayerShare": 937625.32
+  },
+  "data/synthetic/ete/fact_member_month.csv": {
+   "rows": 4380,
+   "sha256": "b7ba2adfdd87e278700b9ed4108bb0cddfeafa3117c56e97c8a3184912a0542b",
+   "sum_EarnedLY_Gross": 362.16
+  },
+  "data/synthetic/line/claims_lines.csv": {
+   "rows": 55370,
+   "sha256": "a35f2fcf535739d046a670bed51a7538c69eb222df673fd17871a617ee5d57b1",
+   "sum_amount": 109531147.61,
+   "amount_by_treatment_year": {
+    "2020": 6988768.03,
+    "2021": 17076726.21,
+    "2022": 19466152.45,
+    "2023": 25276911.78,
+    "2024": 23524990.91,
+    "2025": 17197598.23
+   },
+   "rows_by_status": {
+    "Paid": 52902,
+    "Rejected": 1455,
+    "Outstanding": 758,
+    "Reversed": 255
+   }
+  },
+  "data/synthetic/line/members.csv": {
+   "rows": 37588,
+   "sha256": "b48b12fbc8967eaed7f0b9ce02bb7f748e8a70d6a0b94e43cb45e15dc3d1ec07",
+   "sum_written_premium": 217899665.34
+  },
+  "data/synthetic/line/run_meta.csv": {
+   "rows": 1,
+   "sha256": "64f269cf4cc1e2b79c483850ee5fc6e13bc5a784beba734fe678c86774c467c8"
+  }
+ }
+}

@@ -1,0 +1,2 @@
+valuation_date,listing_threshold,currency_basis,data_source_note
+2025-09-30,0,ORIGINAL,"Synthetic portfolio, tools/synth/generate.py"

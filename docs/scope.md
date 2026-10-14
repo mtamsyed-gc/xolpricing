@@ -252,8 +252,8 @@ When reinstatements are paid:
 | D5 | Default weights | **Agreed:** own table by years available (2–5) |
 | D6 | Stochastic engine | **Agreed:** Python tool with a native fallback |
 | D7 | Excel ↔ Alteryx handshake | **Agreed:** Control workbook (.xlsx) → Alteryx → Results workbook (.xlsx), no VBA unless needed |
-| D8 | Risk load | **Agreed (to confirm):** optional k × σ, default k = 0 |
-| D9 | Reinstatements | **Agreed (to confirm):** all options — number, free/paid, % cost, pro rata as to amount and/or time |
+| D8 | Risk load | **Agreed:** optional k × σ, default k = 0 |
+| D9 | Reinstatements | **Agreed:** all options — number, free/paid, % cost, pro rata as to amount and/or time |
 
 ## 13. Environment checks (GC machine)
 - [ ] Alteryx Designer version

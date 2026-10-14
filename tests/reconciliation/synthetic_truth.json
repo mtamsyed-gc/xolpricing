@@ -1,0 +1,682 @@
+{
+ "parameters": {
+  "valuation_date": "2025-09-30",
+  "first_cohort_year": 2020,
+  "last_cohort_start": "2025-12-01",
+  "n_schemes_initial": 150,
+  "new_schemes_per_year": 18,
+  "scheme_lapse_rate": 0.08,
+  "scheme_size_median": 22.0,
+  "scheme_size_sigma": 1.0,
+  "member_retention": 0.85,
+  "joiner_rate": 0.1,
+  "leaver_rate": 0.08,
+  "usd_schemes": 8,
+  "usd_per_aed": 0.27229407760381213,
+  "base_premium_2021": [
+   [
+    "A",
+    9000.0
+   ],
+   [
+    "B",
+    5500.0
+   ],
+   [
+    "C",
+    2800.0
+   ]
+  ],
+  "premium_trend": 0.07,
+  "annual_limit": [
+   [
+    "A",
+    1000000.0
+   ],
+   [
+    "B",
+    500000.0
+   ],
+   [
+    "C",
+    150000.0
+   ]
+  ],
+  "plan_mix": [
+   [
+    "A",
+    0.2
+   ],
+   [
+    "B",
+    0.5
+   ],
+   [
+    "C",
+    0.3
+   ]
+  ],
+  "plan_cost_factor": [
+   [
+    "A",
+    1.4
+   ],
+   [
+    "B",
+    1.0
+   ],
+   [
+    "C",
+    0.6
+   ]
+  ],
+  "claims_trend": 0.08,
+  "attr_lines_per_ly": 1.6,
+  "attr_mean_2021": 900.0,
+  "attr_cv": 1.5,
+  "large_freq_per_ly": 0.02,
+  "large_xm_2021": 40000.0,
+  "large_alpha": 1.6,
+  "attr_report_lag_mean": 25.0,
+  "large_report_lag_mean": 70.0,
+  "attr_pay_lag_mean": 20.0,
+  "large_pay_lag_mean": 90.0,
+  "large_case_reserve_factor": 0.85,
+  "rejected_share": 0.03,
+  "reversal_share": 0.005
+ },
+ "reference_layers_aed": {
+  "L100xs": {
+   "ap": 100000.0,
+   "limit": 400000.0
+  },
+  "L250xs": {
+   "ap": 250000.0,
+   "limit": 750000.0
+  }
+ },
+ "per_person": {
+  "RA": {
+   "ultimate_all_cohorts": {
+    "2020": {
+     "total": 14856581.98,
+     "n_gt_50000": 68,
+     "n_gt_100000": 20,
+     "n_gt_250000": 2,
+     "n_gt_500000": 0,
+     "L100xs_amount": 1248454.46,
+     "L100xs_count": 20,
+     "L250xs_amount": 149426.1,
+     "L250xs_count": 2
+    },
+    "2021": {
+     "total": 18641465.47,
+     "n_gt_50000": 82,
+     "n_gt_100000": 29,
+     "n_gt_250000": 5,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2774406.72,
+     "L100xs_count": 29,
+     "L250xs_amount": 825505.68,
+     "L250xs_count": 5
+    },
+    "2022": {
+     "total": 23332759.02,
+     "n_gt_50000": 126,
+     "n_gt_100000": 37,
+     "n_gt_250000": 8,
+     "n_gt_500000": 1,
+     "L100xs_amount": 3294588.42,
+     "L100xs_count": 37,
+     "L250xs_amount": 1316873.32,
+     "L250xs_count": 8
+    },
+    "2023": {
+     "total": 25135395.79,
+     "n_gt_50000": 135,
+     "n_gt_100000": 44,
+     "n_gt_250000": 8,
+     "n_gt_500000": 0,
+     "L100xs_amount": 3601280.31,
+     "L100xs_count": 44,
+     "L250xs_amount": 738416.79,
+     "L250xs_count": 8
+    },
+    "2024": {
+     "total": 28137133.09,
+     "n_gt_50000": 122,
+     "n_gt_100000": 40,
+     "n_gt_250000": 7,
+     "n_gt_500000": 4,
+     "L100xs_amount": 4221783.05,
+     "L100xs_count": 40,
+     "L250xs_amount": 2588348.21,
+     "L250xs_count": 7
+    },
+    "2025": {
+     "total": 30307763.77,
+     "n_gt_50000": 137,
+     "n_gt_100000": 60,
+     "n_gt_250000": 12,
+     "n_gt_500000": 2,
+     "L100xs_amount": 5285983.17,
+     "L100xs_count": 60,
+     "L250xs_amount": 1557082.21,
+     "L250xs_count": 12
+    }
+   },
+   "written_cohorts_ultimate": {
+    "2020": {
+     "total": 14856581.98,
+     "n_gt_50000": 68,
+     "n_gt_100000": 20,
+     "n_gt_250000": 2,
+     "n_gt_500000": 0,
+     "L100xs_amount": 1248454.46,
+     "L100xs_count": 20,
+     "L250xs_amount": 149426.1,
+     "L250xs_count": 2
+    },
+    "2021": {
+     "total": 18641465.47,
+     "n_gt_50000": 82,
+     "n_gt_100000": 29,
+     "n_gt_250000": 5,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2774406.72,
+     "L100xs_count": 29,
+     "L250xs_amount": 825505.68,
+     "L250xs_count": 5
+    },
+    "2022": {
+     "total": 23332759.02,
+     "n_gt_50000": 126,
+     "n_gt_100000": 37,
+     "n_gt_250000": 8,
+     "n_gt_500000": 1,
+     "L100xs_amount": 3294588.42,
+     "L100xs_count": 37,
+     "L250xs_amount": 1316873.32,
+     "L250xs_count": 8
+    },
+    "2023": {
+     "total": 25135395.79,
+     "n_gt_50000": 135,
+     "n_gt_100000": 44,
+     "n_gt_250000": 8,
+     "n_gt_500000": 0,
+     "L100xs_amount": 3601280.31,
+     "L100xs_count": 44,
+     "L250xs_amount": 738416.79,
+     "L250xs_count": 8
+    },
+    "2024": {
+     "total": 28137133.09,
+     "n_gt_50000": 122,
+     "n_gt_100000": 40,
+     "n_gt_250000": 7,
+     "n_gt_500000": 4,
+     "L100xs_amount": 4221783.05,
+     "L100xs_count": 40,
+     "L250xs_amount": 2588348.21,
+     "L250xs_count": 7
+    },
+    "2025": {
+     "total": 23020962.15,
+     "n_gt_50000": 106,
+     "n_gt_100000": 48,
+     "n_gt_250000": 10,
+     "n_gt_500000": 1,
+     "L100xs_amount": 4439021.31,
+     "L100xs_count": 48,
+     "L250xs_amount": 1169751.22,
+     "L250xs_count": 10
+    }
+   },
+   "earned_ultimate": {
+    "2020": {
+     "total": 14856581.98,
+     "n_gt_50000": 68,
+     "n_gt_100000": 20,
+     "n_gt_250000": 2,
+     "n_gt_500000": 0,
+     "L100xs_amount": 1248454.46,
+     "L100xs_count": 20,
+     "L250xs_amount": 149426.1,
+     "L250xs_count": 2
+    },
+    "2021": {
+     "total": 18641465.47,
+     "n_gt_50000": 82,
+     "n_gt_100000": 29,
+     "n_gt_250000": 5,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2774406.72,
+     "L100xs_count": 29,
+     "L250xs_amount": 825505.68,
+     "L250xs_count": 5
+    },
+    "2022": {
+     "total": 23332759.02,
+     "n_gt_50000": 126,
+     "n_gt_100000": 37,
+     "n_gt_250000": 8,
+     "n_gt_500000": 1,
+     "L100xs_amount": 3294588.42,
+     "L100xs_count": 37,
+     "L250xs_amount": 1316873.32,
+     "L250xs_count": 8
+    },
+    "2023": {
+     "total": 25135395.79,
+     "n_gt_50000": 135,
+     "n_gt_100000": 44,
+     "n_gt_250000": 8,
+     "n_gt_500000": 0,
+     "L100xs_amount": 3601280.31,
+     "L100xs_count": 44,
+     "L250xs_amount": 738416.79,
+     "L250xs_count": 8
+    },
+    "2024": {
+     "total": 27138622.54,
+     "n_gt_50000": 120,
+     "n_gt_100000": 39,
+     "n_gt_250000": 6,
+     "n_gt_500000": 3,
+     "L100xs_amount": 3817810.33,
+     "L100xs_count": 39,
+     "L250xs_amount": 2167489.52,
+     "L250xs_count": 6
+    },
+    "2025": {
+     "total": 10119754.05,
+     "n_gt_50000": 46,
+     "n_gt_100000": 19,
+     "n_gt_250000": 5,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2256032.4,
+     "L100xs_count": 19,
+     "L250xs_amount": 877764.9,
+     "L250xs_count": 5
+    }
+   },
+   "reported_at_valuation_true_amount": {
+    "2020": {
+     "total": 14856581.98,
+     "n_gt_50000": 68,
+     "n_gt_100000": 20,
+     "n_gt_250000": 2,
+     "n_gt_500000": 0,
+     "L100xs_amount": 1248454.46,
+     "L100xs_count": 20,
+     "L250xs_amount": 149426.1,
+     "L250xs_count": 2
+    },
+    "2021": {
+     "total": 18641465.47,
+     "n_gt_50000": 82,
+     "n_gt_100000": 29,
+     "n_gt_250000": 5,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2774406.72,
+     "L100xs_count": 29,
+     "L250xs_amount": 825505.68,
+     "L250xs_count": 5
+    },
+    "2022": {
+     "total": 23332759.02,
+     "n_gt_50000": 126,
+     "n_gt_100000": 37,
+     "n_gt_250000": 8,
+     "n_gt_500000": 1,
+     "L100xs_amount": 3294588.42,
+     "L100xs_count": 37,
+     "L250xs_amount": 1316873.32,
+     "L250xs_count": 8
+    },
+    "2023": {
+     "total": 25135395.79,
+     "n_gt_50000": 135,
+     "n_gt_100000": 44,
+     "n_gt_250000": 8,
+     "n_gt_500000": 0,
+     "L100xs_amount": 3601280.31,
+     "L100xs_count": 44,
+     "L250xs_amount": 738416.79,
+     "L250xs_count": 8
+    },
+    "2024": {
+     "total": 25236135.98,
+     "n_gt_50000": 108,
+     "n_gt_100000": 33,
+     "n_gt_250000": 5,
+     "n_gt_500000": 3,
+     "L100xs_amount": 3002618.62,
+     "L100xs_count": 33,
+     "L250xs_amount": 2076581.66,
+     "L250xs_count": 5
+    },
+    "2025": {
+     "total": 6849542.81,
+     "n_gt_50000": 32,
+     "n_gt_100000": 12,
+     "n_gt_250000": 2,
+     "n_gt_500000": 0,
+     "L100xs_amount": 839601.25,
+     "L100xs_count": 12,
+     "L250xs_amount": 139162.54,
+     "L250xs_count": 2
+    }
+   }
+  },
+  "LO": {
+   "ultimate_all_cohorts": {
+    "2020": {
+     "total": 7190463.74,
+     "n_gt_50000": 25,
+     "n_gt_100000": 6,
+     "n_gt_250000": 2,
+     "n_gt_500000": 0,
+     "L100xs_amount": 627113.67,
+     "L100xs_count": 6,
+     "L250xs_amount": 148311.55,
+     "L250xs_count": 2
+    },
+    "2021": {
+     "total": 17899428.01,
+     "n_gt_50000": 84,
+     "n_gt_100000": 28,
+     "n_gt_250000": 3,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2332241.64,
+     "L100xs_count": 28,
+     "L250xs_amount": 499662.95,
+     "L250xs_count": 3
+    },
+    "2022": {
+     "total": 20072683.12,
+     "n_gt_50000": 97,
+     "n_gt_100000": 28,
+     "n_gt_250000": 4,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2310884.63,
+     "L100xs_count": 28,
+     "L250xs_amount": 1146186.95,
+     "L250xs_count": 4
+    },
+    "2023": {
+     "total": 25797894.8,
+     "n_gt_50000": 147,
+     "n_gt_100000": 50,
+     "n_gt_250000": 8,
+     "n_gt_500000": 0,
+     "L100xs_amount": 3962674.09,
+     "L100xs_count": 50,
+     "L250xs_amount": 838445.11,
+     "L250xs_count": 8
+    },
+    "2024": {
+     "total": 24735588.66,
+     "n_gt_50000": 110,
+     "n_gt_100000": 34,
+     "n_gt_250000": 6,
+     "n_gt_500000": 3,
+     "L100xs_amount": 3012605.61,
+     "L100xs_count": 34,
+     "L250xs_amount": 1377797.95,
+     "L250xs_count": 6
+    },
+    "2025": {
+     "total": 31344000.77,
+     "n_gt_50000": 143,
+     "n_gt_100000": 58,
+     "n_gt_250000": 11,
+     "n_gt_500000": 3,
+     "L100xs_amount": 5685434.98,
+     "L100xs_count": 58,
+     "L250xs_amount": 2384191.72,
+     "L250xs_count": 11
+    },
+    "2026": {
+     "total": 13371040.02,
+     "n_gt_50000": 54,
+     "n_gt_100000": 25,
+     "n_gt_250000": 5,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2189124.58,
+     "L100xs_count": 25,
+     "L250xs_amount": 653578.59,
+     "L250xs_count": 5
+    }
+   },
+   "written_cohorts_ultimate": {
+    "2020": {
+     "total": 7190463.74,
+     "n_gt_50000": 25,
+     "n_gt_100000": 6,
+     "n_gt_250000": 2,
+     "n_gt_500000": 0,
+     "L100xs_amount": 627113.67,
+     "L100xs_count": 6,
+     "L250xs_amount": 148311.55,
+     "L250xs_count": 2
+    },
+    "2021": {
+     "total": 17899428.01,
+     "n_gt_50000": 84,
+     "n_gt_100000": 28,
+     "n_gt_250000": 3,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2332241.64,
+     "L100xs_count": 28,
+     "L250xs_amount": 499662.95,
+     "L250xs_count": 3
+    },
+    "2022": {
+     "total": 20072683.12,
+     "n_gt_50000": 97,
+     "n_gt_100000": 28,
+     "n_gt_250000": 4,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2310884.63,
+     "L100xs_count": 28,
+     "L250xs_amount": 1146186.95,
+     "L250xs_count": 4
+    },
+    "2023": {
+     "total": 25797894.8,
+     "n_gt_50000": 147,
+     "n_gt_100000": 50,
+     "n_gt_250000": 8,
+     "n_gt_500000": 0,
+     "L100xs_amount": 3962674.09,
+     "L100xs_count": 50,
+     "L250xs_amount": 838445.11,
+     "L250xs_count": 8
+    },
+    "2024": {
+     "total": 24735588.66,
+     "n_gt_50000": 110,
+     "n_gt_100000": 34,
+     "n_gt_250000": 6,
+     "n_gt_500000": 3,
+     "L100xs_amount": 3012605.61,
+     "L100xs_count": 34,
+     "L250xs_amount": 1377797.95,
+     "L250xs_count": 6
+    },
+    "2025": {
+     "total": 30363342.21,
+     "n_gt_50000": 140,
+     "n_gt_100000": 57,
+     "n_gt_250000": 11,
+     "n_gt_500000": 3,
+     "L100xs_amount": 5634958.2,
+     "L100xs_count": 57,
+     "L250xs_amount": 2384191.72,
+     "L250xs_count": 11
+    },
+    "2026": {
+     "total": 7064896.97,
+     "n_gt_50000": 26,
+     "n_gt_100000": 14,
+     "n_gt_250000": 3,
+     "n_gt_500000": 0,
+     "L100xs_amount": 1398118.26,
+     "L100xs_count": 14,
+     "L250xs_amount": 266247.6,
+     "L250xs_count": 3
+    }
+   },
+   "earned_ultimate": {
+    "2020": {
+     "total": 7190463.74,
+     "n_gt_50000": 25,
+     "n_gt_100000": 6,
+     "n_gt_250000": 2,
+     "n_gt_500000": 0,
+     "L100xs_amount": 627113.67,
+     "L100xs_count": 6,
+     "L250xs_amount": 148311.55,
+     "L250xs_count": 2
+    },
+    "2021": {
+     "total": 17899428.01,
+     "n_gt_50000": 84,
+     "n_gt_100000": 28,
+     "n_gt_250000": 3,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2332241.64,
+     "L100xs_count": 28,
+     "L250xs_amount": 499662.95,
+     "L250xs_count": 3
+    },
+    "2022": {
+     "total": 20072683.12,
+     "n_gt_50000": 97,
+     "n_gt_100000": 28,
+     "n_gt_250000": 4,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2310884.63,
+     "L100xs_count": 28,
+     "L250xs_amount": 1146186.95,
+     "L250xs_count": 4
+    },
+    "2023": {
+     "total": 25797894.8,
+     "n_gt_50000": 147,
+     "n_gt_100000": 50,
+     "n_gt_250000": 8,
+     "n_gt_500000": 0,
+     "L100xs_amount": 3962674.09,
+     "L100xs_count": 50,
+     "L250xs_amount": 838445.11,
+     "L250xs_count": 8
+    },
+    "2024": {
+     "total": 24735588.66,
+     "n_gt_50000": 110,
+     "n_gt_100000": 34,
+     "n_gt_250000": 6,
+     "n_gt_500000": 3,
+     "L100xs_amount": 3012605.61,
+     "L100xs_count": 34,
+     "L250xs_amount": 1377797.95,
+     "L250xs_count": 6
+    },
+    "2025": {
+     "total": 23528520.52,
+     "n_gt_50000": 106,
+     "n_gt_100000": 42,
+     "n_gt_250000": 8,
+     "n_gt_500000": 2,
+     "L100xs_amount": 4470979.48,
+     "L100xs_count": 42,
+     "L250xs_amount": 1943504.3,
+     "L250xs_count": 8
+    }
+   },
+   "reported_at_valuation_true_amount": {
+    "2020": {
+     "total": 7190463.74,
+     "n_gt_50000": 25,
+     "n_gt_100000": 6,
+     "n_gt_250000": 2,
+     "n_gt_500000": 0,
+     "L100xs_amount": 627113.67,
+     "L100xs_count": 6,
+     "L250xs_amount": 148311.55,
+     "L250xs_count": 2
+    },
+    "2021": {
+     "total": 17899428.01,
+     "n_gt_50000": 84,
+     "n_gt_100000": 28,
+     "n_gt_250000": 3,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2332241.64,
+     "L100xs_count": 28,
+     "L250xs_amount": 499662.95,
+     "L250xs_count": 3
+    },
+    "2022": {
+     "total": 20072683.12,
+     "n_gt_50000": 97,
+     "n_gt_100000": 28,
+     "n_gt_250000": 4,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2310884.63,
+     "L100xs_count": 28,
+     "L250xs_amount": 1146186.95,
+     "L250xs_count": 4
+    },
+    "2023": {
+     "total": 25797894.8,
+     "n_gt_50000": 147,
+     "n_gt_100000": 50,
+     "n_gt_250000": 8,
+     "n_gt_500000": 0,
+     "L100xs_amount": 3962674.09,
+     "L100xs_count": 50,
+     "L250xs_amount": 838445.11,
+     "L250xs_count": 8
+    },
+    "2024": {
+     "total": 24729073.54,
+     "n_gt_50000": 110,
+     "n_gt_100000": 34,
+     "n_gt_250000": 6,
+     "n_gt_500000": 3,
+     "L100xs_amount": 3009775.36,
+     "L100xs_count": 34,
+     "L250xs_amount": 1377797.95,
+     "L250xs_count": 6
+    },
+    "2025": {
+     "total": 18362337.84,
+     "n_gt_50000": 80,
+     "n_gt_100000": 29,
+     "n_gt_250000": 4,
+     "n_gt_500000": 1,
+     "L100xs_amount": 2242950.09,
+     "L100xs_count": 29,
+     "L250xs_amount": 1123374.37,
+     "L250xs_count": 4
+    }
+   }
+  }
+ },
+ "notes": [
+  "ultimate_all_cohorts - written_cohorts_ultimate = unwritten component (RA cohorts starting after valuation).",
+  "written_cohorts_ultimate - earned_ultimate = unearned component (treatment after valuation on written policies).",
+  "earned_ultimate - reported_at_valuation = IBNR on earned exposure (unreported lines).",
+  "Observed data additionally under-reserves OS large lines by large_case_reserve_factor (IBNER).",
+  "Amounts in AED at the generator's fixed USD rate, after benefit limits, before any treaty terms."
+ ],
+ "events": {
+  "EV2022-01": "supplied event_id, fire, 4 lives",
+  "EV2023-01": "supplied event_id, RTA, 7 lives",
+  "unlabelled_2024-08-02": "no event_id, food poisoning, 18 lives same scheme/site (cause_code EVT-FOOD)"
+ }
+}
