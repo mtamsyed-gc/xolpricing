@@ -130,8 +130,8 @@ Each stage writes control totals, and the next stage reconciles to them. An unex
 | Stage | Workflow | Logic |
 |---|---|---|
 | 00 | `00_read_control` | Read the Control workbook, validate parameters (types, ranges, weights summing to 100%, factor ≥ 1 warnings), explode scenarios |
-| 01 | `01a_adapter_standalone` / `01b_adapter_ete` | Map to the internal schema; record row and amount totals |
-| 02 | `02_standardise` | FX as-if (convert back to original currency, then at the priced rate); benefit sub-limits; QS retention if QS operates first |
+| 01 | `01a_adapter_line` / `01b_adapter_claimant` / `01c_adapter_ete` | Map to the internal schema; FX as-if at the priced rate; member matching; exposure fan-out; record row and amount totals |
+| 02 | `02_standardise` | Benefit sub-limits; QS retention if QS operates first |
 | 03 | `03_exposure` | Life-years and premium by treaty year on the RA/LO basis; indicated unearned and unwritten factors |
 | 04 | `04_accumulate` | Per-person: claimant × accumulation period. Per-event: group claims into events (ID or clustering rule). Stop loss: portfolio × treaty year, split into attritional/large |
 | 05 | `05_adjust` | × cumulative FGU trend to the quote year; × pre-AP completion; cap at policy limit; incidence adjustment; outlier flag on the adjusted amount |
@@ -195,14 +195,48 @@ When reinstatements are paid:
 
 ## 8. Cedant impact (C)
 
+The client-facing format follows the Hollard accumulation deliverable (sheets "Reinsurance Structures" and "Cedant Impact").
+
+**Exhibit C1 — RI structures & options**
+
+One row per option, grouped by cover type. Stop loss rows are labelled in both forms, e.g. "10% xs 100% ($1.0m xs $10.0m)".
+
+| Column | Definition |
+|---|---|
+| Option | XoL 1…n, SL 1…n, EV 1…n |
+| Cover | AP / limit label. A per-person limit may run "to the benefit limit" (e.g. $2,925k xs $75k, where the maximum benefit is $3m) |
+| Exposed lives | Per-person: lives whose annual benefit limit exceeds the AP (time-weighted, quote-year projection). Stop loss and per-event: all lives |
+| Annual premium | Indicative RI premium (§7), plus expected reinstatement premium where applicable |
+| Premium per exposed life p.a. | Annual premium ÷ exposed lives |
+| Premium per reference lives | Annual premium ÷ reference portfolio lives (input, e.g. 20,000). Stop loss is also shown as % of the net claims budget |
+| Expected recoveries p.a. | Simulation mean, credibility-blended (§7.1) |
+| Expected cost of cover | Annual premium − expected recoveries |
+| Recoveries exceed premium | "1 in N yrs", where N = 1 / P(recoveries > premium), from the recovery quantile table |
+
+**Exhibit C2 — Surplus / (loss) against the net claims budget, by scenario**
+
+- **Columns:** average year, then each return period (input list; default 1 in 5, 1 in 50, 1 in 250).
+- **Rows:**
+  - Without RI: net claims before RI, and budget − net claims.
+  - One row per option under each cover type.
+- **Per iteration:** surplus = budget − (gross claims − recoveries + RI premium).
+- **Return-period value:** the 1/N lower quantile of the iteration surplus. It is computed on the joint simulated outcome, never as budget minus separate percentiles.
+- Because the premium is deterministic, Excel derives C2 live from the quantiles of (gross − recoveries) that Alteryx writes out.
+
+**Supporting exhibits**
+
 | Metric | Source |
 |---|---|
-| Expected recoveries vs total RI cost (upfront + expected reinstatement premium); expected net cost of reinsurance, absolute and % of EPI | §7 and the simulation mean |
-| Recovery distribution: P50 / P75 / P90 / P95 / P99; probability that recoveries ≥ RI cost | Alteryx quantile table (Excel lookups, so it stays live when loadings change) |
+| Recovery distribution: P50 / P75 / P90 / P95 / P99 | Alteryx quantile table |
 | Historical as-if: by year, recoveries under the proposed structure vs the as-if premium for that year's exposure; cumulative position | Stage 07 output |
-| Retained claims gross vs net of the full programme: mean and P90 / P95 / P99 of the annual loss ratio | Simulation (descriptive volatility only; no capital) |
-| Option comparison grid: A / B / C metrics side by side across covers and options, including combined programmes | All of the above |
+| Retained loss ratio gross vs net of the full programme, at the same return periods | Simulation (descriptive volatility only; no capital) |
 | QS interaction: cedant net position under different orders of application | Order parameter |
+
+**Inputs** (Control workbook):
+- net claims budget (default = best-estimate gross claims for the quote year)
+- reference portfolio lives
+- return-period list
+- stop loss attachment and limit basis: % of net claims budget, % of EPI, or amount
 
 ## 9. Workshop framework → broker treatment
 

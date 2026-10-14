@@ -8,8 +8,9 @@ loadings, and (C) cedant impact — recoveries vs premium and retained-claims vo
 **Excel** holds the inputs (Control workbook) and the loadings, cedant-impact exhibits and charts
 (Results workbook).
 
-> Status: scope v0.2 agreed; data contracts v0.1 and synthetic data in place — see
-> [`docs/scope.md`](docs/scope.md) and [`docs/data-contracts.md`](docs/data-contracts.md).
+> Status: phase 1 in progress — stages 00 (Control) and 01 (standalone adapters) built and tested.
+> How to run: [`docs/RUNNING.md`](docs/RUNNING.md). Design: [`docs/scope.md`](docs/scope.md),
+> [`docs/data-contracts.md`](docs/data-contracts.md).
 
 ## Synthetic data
 
@@ -24,7 +25,8 @@ unearned / unwritten, so completion and trend logic can be tested against known 
 
 ```
 alteryx/
-  workflows/      .yxmd  data-prep workflows (one per stage, numbered)
+  workflows/      .yxmd  generated workflows, one per stage (LIVE: data/input -> data/output/live)
+    synth/        same workflows wired to data/synthetic (SYNTH variant)
   macros/         .yxmc  reusable macros (e.g. trending, capping, layer loss split)
   apps/           .yxwz  analytic apps, if a user-facing front end is needed
 excel/
@@ -35,10 +37,14 @@ data/
   synthetic/      synthetic portfolio in every input mode: line/, claimant/, ete/ (committed)
   input/          real run inputs (git-ignored, never committed)
   output/         run outputs (git-ignored)
-docs/             scope.md, data-contracts.md, CHANGELOG.md
+docs/             scope.md, data-contracts.md, RUNNING.md, CHANGELOG.md
+tools/alteryx/    workflow builders (build_all.py), xmlkit + strict simulator (vendored from ete-dashboard)
+tools/excel/      Control workbook spec and builder
 tools/synth/      synthetic data generator (seeded, reproducible)
 tests/
+  run_all.py              every test + structural check of the generated workflows
   validate_synthetic.py   reference implementation of the stage-01 adapter checks
+  test_stage00.py / test_stage01.py   simulator runs vs pandas oracle, incl. broken-input cases
   reconciliation/         synthetic_controls.json (observed totals), synthetic_truth.json (ultimates)
 ```
 
@@ -47,8 +53,10 @@ tests/
 - **Synthetic data only in git.** No cedant data, TPA headers or client names are committed.
 - **Relative paths in Alteryx.** Before committing a workflow, use *Options → Advanced Options →
   Workflow Dependencies → All Relative* so it runs from any clone location.
-- **Workbook code lives in `excel/vba/` as well as in the workbook.** Export modules after every
-  change so VBA changes are reviewable in diffs (`.xlsm` itself is binary).
+- **Workflows are generated, not hand-edited.** Change the builder, run `tools/alteryx/build_all.py`, then
+  `tests/run_all.py`. Only Designer tools whose XML is taken from the team's 2025.2 workflows are used.
+- **Workbook code lives in `excel/vba/` as well as in the workbook** (if VBA is ever needed). Export modules after
+  every change so VBA changes are reviewable in diffs.
 - **Numbered stages.** Workflows are named `NN_stage_name.yxmd` (e.g. `01_load_claims.yxmd`) and
   each stage writes a control total that the next stage reconciles to.
 - **Commit messages** state what changed and why; methodology changes also get an entry in

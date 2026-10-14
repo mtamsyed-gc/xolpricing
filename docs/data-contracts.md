@@ -1,6 +1,6 @@
 # Data contracts
 
-Version 0.1 · 2026-10-14 · companion to [`scope.md`](scope.md)
+Version 0.2 · 2026-10-14 · companion to [`scope.md`](scope.md)
 
 This document defines:
 - §2: the input templates (standalone mode) and the ETE mapping (extension mode)
@@ -14,7 +14,7 @@ This document defines:
 |---|---|
 | File format | CSV UTF-8 with one header row, or .xlsx (first sheet / named range). ETE inputs may be Parquet |
 | Dates | ISO `yyyy-mm-dd`; months as the first day of the month |
-| Amounts | Original transaction currency, signed as booked (reversals negative). FX as-if happens in stage 02, never in the source |
+| Amounts | Original transaction currency, signed as booked (reversals negative). The stage-01 adapter adds quote-currency amounts at the priced FX rate (`ctl_fx`): claims keep both; exposure premium and the claims aggregate are in quote currency because they sum across members |
 | Keys | Text, trimmed, upper-cased by the adapter. Composite keys use `\|` |
 | Nulls | Empty cell. Never `0` for unknown |
 | Names | Internal columns are `snake_case`. Template columns use the same names, so the standalone adapter only types and validates |
@@ -152,8 +152,9 @@ Every adapter writes exactly these tables, and everything downstream reads only 
 | cohort_month | date | Month of policy_start (RA allocation) |
 | treatment_date, reported_date, paid_date | date | |
 | admission_date, discharge_date | date | |
-| amount_paid, amount_os | number | Original currency |
-| currency | text | |
+| amount_paid, amount_os | number | Original currency (Paid and Reversed lines → paid; Outstanding → os; Rejected lines excluded) |
+| amount_paid_q, amount_os_q | number | Quote currency at the priced rate |
+| currency, fx_rate | text / number | Transaction currency and the priced rate applied |
 | status | text | Mapped class |
 | annual_limit | number | From the claim, the member, or the plan lookup |
 | segment, site, event_id, cause_code | text | |
@@ -167,12 +168,12 @@ Every adapter writes exactly these tables, and everything downstream reads only 
 | Column | Type | Notes |
 |---|---|---|
 | segment | text | |
-| cohort_month | date | Policy inception month (RA). C mode: from `lives_new`, with each cohort earned uniformly over 12 months |
+| cohort_month | date | Policy inception month (RA). C mode: equal to exposure_month (exposure not split by cohort; `exposure_by_cohort` = false; stage 03 spreads written lives over 12 months for the RA view) |
 | exposure_month | date | |
 | earned_ly | number | Life-years earned in the month |
 | written_ly | number | Booked at the cohort month (RA) |
-| earned_premium, written_premium | number | |
-| lives_inforce | number | |
+| earned_premium, written_premium | number | Quote currency |
+| lives_inforce | number | Month-average in-force lives |
 
 **`int_claims_aggregate`** — grain: segment × cohort_month × incurred_month: `amount_paid`, `amount_os`, `claim_count`. In L and E modes it is built from `int_claims`; in C mode it comes from the monthly file.
 
@@ -204,7 +205,7 @@ Every input block is an **Excel Table** (or a named range) with a fixed name, wh
 | `tbl_trend` | Year | year, client_pct, market_pct, inflation_pct, residual_pct, weight_client, weight_market, weight_inflation, one_off_adj, large_claim_trend_pct (O), premium_trend_pct |
 | `tbl_completion` | Year × component × side × ap_band | year, component (`IBNR` / `UNEARNED` / `UNWRITTEN`), side (`PRE_AP` / `POST_AP_AMOUNT` / `POST_AP_COUNT`), ap_band_from (default 0), selected_factor, indicated_factor (written back by Alteryx, read-only), justification |
 | `tbl_weights` | Year | year, months_complete, use_default (1/0), custom_weight, justification |
-| `tbl_layers` | Cover × option × layer | cover (`PP` / `EV` / `SL`), option_id (1–4), layer (1/2), ap, limit, aal, aad, co_participation_pct, reinstatements_n (blank = unlimited), reinstatement_cost_pct, reinst_pro_rata_time (1/0), sl_basis (`GROSS` / `NET_OF_XOL`), sl_ap_pct_epi, sl_limit_pct_epi, active |
+| `tbl_layers` | Cover × option × layer | cover (`PP` / `EV` / `SL`), option_id (1–4), layer (1/2), label (O), limit_basis (`AMOUNT` / `TO_BENEFIT_LIMIT`), ap, limit, aal, aad, co_participation_pct, reinstatements_n (blank = unlimited), reinstatement_cost_pct, reinst_pro_rata_time (1/0), sl_claims_basis (`GROSS` / `NET_OF_XOL`), sl_measure (`PCT_BUDGET` / `PCT_EPI` / `AMOUNT`), sl_ap, sl_limit, active |
 | `tbl_programme` | Order | step, cover (`QS` / `PP` / `EV` / `SL`), active |
 | `tbl_event_rule` | Scalar set | id_source (`SUPPLIED` / `CLUSTER`), window_days, group_key (`SCHEME` / `SITE` / `CAUSE` combinations), min_lives |
 | `tbl_ev_scenarios` | Scenario | scenario_name, lives, cost_per_life, return_period_yrs, site |
@@ -226,6 +227,7 @@ Every input block is an **Excel Table** (or a named range) with a fixed name, wh
 | Incidence | incidence_adj | 1.00 |
 | QS | qs_cedant_retention_pct | 100% |
 | Stochastic | iterations, seed, fit_cutoff (blank = AP), fit_candidates, fit_years, freq_model (POISSON/NEGBIN), sl_attritional_threshold, sl_cov_floor | 10000, 12345 |
+| Cedant impact | net_claims_budget (blank = best-estimate gross claims), reference_lives, return_periods (comma list), currency_display (QUOTE/USD) | 20000; "5,50,250" |
 
 ## 5. Results workbook (`excel/templates/XoL_Results.xlsx`)
 
@@ -246,6 +248,9 @@ Alteryx overwrites the `out_*` data sheets in full each run. Presentation sheets
 | `out_sim_quantiles` | Scenario × cover × option × measure × q | q = 0.001 … 0.999 for recoveries, reinstatement premium, retained claims, retained LR (Excel lookups for cedant impact) |
 | `out_asif_by_year` | Scenario × cover × option × year | As-if recoveries vs as-if premium, cumulative |
 | `out_ev_scenarios` | Scenario | Deterministic per-event losses by option |
+| `out_exposed_lives` | Cover × option | Exposed lives for the quote year (per-person: lives with annual limit > AP), reference lives |
+
+Presentation sheets: **Reinsurance Structures** (Exhibit C1) and **Cedant Impact** (Exhibit C2), laid out as in scope §8. They are formula-driven from `out_sim_summary`, `out_sim_quantiles`, `out_exposed_lives` and the loadings, so a loading change updates both without a re-run.
 
 ## 6. Validation at the adapters (stage 01)
 
@@ -261,3 +266,13 @@ Alteryx overwrites the `out_*` data sheets in full each run. Presentation sheets
 | A08 | C mode: listing complete above `listing_threshold` (Σ listing ≤ Σ aggregate by year) | STOP if exceeded |
 | A09 | Exposure: lives_new summed over 12 months vs average lives_inforce, within 0.6–1.4 | FLAG |
 | A10 | ETE mode: payer totals in `fact_claims` reconcile to the ETE recon ledger | FLAG |
+| A11 | Claim status value not mapped (Paid / Outstanding / Rejected / Reversed, with common synonyms) | STOP |
+| A12 | Required date or amount blank or not ISO (row excluded) | STOP |
+| A13 | Claims whose member has no member record (excluded; listed by member) | FLAG |
+
+Matching (line mode): tier 1 on member_id + policy_id; tier 2 on member_id with treatment inside the cover period
+(latest cover wins). Each adapter also writes `recon_01a.csv` / `recon_01b.csv`: rows in, rejected, unmatched, out,
+and amount and exposure totals, so stage 02 can reconcile to it.
+
+Missing columns: every input is unioned with an empty template of all contract columns, so an absent optional column
+arrives as Null and an absent required column raises A01 with a readable message instead of a tool error.
