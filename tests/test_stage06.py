@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools/alteryx"))
 sys.path.insert(0, str(ROOT / "tests"))
 import xol_common as C  # noqa: E402
-import build_stage00, build_stage01, build_stage02, build_stage03, build_stage04, build_stage05, build_stage06  # noqa: E401,E402
+import build_stage00, build_stage01, build_stage02, build_stage03, build_stage04a, build_stage04, build_stage05, build_stage06  # noqa: E401,E402
 import sim  # noqa: E402
 import test_stage04 as T4  # noqa: E402
 import test_stage05 as T5V  # noqa: E402
@@ -167,7 +167,7 @@ def claimant_mode():
     vc = C.Variant("T5C", out / "wf", "..\\..\\..\\..\\", "data/output/t5c/XoL_Control_t5c.xlsx",
                    "data/synthetic/line", "data/synthetic/claimant", "data/output/t5c")
     for b in (build_stage00.build(vc), build_stage01.build_claimant(vc), build_stage02.build(vc),
-              build_stage03.build(vc), build_stage04.build(vc), build_stage05.build(vc), build_stage06.build(vc)):
+              build_stage03.build(vc), build_stage04a.build(vc), build_stage04.build(vc), build_stage05.build(vc), build_stage06.build(vc)):
         sim.run(b)
         results.append((f"claimant mode {b.stem}: no STOP", not [m for m in sim.MESSAGES if m[0] == "Error"]))
     with open(out / "stage/int_members.yxdb", "rb") as f:
@@ -218,7 +218,7 @@ def main() -> int:
             ws.cell(r, 3).value = "PROGRAMME"
     wb.save(CTL)
     for b in (build_stage00.build(V), build_stage01.build_line(V), build_stage02.build(V), build_stage03.build(V),
-              build_stage04.build(V), build_stage05.build(V), build_stage06.build(V)):
+              build_stage04a.build(V), build_stage04.build(V), build_stage05.build(V), build_stage06.build(V)):
         sim.run(b)
         results.append((f"{b.stem}: no STOP", not [m for m in sim.MESSAGES if m[0] == "Error"]))
 

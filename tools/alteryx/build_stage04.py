@@ -4,7 +4,11 @@ Reads bc_adjusted, bc_weights, bc_summary (stage 03), exp_exposure_ty (stage 02)
     Fit      single-parameter Pareto above u (u = fit_cutoff, else lowest active PP AP) by MLE with censoring at the
              unit's cap (benefit / policy limit):  alpha = n_uncensored / sum ln(min(adj, cap) / u)
     Freq     Poisson, lambda = sum_ty w_ty x (units > u x post-AP count factor / full-year exposure) x lives_Q x incidence
-    Sim      per iteration N ~ Poisson(lambda) (inverse CDF), X = u U^(-1/alpha), cap sampled from the fitted units'
+    Severity severity_source = PYTHON: the distribution selected in stage 04a (sev_table: ln x on a grid of
+             conditional survival s_k = 10^(-k/K)); NATIVE: the Pareto above, on the same grid (exact for a Pareto).
+             X from U by interpolating ln x linearly in log10 U: t = -log10(U) K, k = min(floor(t), K D - 1),
+             ln X = lx0_k + (t - k)(lx1_k - lx0_k). S07 stops when PYTHON is chosen and the table is empty.
+    Sim      per iteration N ~ Poisson(lambda) (inverse CDF), X as above, cap sampled from the fitted units'
              caps, claim = min(X, cap); layer loss per active PP layer, AAD / AAL / reinstatements on the annual total
     RNG      MINSTD (Lehmer, a = 48271, m = 2^31 - 1) seeded from `seed`; three non-overlapping streams by jump-ahead
              (Poisson draws, severity, cap). Same seed -> identical results in Designer and the simulator.
@@ -14,8 +18,15 @@ t_sl = max(sl_attritional_threshold, u), for stage 05), checks_04.csv, recon_04.
 """
 from __future__ import annotations
 
+import sys
+
 import xol_common as C
 from xol_common import X
+
+sys.path.insert(0, str(C.ROOT / "tools/python"))
+import sevfit  # noqa: E402
+
+KSEV, KD = sevfit.K_PER_DECADE, sevfit.K_PER_DECADE * sevfit.DECADES    # severity grid: points per decade, rows
 
 M = 2147483647
 A = 48271
@@ -57,6 +68,45 @@ def layer_loss(claim, cap):
     return f"IIF({over} <= 0, 0, IIF({over} < {lim}, {over}, IIF({lim} > 0, {lim}, 0))) * (1 - [cop])"
 
 
+def pp_layers(wf, v):
+    """Active per-person layers with their terms (key kl = 1)."""
+    lay = wf.input_yxdb(C.stage(v, "ctl_layers"), label="ctl_layers (stage 00)")
+    lay, _ = wf.filter(lay, '[cover] = "PP" AND [active] = 1', label="active per-person layers")
+    lay = wf.formula(lay, [("lim_basis", X.STR, 'IIF(IsNull([limit_basis]), "AMOUNT", [limit_basis])'),
+                           ("cop", X.DBL, "IIF(IsNull([co_participation_pct]), 0, [co_participation_pct])"),
+                           ("l_label", X.STR, 'IIF(IsNull([label]), "PP option " + ToString([option_id]), [label])'),
+                           ("kl", X.INT, "1")], label="layer fields")
+    return wf.select(lay, keep=["kl", "option_id", "layer", "l_label", "lim_basis", "ap", "limit", "aal", "aad", "cop",
+                                "reinstatements_n", "reinstatement_cost_pct", "reinst_pro_rata_time"],
+                     keep_unknown=False, label="layers")
+
+
+def threshold_u(wf, par, lay):
+    """par (key kp, p_fit_cutoff) + u_fit = fit_cutoff, else the lowest active PP AP."""
+    minap = wf.summarize(lay, [("kl", "GroupBy", "kmin"), ("ap", "Min", "min_ap")], label="lowest AP")
+    pu = C.append(wf, par, minap, "kp", "kmin", "+ lowest AP")
+    return wf.formula(pu, [("u_fit", X.DBL, "IIF(IsNull([p_fit_cutoff]), [min_ap], [p_fit_cutoff])")],
+                      label="threshold u")
+
+
+def thresholds(wf, lay):
+    """Diagnostic thresholds: each AP (is_ap = 1), each exhaustion point, 250k / 500k / 1m / 2m; distinct t."""
+    thr_l = wf.formula(lay, [("t", X.DBL, "[ap]"), ("t_label", X.STR, '"AP " + [l_label]'), ("is_ap", X.INT, "1")],
+                       label="AP thresholds")
+    thr_l2, _ = wf.filter(lay, '[lim_basis] = "AMOUNT" AND !IsNull([limit])', label="layers with a fixed limit")
+    thr_l2 = wf.formula(thr_l2, [("t", X.DBL, "[ap] + [limit]"), ("t_label", X.STR, '"exhaust " + [l_label]'),
+                                 ("is_ap", X.INT, "0")], label="exhaustion thresholds")
+    fixed = wf.text_input(["t", "t_label", "is_ap"], [[x, f"{int(x):,}", "0"] for x in (250000, 500000, 1000000, 2000000)],
+                          label="round thresholds")
+    fixed = wf.select(fixed, keep=["t", "t_label", "is_ap"], types={"t": X.DBL, "is_ap": X.INT}, keep_unknown=False,
+                      label="typed")
+    thr = wf.union([wf.select(thr_l, keep=["t", "t_label", "is_ap"], keep_unknown=False, label="t"),
+                    wf.select(thr_l2, keep=["t", "t_label", "is_ap"], keep_unknown=False, label="t"), fixed],
+                   label="thresholds")
+    thr = wf.sort(thr, [("t", "Ascending"), ("is_ap", "Descending")], label="APs first")
+    return wf.unique(thr, ["t"], label="distinct thresholds")[0]
+
+
 def build(v):
     wf = X.WF("04_simulate", "Stage 04: per-person stochastic model (native: censored Pareto, Poisson, MINSTD RNG)")
     wf.dag = True
@@ -65,26 +115,15 @@ def build(v):
     # ------------------------------------------------------------------ inputs
     wf.container("04.1 Inputs: parameters, layers, threshold u")
     par = C.params_stream(wf, v, ["iterations", "seed", "fit_cutoff", "freq_model", "incidence_adj", "years_included",
-                                  "sl_attritional_threshold"], key="kp", label="parameters")
-    lay = wf.input_yxdb(C.stage(v, "ctl_layers"), label="ctl_layers (stage 00)")
-    lay, _ = wf.filter(lay, '[cover] = "PP" AND [active] = 1', label="active per-person layers")
-    lay = wf.formula(lay, [("lim_basis", X.STR, 'IIF(IsNull([limit_basis]), "AMOUNT", [limit_basis])'),
-                           ("cop", X.DBL, "IIF(IsNull([co_participation_pct]), 0, [co_participation_pct])"),
-                           ("l_label", X.STR, 'IIF(IsNull([label]), "PP option " + ToString([option_id]), [label])'),
-                           ("kl", X.INT, "1")], label="layer fields")
-    lay = wf.select(lay, keep=["kl", "option_id", "layer", "l_label", "lim_basis", "ap", "limit", "aal", "aad", "cop",
-                               "reinstatements_n", "reinstatement_cost_pct", "reinst_pro_rata_time"],
-                    keep_unknown=False, label="layers")
-    minap = wf.summarize(lay, [("kl", "GroupBy", "kmin"), ("ap", "Min", "min_ap")], label="lowest AP")
-    pu = C.append(wf, par, minap, "kp", "kmin", "+ lowest AP")
-    pu = wf.formula(pu, [("u_fit", X.DBL, "IIF(IsNull([p_fit_cutoff]), [min_ap], [p_fit_cutoff])"),
-                         ("s0", X.DBL, f"[p_seed] - {M - 1} * Floor([p_seed] / {M - 1}) + 1")],
-                    label="threshold u, seed state")
+                                  "sl_attritional_threshold", "severity_source"], key="kp", label="parameters")
+    lay = pp_layers(wf, v)
+    pu = threshold_u(wf, par, lay)
+    pu = wf.formula(pu, [("s0", X.DBL, f"[p_seed] - {M - 1} * Floor([p_seed] / {M - 1}) + 1")], label="seed state")
     pu = wf.formula(pu, [(f"start{j}", X.DBL, jump("[s0]", JUMP[j])) for j in (1, 2, 3)] + [
         ("t_sl", X.DBL, "IIF(IsNull([p_sl_attritional_threshold]) OR [p_sl_attritional_threshold] < [u_fit], [u_fit], "
                         "[p_sl_attritional_threshold])")], label="stream starts, stop-loss large threshold")
     ctx = wf.select(pu, keep=["kp", "u_fit", "p_iterations", "p_incidence_adj", "p_freq_model", "start1", "start2",
-                              "start3", "s0", "t_sl"], keep_unknown=False, label="simulation context")
+                              "start3", "s0", "t_sl", "p_severity_source"], keep_unknown=False, label="simulation context")
 
     # ------------------------------------------------------------------ fit
     wf.container("04.2 Severity fit: Pareto above u with censoring at caps; diagnostics")
@@ -108,16 +147,7 @@ def build(v):
     caps = wf.select(caps, keep=["cap_rank", "cap"], rename={"cap_rank": "c_rank", "cap": "s_cap"}, keep_unknown=False,
                      label="cap table")
     # diagnostics: empirical vs fitted survival at thresholds
-    thr_l = wf.formula(lay, [("t", X.DBL, "[ap]"), ("t_label", X.STR, '"AP " + [l_label]')], label="AP thresholds")
-    thr_l2, _ = wf.filter(lay, '[lim_basis] = "AMOUNT" AND !IsNull([limit])', label="layers with a fixed limit")
-    thr_l2 = wf.formula(thr_l2, [("t", X.DBL, "[ap] + [limit]"), ("t_label", X.STR, '"exhaust " + [l_label]')],
-                        label="exhaustion thresholds")
-    fixed = wf.text_input(["t", "t_label"], [[x, f"{int(x):,}"] for x in (250000, 500000, 1000000, 2000000)],
-                          label="round thresholds")
-    thr = wf.union([wf.select(thr_l, keep=["t", "t_label"], keep_unknown=False, label="t"),
-                    wf.select(thr_l2, keep=["t", "t_label"], keep_unknown=False, label="t"), fixed], label="thresholds")
-    thr = wf.unique(thr, ["t"], label="distinct thresholds")[0]
-    thr = wf.formula(thr, [("kt", X.INT, "1")], label="key")
+    thr = wf.formula(thresholds(wf, lay), [("kt", X.INT, "1")], label="key")
     tx = C.append(wf, fu, wf.select(thr, keep=["kt", "t", "t_label"], keep_unknown=False, label="thr"), "kx", "kt",
                   "units x thresholds")
     tx = wf.formula(tx, [("ge", X.DBL, "IIF([adj] >= [t], 1, 0)")], label="exceeds t")
@@ -202,6 +232,34 @@ def build(v):
     nn = wf.sort(nn, [("iter", "Ascending")], label="by iteration")
 
     # ------------------------------------------------------------------ claims
+    wf.container("04.5a Severity table: fitted distribution (04a, PYTHON) or the Pareto above (NATIVE)")
+    ntab = wf.generate_rows(wf.select(lam, keep=["kw", "u_fit", "alpha"], keep_unknown=False, label="u, alpha"),
+                            "k", X.INT64, "0", f"[k] < {KD}", "[k] + 1", label=f"k = 0 .. {KD - 1}")
+    ntab = wf.formula(ntab, [("lx0", X.DBL, f"Log([u_fit]) + [k] * Log(10) / ({KSEV} * [alpha])"),
+                             ("lx1", X.DBL, f"Log([u_fit]) + ([k] + 1) * Log(10) / ({KSEV} * [alpha])"),
+                             ("dist", X.STR, '"PARETO (native)"'), ("src", X.STR, '"NATIVE"')],
+                      label="Pareto: ln x = ln u + k ln 10 / (K alpha)")
+    ptab = wf.input_yxdb(C.stage(v, "sev_table"), label="sev_table (stage 04a)")
+    ptab = wf.formula(ptab, [("src", X.STR, '"PYTHON"')], label="fitted")
+    tcols = ["k", "lx0", "lx1", "dist", "src"]
+    tab = wf.union([wf.select(ntab, keep=tcols, keep_unknown=False, label="native"),
+                    wf.select(ptab, keep=tcols, keep_unknown=False, label="fitted")], label="both tables")
+    tab = wf.formula(tab, [("kz", X.INT, "1")], label="key")
+    tab = C.append(wf, tab, wf.select(ctx, keep=["kp", "p_severity_source"], keep_unknown=False, label="source"),
+                   "kz", "kp", "+ severity_source")
+    tab, _ = wf.filter(tab, "[src] = [p_severity_source]", label="table in use")
+    tab = wf.select(tab, keep=["k", "lx0", "lx1", "dist"], rename={"k": "sk", "dist": "sev_dist"}, keep_unknown=False,
+                    label="severity table")
+    tinfo = wf.summarize(wf.formula(tab, [("kt2", X.INT, "1"), ("one", X.DBL, "1")], label="key"),
+                         [("kt2", "GroupBy", "kt2"), ("one", "Sum", "n_tab"), ("sev_dist", "First", "sev_dist")],
+                         label="rows, distribution")
+    tchk = wf.left_join(wf.select(ctx, keep=["kp", "p_severity_source"], keep_unknown=False, label="source"),
+                        tinfo, ["kp"], ["kt2"], label="+ table rows (none = Null)")
+    s07, _ = wf.filter(tchk, f"IsNull([n_tab]) OR [n_tab] != {KD}", label="S07 no severity table")
+    checks.append(C.check_formula(wf, s07, sn, "S07", "STOP", '"severity_source " + [p_severity_source]',
+                                  '"no severity table: run 04a_fit_severity after 03_burning_cost, or set '
+                                  'severity_source = NATIVE"'))
+
     wf.container("04.5 Claims: severity and cap draws")
     cl = wf.join(
         nn, wf.select(lam, keep=["kw", "u_fit", "alpha", "max_observed", "n_fit", "start2", "start3", "t_sl"],
@@ -211,8 +269,14 @@ def build(v):
     cl = wf.sort(cl, [("iter", "Ascending"), ("j", "Ascending")], label="claim order")
     cl = stream(wf, cl, "s2", "start2", "severity uniforms")
     cl = stream(wf, cl, "s3", "start3", "cap uniforms")
-    cl = wf.formula(cl, [("x", X.DBL, "[u_fit] * Pow([u_s2], -1 / [alpha])"),
-                         ("cap_rank", X.INT64, "Floor([u_s3] * [n_fit]) + 1")], label="severity, cap index")
+    cl = wf.formula(cl, [("t_sev", X.DBL, f"-Log10([u_s2]) * {KSEV}"),
+                         ("cap_rank", X.INT64, "Floor([u_s3] * [n_fit]) + 1")], label="grid position, cap index")
+    cl = wf.formula(cl, [("sev_k", X.INT64, f"IIF(Floor([t_sev]) > {KD - 1}, {KD - 1}, Floor([t_sev]))")],
+                    label="grid row (last segment extended)")
+    cl = wf.join(cl, wf.select(tab, keep=["sk", "lx0", "lx1"], keep_unknown=False, label="grid"), ["sev_k"], ["sk"],
+                 label="+ severity grid")["J"]
+    cl = wf.formula(cl, [("x", X.DBL, "Exp([lx0] + ([t_sev] - [sev_k]) * ([lx1] - [lx0]))")],
+                    label="severity X: ln x interpolated in log10 U")
     cl = wf.join(cl, caps, ["cap_rank"], ["c_rank"], label="+ sampled cap")["J"]
     cl = wf.formula(cl, [("claim", X.DBL, "IIF([x] < [s_cap], [x], [s_cap])")], label="claim = min(X, cap)")
     cl = wf.formula(cl, [("claim_belowM", X.DBL, "IIF([claim] < [max_observed], [claim], [max_observed])"),
@@ -322,8 +386,10 @@ def build(v):
         ("expected_loss_blended", X.DBL, "[credibility_z] * [expected_cost_det] + (1 - [credibility_z]) * "
                                          "[mean_below_max_observed] + [mean_above_max_observed]"),
         ("expected_loss_pppy", X.DBL, "[expected_loss_blended] / [lives_q]")], label="credibility blend")
+    st = C.append(wf, st, wf.select(tinfo, keep=["kt2", "sev_dist"], keep_unknown=False, label="distribution"),
+                  "ks", "kt2", "+ severity distribution")
     sto = wf.select(st, keep=["option_id", "layer", "l_label", "p_iterations", "lambda", "freq_dist", "phi", "u_fit",
-                              "alpha", "max_observed",
+                              "alpha", "sev_dist", "max_observed",
                               "lives_q", "mean_recovery", "sd_recovery", "cov", "p_zero", "p50", "p75", "p90", "p95",
                               "p99", "p995", "max_recovery", "mean_below_max_observed", "mean_above_max_observed",
                               "mean_reinst_usage", "expected_cost_det", "credibility_z", "det_to_stoch_below",

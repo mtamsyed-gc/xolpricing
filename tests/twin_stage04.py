@@ -22,6 +22,8 @@ T.CTL = ROOT / "data/synthetic/XoL_Control_synthetic.xlsx"
 
 def main() -> int:
     d = Path(sys.argv[1])
+    if (d / "out_sev_table.csv").exists():       # Designer's stage-04a grid (stage 03 here empties the staged one)
+        T.TAB = pd.read_csv(d / "out_sev_table.csv", encoding="utf-8-sig")
     e = T.oracle()
     summ = pd.read_csv(d / "out_sim_summary.csv", encoding="utf-8-sig").set_index("option_id")
     its = pd.read_csv(d / "out_sim_iterations.csv", encoding="utf-8-sig")

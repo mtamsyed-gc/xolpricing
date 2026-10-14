@@ -36,7 +36,7 @@ LIVE = Variant("LIVE", ROOT / "alteryx/workflows", "..\\..\\", "data/input/XoL_C
                "data/input/line", "data/input/claimant", "data/output/live", "data/input/ete")
 SYNTH = Variant("SYNTH", ROOT / "alteryx/workflows/synth", "..\\..\\..\\", "data/synthetic/XoL_Control_synthetic.xlsx",
                 "data/synthetic/line", "data/synthetic/claimant", "data/output/synth", "data/synthetic/ete")
-VERSION = "0.4"          # tool version carried into the run log
+VERSION = "0.5"          # tool version carried into the run log
 VARIANTS = (LIVE, SYNTH)
 
 
@@ -50,6 +50,15 @@ def result(wf, src, v: Variant, name: str, label: str = ""):
     wf.output_csv(src, v.p(f"{v.out_dir}/results/{name}.csv"), label=label or f"{name}.csv")
     wf.output_yxdb(src, stage(v, f"res_{name}"), label=f"res_{name}")
     return src
+
+
+def empty_yxdb(wf, fields: dict, path: str, label: str):
+    """Write a typed, empty .yxdb (fields: name -> type): a dummy row typed by a Select, then filtered away."""
+    t = wf.text_input(list(fields), [["0" if ty != X.STR else "-" for ty in fields.values()]], label=f"{label}: schema")
+    t = wf.select(t, keep=list(fields), types={f: ty for f, ty in fields.items() if ty != X.STR}, keep_unknown=False,
+                  label=f"{label}: types")
+    t, _ = wf.filter(t, "1 = 0", label=f"{label}: no rows")
+    return wf.output_yxdb(t, path, label=label)
 
 
 def checks_csv(v: Variant, stage_no: str) -> str:
@@ -67,14 +76,15 @@ def check_formula(wf, src, stage_no: str, code: str, severity: str, item_expr: s
     return wf.select(t, keep=CHECK_FIELDS, keep_unknown=False, label=f"{code} fields")
 
 
-def finish_checks(wf, check_srcs: list, v: Variant, stage_no: str):
+def finish_checks(wf, check_srcs: list, v: Variant, stage_no: str, chk: str = ""):
     """Union all check records with a header row (so the file always has the schema), write the CSV and raise a
     Designer Error for every STOP (the workflow's Cancel-on-error setting then stops the run)."""
     hdr = wf.text_input(CHECK_FIELDS, [["S" + stage_no, "OK", "INFO", "-", f"stage {stage_no} checks ran"]],
                         label="check header row")
     allc = wf.union([hdr] + check_srcs, label="all checks", differ="Ignore")
     wf.output_csv(allc, checks_csv(v, stage_no), label=f"checks_{stage_no}.csv")
-    wf.output_yxdb(allc, stage(v, f"chk_{stage_no[:2]}"), label=f"chk_{stage_no[:2]} (for the Results workbook)")
+    chk = chk or stage_no[:2]       # 01a / 01b / 01c share chk_01; 04a keeps its own (chk_04a)
+    wf.output_yxdb(allc, stage(v, f"chk_{chk}"), label=f"chk_{chk} (for the Results workbook)")
     stop, _ = wf.filter(allc, '[severity] = "STOP"', label="STOP checks")
     wf.message(stop, '"[" + [code] + "] " + [item] + ": " + [message]', kind="Error", label="stop the run")
     return allc

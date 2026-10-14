@@ -19,7 +19,7 @@ from openpyxl import load_workbook
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools/alteryx"))
 import xol_common as C  # noqa: E402
-import build_stage00, build_stage01, build_stage02, build_stage03, build_stage04  # noqa: E401,E402
+import build_stage00, build_stage01, build_stage02, build_stage03, build_stage04, build_stage04a  # noqa: E401,E402
 import sim  # noqa: E402
 
 N_ITER = 500
@@ -53,7 +53,23 @@ def minstd(start, n):
     return out / M
 
 
-def oracle():
+KSEV, DEC = 50, 10        # severity grid: points per decade, decades (tools/python/sevfit.py)
+TAB = None                 # a stage-04a grid to use instead of the staged one (Designer twin: its out_sev_table.csv)
+
+
+def severity(u2, u, alpha, src, tab):
+    """NATIVE: the Pareto in closed form. PYTHON: ln x interpolated in log10 U on the stage-04a grid."""
+    if src == "NATIVE":
+        return u * u2 ** (-1 / alpha)
+    tab = tab.sort_values("k")
+    lx0, lx1 = tab.lx0.to_numpy(), tab.lx1.to_numpy()
+    t = -np.log10(u2) * KSEV
+    k = np.minimum(np.floor(t), KSEV * DEC - 1).astype(int)
+    return np.exp(lx0[k] + (t - k) * (lx1[k] - lx0[k]))
+
+
+def oracle(tab=None):
+    """tab: the stage-04a severity grid to use (default: the staged sev_table)."""
     prm = pd.read_excel(CTL, sheet_name="Params", header=3).set_index("param_id").value
     seed, iters = int(prm["seed"]), int(prm["iterations"])
     inc = float(prm["incidence_adj"])
@@ -96,7 +112,9 @@ def oracle():
     n_claims = np.searchsorted(cdf, u1, side="left")       # #{k: cdf_k < U}
     tot = int(n_claims.sum())
     u2, u3 = minstd(starts[2], tot), minstd(starts[3], tot)
-    x = u * u2 ** (-1 / alpha)
+    src = "NATIVE" if pd.isna(prm.get("severity_source")) else str(prm["severity_source"])
+    tab = tab if tab is not None else TAB
+    x = severity(u2, u, alpha, src, load("sev_table") if tab is None and src == "PYTHON" else tab)
     cap = caps[np.floor(u3 * len(caps)).astype(int)]
     claim = np.minimum(x, cap)
     below = np.minimum(claim, big_m)
@@ -124,7 +142,7 @@ def oracle():
         ru = (np.zeros(iters) if pd.isna(cost) or pd.isna(L.limit) else
               cost * (rec if pd.isna(n_r) else np.minimum(rec, n_r * L.limit)) / L.limit)
         out[int(L.option_id)] = dict(rec=rec, above=(xl - xlb) * f, ru=ru)
-    return dict(alpha=alpha, lam=lam, phi=phi, nb=nb, n_claims=n_claims, u1=u1, out=out, claims_sum=claim.sum(), claim=claim,
+    return dict(src=src, x=x, u2=u2, alpha=alpha, lam=lam, phi=phi, nb=nb, n_claims=n_claims, u1=u1, out=out, claims_sum=claim.sum(), claim=claim,
                 it_idx=it_idx, iters=iters, u=u, lives=lives)
 
 
@@ -142,13 +160,18 @@ def negbin():
     for r in range(5, ws.max_row + 1):
         if ws.cell(r, 1).value == "freq_model":
             ws.cell(r, 3).value = "NEGBIN"
+        if ws.cell(r, 1).value == "severity_source":       # this variant also covers the native severity path
+            ws.cell(r, 3).value = "NATIVE"
     wb.save(CTL)
     vn = C.Variant("T4N", OUT / "wf", "..\\..\\..\\..\\", "data/output/t4n/XoL_Control_t4n.xlsx",
                    "data/synthetic/line", "data/synthetic/claimant", "data/output/t4n")
     for b in (build_stage00.build(vn), build_stage01.build_line(vn), build_stage02.build(vn), build_stage03.build(vn),
-              build_stage04.build(vn)):
+              build_stage04.build(vn)):          # no 04a: the native path needs no fit
         sim.run(b)
     e = oracle()
+    summ0 = pd.read_csv(OUT / "results/out_sim_summary.csv")
+    results.append((f"NATIVE severity without 04a ({summ0.sev_dist.iloc[0]})", e["src"] == "NATIVE" and
+                    (summ0.sev_dist == "PARETO (native)").all()))
     summ = pd.read_csv(OUT / "results/out_sim_summary.csv").set_index("option_id")
     its = pd.read_csv(OUT / "results/out_sim_iterations.csv")
     results.append((f"NEGBIN used (phi {e['phi']:.2f})", e["nb"] and (summ.freq_dist == "NEGBIN").all()))
@@ -160,6 +183,67 @@ def negbin():
     n = e["n_claims"]
     results.append((f"NEGBIN counts: mean {n.mean():.1f} vs lambda {e['lam']:.1f}, variance / mean {n.var() / n.mean():.2f}"
                     f" vs phi {e['phi']:.2f}", abs(n.mean() / e["lam"] - 1) < 0.05 and abs(n.var() / n.mean() / e["phi"] - 1) < 0.3))
+    OUT, CTL = keep
+
+
+def variant(name, edit):
+    """A copy of the main control (t4) with edit(Params sheet) applied, run 00-04 in a new folder."""
+    global OUT, CTL
+    keep = OUT, CTL
+    OUT = ROOT / f"data/output/{name}"
+    CTL = OUT / f"XoL_Control_{name}.xlsx"
+    OUT.mkdir(parents=True, exist_ok=True)
+    shutil.copy(keep[1], CTL)
+    wb = load_workbook(CTL)
+    edit(wb["Params"])
+    wb.save(CTL)
+    v = C.Variant(name.upper(), OUT / "wf", "..\\..\\..\\..\\", f"data/output/{name}/XoL_Control_{name}.xlsx",
+                  "data/synthetic/line", "data/synthetic/claimant", f"data/output/{name}")
+    return keep, v
+
+
+def set_p(ws, pid, value):
+    for r in range(5, ws.max_row + 1):
+        if ws.cell(r, 1).value == pid:
+            ws.cell(r, 3).value = value
+
+
+def gpd():
+    """fit_selected = GPD: stage 04 draws from the GPD grid of 04a; exact match to the oracle on that grid, and the
+    draws follow the fitted GPD (conditional survival at the drawn values is uniform)."""
+    global OUT, CTL
+    keep, v = variant("t4g", lambda ws: set_p(ws, "fit_selected", "GPD"))
+    for b in (build_stage00.build(v), build_stage01.build_line(v), build_stage02.build(v), build_stage03.build(v),
+              build_stage04a.build(v), build_stage04.build(v)):
+        sim.run(b)
+        results.append((f"t4g {b.stem}: no STOP", not [m for m in sim.MESSAGES if m[0] == "Error"]))
+    e = oracle()
+    its = pd.read_csv(OUT / "results/out_sim_iterations.csv")
+    summ = pd.read_csv(OUT / "results/out_sim_summary.csv")
+    cand = pd.read_csv(OUT / "results/out_fit_candidates.csv").set_index("dist")
+    results.append(("GPD selected by fit_selected, used by stage 04", (summ.sev_dist == "GPD").all() and
+                    cand.loc["GPD", "selected"] == 1 and cand.selected.sum() == 1))
+    for o, d in e["out"].items():
+        g = its[its.option_id == o].sort_values("iter")
+        close(f"GPD option {o} recovery by iteration", g.recovery, d["rec"])
+    xi, sg = cand.loc["GPD", "p1"], cand.loc["GPD", "p2"]
+    s_x = (1 + xi * (e["x"] - e["u"]) / sg) ** (-1 / xi)        # fitted conditional survival at the draws
+    close("GPD draws: conditional survival at X = U (grid interpolation)", s_x, e["u2"], tol=2e-3)
+    OUT, CTL = keep
+
+
+def stale():
+    """Stage 03 empties the fit: 04 after 03 without 04a stops (S07)."""
+    global OUT, CTL
+    keep, v = variant("t4s", lambda ws: None)
+    for b in (build_stage00.build(v), build_stage01.build_line(v), build_stage02.build(v), build_stage03.build(v)):
+        sim.run(b)
+    try:
+        sim.run(build_stage04.build(v))
+        msgs = [m for m in sim.MESSAGES if m[0] == "Error"]
+    except sim.SimError as ex:
+        msgs = [("Error", str(ex))]
+    results.append((f"PYTHON without a fresh 04a: S07 stops ({msgs[:1]})", any("S07" in m[1] for m in msgs)))
     OUT, CTL = keep
 
 
@@ -181,7 +265,7 @@ def main() -> int:
             ly.cell(r, hdr.index("reinstatement_cost_pct") + 1).value = 1.0
     wb.save(CTL)
     for b in (build_stage00.build(V), build_stage01.build_line(V), build_stage02.build(V), build_stage03.build(V),
-              build_stage04.build(V)):
+              build_stage04a.build(V), build_stage04.build(V)):
         sim.run(b)
         results.append((f"{b.stem}: no STOP", not [m for m in sim.MESSAGES if m[0] == "Error"]))
 
@@ -206,6 +290,11 @@ def main() -> int:
         close(f"option {o} above largest observed", [summ.loc[o, "mean_above_max_observed"]], [d["above"].mean()])
         close(f"option {o} reinstatement usage", [summ.loc[o, "mean_reinst_usage"]], [d["ru"].mean()])
     close("dispersion phi", [summ.phi.iloc[0]], [e["phi"]])
+    results.append((f"PYTHON severity: {summ.sev_dist.iloc[0]} selected in 04a", e["src"] == "PYTHON" and
+                    (summ.sev_dist == "PARETO").all()))
+    close("fitted Pareto grid = closed-form Pareto draws", e["x"], e["u"] * e["u2"] ** (-1 / e["alpha"]), tol=1e-11)
+    gpd()
+    stale()
     negbin()
     # statistical sense
     a = summ.alpha.iloc[0]

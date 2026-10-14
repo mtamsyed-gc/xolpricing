@@ -10,6 +10,16 @@ import control_spec as S
 
 PARAM_COLS = [p[0] for p in S.PARAMS]
 
+# text columns of the stage-04a tables (others numeric), for the typed placeholders stage 03 writes
+TEXT_COLS = {"dist", "p1_name", "p2_name", "t_label"}
+INT_COLS = {"n_params", "converged", "boundary", "rank_aic", "rank_bic", "rank_ks", "selected", "n_above", "n_fit",
+            "n_uncensored"}
+
+
+def col_type(c, X):
+    """Designer type of a stage-04a column (X = xmlkit)."""
+    return X.STR if c in TEXT_COLS else X.INT64 if c in INT_COLS else X.DBL
+
 SHEETS = {
     "out_params": PARAM_COLS,
     "out_loadings": [c for c, *_ in S.TABLES["Loadings"][2]],
@@ -32,8 +42,13 @@ SHEETS = {
                          "trended", "pre_ap_f", "adj_uncapped", "cap", "adj", "outlier", "outlier_thr"],
     "out_fit": ["t", "t_label", "u_fit", "alpha", "alpha_se", "n_fit", "n_uncensored", "n_censored", "max_observed",
                 "n_ge", "expected_n", "s_empirical", "s_fitted"],
+    "out_fit_candidates": ["dist", "n_params", "p1_name", "p1", "p2_name", "p2", "loglik", "aic", "bic", "ks",
+                           "converged", "boundary", "rank_aic", "rank_bic", "rank_ks", "selected", "me_ratio_min",
+                           "me_ratio_max", "u_fit", "max_observed", "n_fit", "n_uncensored"],
+    "out_fit_mean_excess": ["dist", "ap", "n_above", "mean_excess_empirical", "mean_excess_fitted", "ratio"],
+    "out_fit_survival": ["dist", "t", "t_label", "s_km", "s_fitted"],
     "out_sim_summary": ["option_id", "layer", "l_label", "iterations", "lambda", "freq_dist", "phi", "u_fit", "alpha",
-                        "max_observed", "lives_q", "mean_recovery", "sd_recovery", "cov", "p_zero", "p50", "p75", "p90",
+                        "sev_dist", "max_observed", "lives_q", "mean_recovery", "sd_recovery", "cov", "p_zero", "p50", "p75", "p90",
                         "p95", "p99", "p995", "max_recovery", "mean_below_max_observed", "mean_above_max_observed",
                         "mean_reinst_usage", "expected_cost_det", "credibility_z", "det_to_stoch_below",
                         "expected_loss_blended", "expected_loss_pppy"],

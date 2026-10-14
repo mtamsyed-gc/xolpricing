@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT / "tools/excel"))
 import xol_common as C  # noqa: E402
 import results_spec as RS  # noqa: E402
 import build_results  # noqa: E402
-import build_stage00, build_stage01, build_stage02, build_stage03, build_stage04, build_stage05, build_stage06, build_stage07  # noqa: E401,E402
+import build_stage00, build_stage01, build_stage02, build_stage03, build_stage04a, build_stage04, build_stage05, build_stage06, build_stage07  # noqa: E401,E402
 import sim  # noqa: E402
 
 OUT = ROOT / "data/output/t7"
@@ -59,7 +59,7 @@ def set_param(pid, value):
 
 def run_all():
     for b in (build_stage00.build(V), build_stage01.build_line(V), build_stage02.build(V), build_stage03.build(V),
-              build_stage04.build(V), build_stage05.build(V), build_stage06.build(V), build_stage07.build(V)):
+              build_stage04a.build(V), build_stage04.build(V), build_stage05.build(V), build_stage06.build(V), build_stage07.build(V)):
         sim.run(b)
         ok(f"{b.stem}: no STOP", not [m for m in sim.MESSAGES if m[0] == "Error"])
 
@@ -148,6 +148,14 @@ def exhibit_checks(calc, R, ctl, tag=""):
                    for k, x in comp if k != "sl")
         rp50 = (budget - qq.net_claims - up - ri_q) / 1000
         close(f"{tag}C2 {key}: average year, 1 in 50", [ci.cell(11, col).value, ci.cell(13, col).value], [avg, rp50])
+    fc = pd.read_csv(R / "out_fit_candidates.csv") if (R / "out_fit_candidates.csv").exists() else pd.DataFrame()
+    if "Severity" in w.sheetnames and len(fc):      # (a 0.4 workbook has no Severity sheet)
+        sv = w["Severity"]
+        got = [[sv.cell(7 + i, c).value for c in (1, 3, 7)] for i in range(len(fc))]
+        ok(f"{tag}Severity: candidates, parameter 1 and AIC as out_fit_candidates; used {sv['H4'].value}",
+           [g[0] for g in got] == list(fc.dist) and
+           np.allclose([g[1] for g in got], fc.p1, rtol=1e-12) and np.allclose([g[2] for g in got], fc.aic, rtol=1e-12)
+           and sv["H4"].value == ps.sev_dist.iloc[0] == fc[fc.selected == 1].dist.iloc[0])
     ex = w["Expiring"]
     ok(f"{tag}Expiring: matched option {ex['G5'].value}, actual recoveries read ({ex['H13'].value})",
        ex["G5"].value == 1 and ex["H13"].value == 2650000)

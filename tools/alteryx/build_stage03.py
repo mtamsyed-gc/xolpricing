@@ -16,6 +16,7 @@ stage bc_units (unit x layer detail for later stages), checks_03.csv, recon_03.c
 from __future__ import annotations
 
 import xol_common as C
+import results_spec as R
 from xol_common import X
 
 BIG = "1000000000000000"
@@ -416,6 +417,15 @@ def build(v):
                       (units, "bc_units", "rows", None), (units, "bc_units", "xl_c", "xl_c"),
                       (byo, "out_bc_by_year", "xl_aa", "xl_aa"), (smo, "out_bc_summary", "rows", None)], v, sn)
     C.finish_checks(wf, checks, v, sn)
+
+    # ------------------------------------------------------------------ reset the stage-04a outputs
+    wf.container("03.10 Reset the severity fit (04a): a fit always belongs to the burning cost it was run on")
+    for name in ("out_fit_candidates", "out_fit_mean_excess", "out_fit_survival"):
+        C.empty_yxdb(wf, {c: R.col_type(c, X) for c in R.SHEETS[name]}, C.stage(v, f"res_{name}"),
+                     f"res_{name} (empty)")
+    C.empty_yxdb(wf, {"k": X.INT64, "lx0": X.DBL, "lx1": X.DBL, "dist": X.STR}, C.stage(v, "sev_table"),
+                 "sev_table (empty)")
+    C.empty_yxdb(wf, {f: X.STR for f in C.CHECK_FIELDS}, C.stage(v, "chk_04a"), "chk_04a (empty)")
     return C.save(wf, v, "03_burning_cost.yxmd")
 
 

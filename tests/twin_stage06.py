@@ -8,13 +8,15 @@ The oracle reads the simulator's stage-00..03 staging for SYNTH in line mode (re
 of stages 00-03 has shown to be identical to Designer's, and replays stage 04 with the stage-04 oracle.
 """
 import sys
+
+import pandas as pd
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tests"))
 sys.path.insert(0, str(ROOT / "tools/alteryx"))
 import xol_common as C  # noqa: E402
-import build_stage00, build_stage01, build_stage02, build_stage03  # noqa: E401,E402
+import build_stage00, build_stage01, build_stage02, build_stage03, build_stage04a  # noqa: E401,E402
 import sim  # noqa: E402
 import test_stage06 as T  # noqa: E402
 
@@ -24,8 +26,10 @@ T.CTL = ROOT / C.SYNTH.control
 
 def main() -> int:
     d = Path(sys.argv[1])
+    if (d / "out_sev_table.csv").exists():       # Designer's stage-04a grid (stage 03 here empties the staged one)
+        T.T4.TAB = pd.read_csv(d / "out_sev_table.csv", encoding="utf-8-sig")
     for b in (build_stage00.build(C.SYNTH), build_stage01.build_line(C.SYNTH), build_stage02.build(C.SYNTH),
-              build_stage03.build(C.SYNTH)):
+              build_stage03.build(C.SYNTH), build_stage04a.build(C.SYNTH)):    # 04a: the grid if Designer's is absent
         sim.run(b)
     T.compare(T.oracle(), d, d / "checks_06.csv", tol=1e-7)
     for name, ok in T.results:

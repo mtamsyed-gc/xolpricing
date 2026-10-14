@@ -11,6 +11,7 @@ import build_stage00  # noqa: E402
 import build_stage01  # noqa: E402
 import build_stage02  # noqa: E402
 import build_stage03  # noqa: E402
+import build_stage04a  # noqa: E402
 import numpy as np  # noqa: E402
 import sim  # noqa: E402
 
@@ -36,6 +37,7 @@ def main() -> int:
     sim.run(build_stage01.build_ete(C.SYNTH))
     for f in ("checks_01c", "recon_01c"):
         ok &= compare(f)
+    sim.run(build_stage04a.build(C.SYNTH))       # severity grid for the stage-04 oracle when Designer's is absent
     ok &= stage04()
     ok &= twin("stage05", "twin_stage05.py", "stage 05 (per-event)")
     ok &= stage06()
@@ -123,8 +125,11 @@ def stage07() -> bool:
     book = ROOT / "data/output/twin07.xlsx"
     shutil.copy(TWIN / "stage07/XoL_Results_designer.xlsx", book)
     wb = load_workbook(book)      # not read-only: Designer writes no sheet dimension, so max_row needs a full load
-    good = set(RS.SHEETS) <= set(wb.sheetnames)
-    for sheet in RS.SHEETS:
+    need = set(RS.SHEETS)
+    if "Severity" not in wb.sheetnames:          # baseline written by 0.4 (before stage 04a): no fit sheets
+        need -= {"out_fit_candidates", "out_fit_mean_excess", "out_fit_survival"}
+    good = need <= set(wb.sheetnames)
+    for sheet in sorted(need):
         if good and (d / f"{sheet}.csv").exists():
             good &= wb[sheet].max_row - 1 == len(pd.read_csv(d / f"{sheet}.csv"))
     rc = T7.recalc(book)

@@ -503,12 +503,12 @@ def make_func(name, args):
     if n in ("datetimeyear", "datetimemonth", "datetimeday"):
         attr = n[8:]
         return lambda c: None if _dt(a(0, c)) is None else getattr(_dt(a(0, c)), attr)
-    if n in ("log", "exp"):     # XOL: Designer Log (natural) / Exp
-        def le(c, f=(math.log if n == "log" else math.exp)):
+    if n in ("log", "exp", "log10"):     # XOL: Designer Log (natural) / Exp / Log10
+        def le(c, f={"log": math.log, "exp": math.exp, "log10": math.log10}[n]):
             x = a(0, c)
             if x is None:
                 return None
-            if n == "log" and x <= 0:
+            if n != "exp" and x <= 0:
                 raise SimError("Log of a non-positive number")
             return f(x)
         return le
@@ -1165,6 +1165,81 @@ def output_xlsx(cfg, t, base):
     return p
 
 
+def jupyter(cfg, named, base):
+    """XOL: Python tool (production script). The script runs here with a stand-in for `ayx.Alteryx`: read("#n") gives
+    the n-th input as a pandas DataFrame, write(df, n) sets output anchor Output<n>. Output types as Designer maps
+    pandas dtypes: int64 -> Int64, float64 -> Double, bool -> Bool, other -> V_WString (NaN / None -> Null)."""
+    import types
+    import pandas as pd
+    script = cfg.findtext("productionModeScript")
+    if not script:
+        raise SimError("Python tool without a production script")
+    inputs = {name: t for name, t in named}
+    outs = {}
+
+    class Alteryx:
+        @staticmethod
+        def read(name):
+            if name not in inputs:
+                raise SimError(f"Python tool: no input {name}")
+            t = inputs[name]
+            df = pd.DataFrame([[r[f] for f in t.fields] for r in t.rows], columns=list(t.fields))
+            for f, ty in t.fields.items():
+                if ty == "Double" or ty in INTS:
+                    df[f] = pd.to_numeric(df[f])
+            return df
+
+        @staticmethod
+        def write(df, n):
+            outs[f"Output{n}"] = df.copy()
+
+        @staticmethod
+        def getWorkflowConstant(name):
+            if name == "Engine.WorkflowDirectory":
+                return str(base) + "\\"
+            raise SimError(f"Python tool: constant {name}")
+
+    mod = types.ModuleType("ayx")
+    mod.Alteryx = Alteryx
+    saved = sys.modules.get("ayx")
+    sys.modules["ayx"] = mod
+    try:
+        exec(compile(script, "<Python tool>", "exec"), {"__name__": "__alteryx__"})
+    except SimError:
+        raise
+    except Exception as e:
+        raise SimError(f"Python tool script failed: {type(e).__name__}: {e}") from None
+    finally:
+        if saved is None:
+            sys.modules.pop("ayx", None)
+        else:
+            sys.modules["ayx"] = saved
+    res = {}
+    for anchor, df in outs.items():
+        fields = {}
+        for c in df.columns:
+            dt = str(df[c].dtype)
+            fields[str(c)] = ("Int64" if dt.startswith("int") else "Double" if dt.startswith("float") else
+                              "Bool" if dt == "bool" else "V_WString")
+        rows = []
+        for rec in df.itertuples(index=False):
+            o = {}
+            for (c, ty), v in zip(fields.items(), rec):
+                if v is None or (not isinstance(v, str) and pd.isna(v)):
+                    o[c] = None
+                elif ty == "Int64":
+                    o[c] = int(v)
+                elif ty == "Double":
+                    o[c] = float(v)
+                elif ty == "Bool":
+                    o[c] = bool(v)
+                else:
+                    o[c] = str(v)
+            rows.append(o)
+        res[anchor] = Table(fields, rows)
+    return res
+
+
 # ============================================================================================== runner
 def run(path, verbose=False, trace=None):
     """trace: optional dict filled with {tool_id: {anchor: [input field names]}} (alteryx/audit.py)."""
@@ -1248,6 +1323,8 @@ def run(path, verbose=False, trace=None):
                     res = field_info(one())
                 elif kind == "Message":
                     res = message(cfg, one())
+                elif kind == "JupyterCode":
+                    res = jupyter(cfg, src.get("Input", []), base)
                 elif kind == "BlockUntilDone":      # sheets downstream run in tool order (= Output1, 2, 3 order)
                     res = {a: one() for a in ("Output", "Output2", "Output3")}   # Designer anchor names
                 else:

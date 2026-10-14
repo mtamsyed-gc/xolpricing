@@ -31,7 +31,8 @@ OUT = ROOT / "excel/templates/XoL_Results.xlsx"
 ABBR = {"out_params": "pa", "out_loadings": "lo", "out_run_log": "rl", "out_struct_summary": "ss",
         "out_struct_quantiles": "sq", "out_sim_summary": "ps", "out_ev_sim_summary": "es", "out_bc_summary": "bs",
         "out_ev_bc_summary": "eb", "out_exposed_lives": "el", "out_gross_summary": "gs", "out_expiring": "xp",
-        "out_asif_by_year": "ai", "scn_summary": "sc"}
+        "out_asif_by_year": "ai", "scn_summary": "sc", "out_fit_candidates": "fc", "out_fit_mean_excess": "fm",
+        "out_fit_survival": "fv"}
 ROWS = 60000
 
 F = "Arial"
@@ -444,6 +445,54 @@ def expiring(wb):
     return ws
 
 
+# -------------------------------------------------------------------------------------------------------- Severity
+def severity(wb):
+    ws = wb.create_sheet("Severity")
+    title(ws, "Severity fit above u (stage 04a)",
+          "Candidates fitted to the trended, completed, capped claims above u: left-truncated at u, censored at the "
+          "benefit / policy limits. The simulation uses the selected one when severity_source = PYTHON (Control).")
+
+    def ix(name, i, fmt=None, ref=None):
+        return (f'=IFERROR(IF(INDEX({name},{i})="","",INDEX({name},{i})),"")' if fmt is not None else
+                f'=IFERROR(INDEX({name},{i})&"","")')
+    cell(ws, "A4", "Threshold u", BOLD)
+    cell(ws, "B4", "=IFERROR(INDEX(fc_u_fit,1),\"\")", fmt=AMT)
+    cell(ws, "C4", "Uncensored units", BOLD)
+    cell(ws, "D4", "=IFERROR(INDEX(fc_n_uncensored,1),\"\")", fmt=NUM)
+    cell(ws, "E4", "Largest observed", BOLD)
+    cell(ws, "F4", "=IFERROR(INDEX(fc_max_observed,1),\"\")", fmt=AMT)
+    cell(ws, "G4", "Used by the simulation", BOLD)
+    cell(ws, "H4", "=IFERROR(INDEX(ps_sev_dist,1),\"\")", BOLD)
+    cols = ["Distribution", "Parameter 1", "Value", "Parameter 2", "Value", "Log-likelihood", "AIC", "BIC", "KS",
+            "Rank (AIC)", "Boundary fit", "Selected", "Mean excess ratio min", "Mean excess ratio max"]
+    header(ws, 6, cols, col0=1)
+    src = [("dist", None), ("p1_name", None), ("p1", "0.0000"), ("p2_name", None), ("p2", "#,##0.0000"),
+           ("loglik", "#,##0.00"), ("aic", "#,##0.00"), ("bic", "#,##0.00"), ("ks", "0.0000"), ("rank_aic", "0"),
+           ("boundary", "0"), ("selected", "0"), ("me_ratio_min", "0.000"), ("me_ratio_max", "0.000")]
+    for i in range(5):
+        for j, (c_, f_) in enumerate(src):
+            cell(ws, f"{L(j + 1)}{7 + i}", ix(f"fc_{c_}", i + 1, f_), fmt=f_)
+    cell(ws, "A13", "AIC = 2k - 2 log L; BIC = k ln n - 2 log L; KS = largest distance between the fitted conditional "
+                    "survival and the Kaplan-Meier estimate. Boundary fit: the optimum runs to an extreme parameter "
+                    "(no proper maximum above u); never selected automatically. Selection: fit_selected, else the "
+                    "lowest AIC. Mean excess ratio: fitted / empirical E[X - AP | X > AP] (caps and the largest "
+                    "observed claim applied), 0.8-1.25 expected.", SUB)
+    header(ws, 15, ["Distribution", "AP", "Units above AP", "Mean excess (data)", "Mean excess (fitted)", "Ratio"],
+           col0=1)
+    me = [("dist", None), ("ap", AMT), ("n_above", NUM), ("mean_excess_empirical", AMT), ("mean_excess_fitted", AMT),
+          ("ratio", "0.000")]
+    for i in range(30):
+        for j, (c_, f_) in enumerate(me):
+            cell(ws, f"{L(j + 1)}{16 + i}", ix(f"fm_{c_}", i + 1, f_), fmt=f_)
+    header(ws, 15, ["Distribution", "Threshold", "Label", "Survival (Kaplan-Meier)", "Survival (fitted)"], col0=8)
+    sv = [("dist", None), ("t", AMT), ("t_label", None), ("s_km", "0.0000"), ("s_fitted", "0.0000")]
+    for i in range(60):
+        for j, (c_, f_) in enumerate(sv):
+            cell(ws, f"{L(j + 8)}{16 + i}", ix(f"fv_{c_}", i + 1, f_), fmt=f_)
+    widths(ws, {L(i + 1): 14 for i in range(14)})
+    return ws
+
+
 # -------------------------------------------------------------------------------------------------------- Scenarios
 def scenarios(wb):
     ws = wb.create_sheet("Scenarios")
@@ -478,7 +527,7 @@ def readme(wb):
     lines = [
         ("How it is filled", BOLD),
         ("1. Copy this template once to data/output/<live|synth>/XoL_Results.xlsx (next to the stage folders).", BASE),
-        ("2. Run the workflows 00 -> 01 -> 02 -> 03 -> 04 -> 05 -> 06 -> 07 in Alteryx. Stage 07 replaces the data "
+        ("2. Run the workflows 00 -> 01 -> 02 -> 03 -> 04a -> 04 -> 05 -> 06 -> 07 in Alteryx. Stage 07 replaces the data "
          "sheets (out_*, scn_summary); close this workbook in Excel before running it.", BASE),
         ("3. Open the workbook. Every exhibit recalculates from the data sheets and the Inputs sheet.", BASE),
         ("", BASE),
@@ -491,6 +540,8 @@ def readme(wb):
         ("Cedant Impact - Exhibit C2: surplus / (loss) against the net claims budget for the average year and the "
          "return periods, without RI and with each structure.", BASE),
         ("Expiring - expiring rate trended vs indicated premium; as-if experience by treaty year.", BASE),
+        ("Severity - candidates fitted above u in stage 04a (Python tool): parameters, AIC / BIC / KS, mean excess at "
+         "each AP and survival against Kaplan-Meier; the distribution the simulation used.", BASE),
         ("Scenarios - one row per sensitivity run (Params scenario_id).", BASE),
         ("out_* - data written by Alteryx (do not edit; they are replaced each run). out_run_log lists the "
          "parameters, justifications, scenario and data mode of the run; out_warnings every check (STOP / FLAG / INFO).",
@@ -528,6 +579,7 @@ def build(path=OUT):
     structures(wb)
     impact(wb)
     expiring(wb)
+    severity(wb)
     scenarios(wb)
     data_sheets(wb)
     define_names(wb)

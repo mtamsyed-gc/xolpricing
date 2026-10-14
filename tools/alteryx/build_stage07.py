@@ -18,7 +18,7 @@ import control_spec as S
 import results_spec as R
 
 WORKBOOK = "XoL_Results.xlsx"
-CHK = ["00", "01", "02", "03", "04", "05", "06"]
+CHK = ["00", "01", "02", "03", "04a", "04", "05", "06"]
 REC = ["01", "02", "03", "04", "05", "06"]
 
 

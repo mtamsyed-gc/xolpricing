@@ -189,6 +189,20 @@ class WF:
         self.connect(src, t)
         return t
 
+    def python(self, srcs, script, label=""):
+        """Python tool, production (script) mode, Designer's base environment. XML as Designer 2026.2 saves it
+        (2026-10-14). Inputs: srcs[i] connects to anchor "Input" named "#<i+1>" (Alteryx.read("#1")); outputs are
+        anchors "Output1".."Output5" (Alteryx.write(df, n))."""
+        assert "]]>" not in script
+        cfg = ('<JupyterProduction>true</JupyterProduction><LastExecutedByEngineVersion>*</LastExecutedByEngineVersion>'
+               '<Notebook><![CDATA[{}]]></Notebook>'
+               f'<productionModeScript><![CDATA[{script}]]></productionModeScript>'
+               '<vEnvName>designerbasetools_venv</vEnvName>')
+        t = self._add("JupyterCode", "AlteryxJupyter", cfg, label, dll="AlteryxJupyterPluginEngine.dll")
+        for i, s in enumerate(srcs):
+            self.connect(s, t, "Input", name=f"#{i + 1}")
+        return t
+
     def input_yxdb(self, path, label=""):
         """Alteryx database (.yxdb): lossless types, as Designer writes the Input Data tool for it."""
         cfg = (f'<Passwords /><File OutputFileName="" FileFormat="19" SearchSubDirs="False" RecordLimit="">'

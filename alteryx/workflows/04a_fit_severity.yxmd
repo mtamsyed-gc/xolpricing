@@ -1,0 +1,516 @@
+<?xml version="1.0"?>
+<AlteryxDocument yxmdVer="2025.2" RunE2="T">
+<Nodes>
+<Node ToolID="1"><GuiSettings Plugin="AlteryxGuiToolkit.ToolContainer.ToolContainer"><Position x="60" y="60" width="1860" height="520" /></GuiSettings><Properties><Configuration><Caption>04a.1 Fit data: units above u, censoring at caps; thresholds</Caption><Style TextColor="#314c4a" FillColor="#ecf2f2" BorderColor="#314c4a" Transparency="25" Margin="25" /><Disabled value="False" /><Folded value="False" /></Configuration><Annotation DisplayMode="0"><Name /><AnnotationText>04a.1 Fit data: units above u, censoring at caps; thresholds</AnnotationText><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><ChildNodes>
+<Node ToolID="2"><GuiSettings Plugin="AlteryxBasePluginsGui.DbFileInput.DbFileInput"><Position x="90" y="110" /></GuiSettings><Properties><Configuration><Passwords /><File OutputFileName="" FileFormat="19" SearchSubDirs="False" RecordLimit="">..\..\data\output\live\stage\ctl_params.yxdb</File><FormatSpecificOptions /></Configuration><Annotation DisplayMode="0"><Name>ctl_params (stage 00)</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxDbFileInput" /></Node>
+<Node ToolID="3"><GuiSettings Plugin="AlteryxBasePluginsGui.Formula.Formula"><Position x="210" y="110" /></GuiSettings><Properties><Configuration><FormulaFields><FormulaField expression="1" field="kp" size="4" type="Int32" /></FormulaFields></Configuration><Annotation DisplayMode="0"><Name>parameters: key</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxFormula" /></Node>
+<Node ToolID="4"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="330" y="110" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="kp" selected="True" /><SelectField field="fit_cutoff" selected="True" rename="p_fit_cutoff" /><SelectField field="fit_candidates" selected="True" rename="p_fit_candidates" /><SelectField field="fit_selected" selected="True" rename="p_fit_selected" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>parameters</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+<Node ToolID="5"><GuiSettings Plugin="AlteryxBasePluginsGui.DbFileInput.DbFileInput"><Position x="90" y="200" /></GuiSettings><Properties><Configuration><Passwords /><File OutputFileName="" FileFormat="19" SearchSubDirs="False" RecordLimit="">..\..\data\output\live\stage\ctl_layers.yxdb</File><FormatSpecificOptions /></Configuration><Annotation DisplayMode="0"><Name>ctl_layers (stage 00)</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxDbFileInput" /></Node>
+<Node ToolID="6"><GuiSettings Plugin="AlteryxBasePluginsGui.Filter.Filter"><Position x="210" y="200" /></GuiSettings><Properties><Configuration><Expression>[cover] = "PP" AND [active] = 1</Expression><Mode>Custom</Mode></Configuration><Annotation DisplayMode="0"><Name>active per-person layers</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxFilter" /></Node>
+<Node ToolID="7"><GuiSettings Plugin="AlteryxBasePluginsGui.Formula.Formula"><Position x="330" y="200" /></GuiSettings><Properties><Configuration><FormulaFields><FormulaField expression='IIF(IsNull([limit_basis]), "AMOUNT", [limit_basis])' field="lim_basis" size="1073741823" type="V_WString" /><FormulaField expression="IIF(IsNull([co_participation_pct]), 0, [co_participation_pct])" field="cop" size="8" type="Double" /><FormulaField expression='IIF(IsNull([label]), "PP option " + ToString([option_id]), [label])' field="l_label" size="1073741823" type="V_WString" /><FormulaField expression="1" field="kl" size="4" type="Int32" /></FormulaFields></Configuration><Annotation DisplayMode="0"><Name>layer fields</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxFormula" /></Node>
+<Node ToolID="8"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="450" y="200" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="kl" selected="True" /><SelectField field="option_id" selected="True" /><SelectField field="layer" selected="True" /><SelectField field="l_label" selected="True" /><SelectField field="lim_basis" selected="True" /><SelectField field="ap" selected="True" /><SelectField field="limit" selected="True" /><SelectField field="aal" selected="True" /><SelectField field="aad" selected="True" /><SelectField field="cop" selected="True" /><SelectField field="reinstatements_n" selected="True" /><SelectField field="reinstatement_cost_pct" selected="True" /><SelectField field="reinst_pro_rata_time" selected="True" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>layers</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+<Node ToolID="9"><GuiSettings Plugin="AlteryxSpatialPluginsGui.Summarize.Summarize"><Position x="570" y="200" /></GuiSettings><Properties><Configuration><SummarizeFields><SummarizeField field="kl" action="GroupBy" rename="kmin" /><SummarizeField field="ap" action="Min" rename="min_ap" /></SummarizeFields></Configuration><Annotation DisplayMode="0"><Name>lowest AP</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxSpatialPluginsEngine.dll" EngineDllEntryPoint="AlteryxSummarize" /></Node>
+<Node ToolID="10"><GuiSettings Plugin="AlteryxBasePluginsGui.Join.Join"><Position x="690" y="110" /></GuiSettings><Properties><Configuration joinByRecordPos="False"><JoinInfo connection="Left"><Field field="kp" /></JoinInfo><JoinInfo connection="Right"><Field field="kmin" /></JoinInfo><SelectConfiguration><Configuration outputConnection="Join"><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="*Unknown" selected="True" /></SelectFields></Configuration></SelectConfiguration></Configuration><Annotation DisplayMode="0"><Name>+ lowest AP</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxJoin" /></Node>
+<Node ToolID="11"><GuiSettings Plugin="AlteryxBasePluginsGui.Formula.Formula"><Position x="810" y="110" /></GuiSettings><Properties><Configuration><FormulaFields><FormulaField expression="IIF(IsNull([p_fit_cutoff]), [min_ap], [p_fit_cutoff])" field="u_fit" size="8" type="Double" /></FormulaFields></Configuration><Annotation DisplayMode="0"><Name>threshold u</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxFormula" /></Node>
+<Node ToolID="12"><GuiSettings Plugin="AlteryxBasePluginsGui.DbFileInput.DbFileInput"><Position x="90" y="290" /></GuiSettings><Properties><Configuration><Passwords /><File OutputFileName="" FileFormat="19" SearchSubDirs="False" RecordLimit="">..\..\data\output\live\stage\bc_adjusted.yxdb</File><FormatSpecificOptions /></Configuration><Annotation DisplayMode="0"><Name>bc_adjusted (stage 03)</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxDbFileInput" /></Node>
+<Node ToolID="13"><GuiSettings Plugin="AlteryxBasePluginsGui.Formula.Formula"><Position x="210" y="290" /></GuiSettings><Properties><Configuration><FormulaFields><FormulaField expression="1" field="kx" size="4" type="Int32" /></FormulaFields></Configuration><Annotation DisplayMode="0"><Name>key</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxFormula" /></Node>
+<Node ToolID="14"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="930" y="110" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="kp" selected="True" /><SelectField field="u_fit" selected="True" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>u</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+<Node ToolID="15"><GuiSettings Plugin="AlteryxBasePluginsGui.Join.Join"><Position x="1050" y="290" /></GuiSettings><Properties><Configuration joinByRecordPos="False"><JoinInfo connection="Left"><Field field="kx" /></JoinInfo><JoinInfo connection="Right"><Field field="kp" /></JoinInfo><SelectConfiguration><Configuration outputConnection="Join"><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="*Unknown" selected="True" /></SelectFields></Configuration></SelectConfiguration></Configuration><Annotation DisplayMode="0"><Name>+ u</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxJoin" /></Node>
+<Node ToolID="16"><GuiSettings Plugin="AlteryxBasePluginsGui.Filter.Filter"><Position x="1170" y="290" /></GuiSettings><Properties><Configuration><Expression>[adj] &gt; [u_fit]</Expression><Mode>Custom</Mode></Configuration><Annotation DisplayMode="0"><Name>units above u</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxFilter" /></Node>
+<Node ToolID="17"><GuiSettings Plugin="AlteryxBasePluginsGui.Sort.Sort"><Position x="1290" y="290" /></GuiSettings><Properties><Configuration><SortInfo locale="1033"><Field field="acc_key" order="Ascending" /></SortInfo></Configuration><Annotation DisplayMode="0"><Name>fixed order</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSort" /></Node>
+<Node ToolID="18"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="1410" y="290" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="adj" selected="True" /><SelectField field="adj_uncapped" selected="True" /><SelectField field="cap" selected="True" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>fit units</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+<Node ToolID="19"><GuiSettings Plugin="AlteryxBasePluginsGui.Formula.Formula"><Position x="1410" y="380" /></GuiSettings><Properties><Configuration><FormulaFields><FormulaField expression="1" field="km" size="4" type="Int32" /></FormulaFields></Configuration><Annotation DisplayMode="0"><Name>key</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxFormula" /></Node>
+<Node ToolID="20"><GuiSettings Plugin="AlteryxSpatialPluginsGui.Summarize.Summarize"><Position x="1530" y="380" /></GuiSettings><Properties><Configuration><SummarizeFields><SummarizeField field="km" action="GroupBy" rename="km" /><SummarizeField field="adj" action="Max" rename="max_observed" /></SummarizeFields></Configuration><Annotation DisplayMode="0"><Name>largest observed</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxSpatialPluginsEngine.dll" EngineDllEntryPoint="AlteryxSummarize" /></Node>
+<Node ToolID="21"><GuiSettings Plugin="AlteryxBasePluginsGui.Join.Join"><Position x="1650" y="110" /></GuiSettings><Properties><Configuration joinByRecordPos="False"><JoinInfo connection="Left"><Field field="kp" /></JoinInfo><JoinInfo connection="Right"><Field field="km" /></JoinInfo><SelectConfiguration><Configuration outputConnection="Join"><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="*Unknown" selected="True" /></SelectFields></Configuration></SelectConfiguration></Configuration><Annotation DisplayMode="0"><Name>+ largest observed</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxJoin" /></Node>
+<Node ToolID="22"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="1770" y="110" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="u_fit" selected="True" /><SelectField field="max_observed" selected="True" /><SelectField field="p_fit_candidates" selected="True" rename="fit_candidates" /><SelectField field="p_fit_selected" selected="True" rename="fit_selected" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>fit context</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+<Node ToolID="23"><GuiSettings Plugin="AlteryxBasePluginsGui.Formula.Formula"><Position x="570" y="290" /></GuiSettings><Properties><Configuration><FormulaFields><FormulaField expression="[ap]" field="t" size="8" type="Double" /><FormulaField expression='"AP " + [l_label]' field="t_label" size="1073741823" type="V_WString" /><FormulaField expression="1" field="is_ap" size="4" type="Int32" /></FormulaFields></Configuration><Annotation DisplayMode="0"><Name>AP thresholds</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxFormula" /></Node>
+<Node ToolID="24"><GuiSettings Plugin="AlteryxBasePluginsGui.Filter.Filter"><Position x="570" y="380" /></GuiSettings><Properties><Configuration><Expression>[lim_basis] = "AMOUNT" AND !IsNull([limit])</Expression><Mode>Custom</Mode></Configuration><Annotation DisplayMode="0"><Name>layers with a fixed limit</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxFilter" /></Node>
+<Node ToolID="25"><GuiSettings Plugin="AlteryxBasePluginsGui.Formula.Formula"><Position x="690" y="380" /></GuiSettings><Properties><Configuration><FormulaFields><FormulaField expression="[ap] + [limit]" field="t" size="8" type="Double" /><FormulaField expression='"exhaust " + [l_label]' field="t_label" size="1073741823" type="V_WString" /><FormulaField expression="0" field="is_ap" size="4" type="Int32" /></FormulaFields></Configuration><Annotation DisplayMode="0"><Name>exhaustion thresholds</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxFormula" /></Node>
+<Node ToolID="26"><GuiSettings Plugin="AlteryxBasePluginsGui.TextInput.TextInput"><Position x="90" y="380" /></GuiSettings><Properties><Configuration><NumRows value="4" /><Fields><Field name="t" /><Field name="t_label" /><Field name="is_ap" /></Fields><Data><r><c>250000</c><c>250,000</c><c>0</c></r><r><c>500000</c><c>500,000</c><c>0</c></r><r><c>1000000</c><c>1,000,000</c><c>0</c></r><r><c>2000000</c><c>2,000,000</c><c>0</c></r></Data></Configuration><Annotation DisplayMode="0"><Name>round thresholds</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxTextInput" /></Node>
+<Node ToolID="27"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="210" y="380" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="t" selected="True" type="Double" size="8" /><SelectField field="t_label" selected="True" /><SelectField field="is_ap" selected="True" type="Int32" size="4" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>typed</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+<Node ToolID="28"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="690" y="290" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="t" selected="True" /><SelectField field="t_label" selected="True" /><SelectField field="is_ap" selected="True" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>t</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+<Node ToolID="29"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="810" y="380" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="t" selected="True" /><SelectField field="t_label" selected="True" /><SelectField field="is_ap" selected="True" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>t</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+<Node ToolID="30"><GuiSettings Plugin="AlteryxBasePluginsGui.Union.Union"><Position x="930" y="290" /></GuiSettings><Properties><Configuration><ByName_ErrorMode>Warning</ByName_ErrorMode><ByName_OutputMode>All</ByName_OutputMode><Mode>ByName</Mode><SetOutputOrder value="False" /></Configuration><Annotation DisplayMode="0"><Name>thresholds</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxUnion" /></Node>
+<Node ToolID="31"><GuiSettings Plugin="AlteryxBasePluginsGui.Sort.Sort"><Position x="1050" y="380" /></GuiSettings><Properties><Configuration><SortInfo locale="1033"><Field field="t" order="Ascending" /><Field field="is_ap" order="Descending" /></SortInfo></Configuration><Annotation DisplayMode="0"><Name>APs first</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSort" /></Node>
+<Node ToolID="32"><GuiSettings Plugin="AlteryxBasePluginsGui.Unique.Unique"><Position x="1170" y="380" /></GuiSettings><Properties><Configuration><UniqueFields><Field field="t" /></UniqueFields></Configuration><Annotation DisplayMode="0"><Name>distinct thresholds</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxUnique" /></Node>
+<Node ToolID="33"><GuiSettings Plugin="AlteryxBasePluginsGui.Formula.Formula"><Position x="1290" y="380" /></GuiSettings><Properties><Configuration><FormulaFields><FormulaField expression="1" field="kt" size="4" type="Int32" /></FormulaFields></Configuration><Annotation DisplayMode="0"><Name>key</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxFormula" /></Node>
+<Node ToolID="34"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="930" y="200" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="kp" selected="True" /><SelectField field="u_fit" selected="True" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>u</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+<Node ToolID="35"><GuiSettings Plugin="AlteryxBasePluginsGui.Join.Join"><Position x="1410" y="470" /></GuiSettings><Properties><Configuration joinByRecordPos="False"><JoinInfo connection="Left"><Field field="kt" /></JoinInfo><JoinInfo connection="Right"><Field field="kp" /></JoinInfo><SelectConfiguration><Configuration outputConnection="Join"><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="*Unknown" selected="True" /></SelectFields></Configuration></SelectConfiguration></Configuration><Annotation DisplayMode="0"><Name>+ u</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxJoin" /></Node>
+<Node ToolID="36"><GuiSettings Plugin="AlteryxBasePluginsGui.Filter.Filter"><Position x="1530" y="470" /></GuiSettings><Properties><Configuration><Expression>[t] &gt;= [u_fit]</Expression><Mode>Custom</Mode></Configuration><Annotation DisplayMode="0"><Name>thresholds at or above u</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxFilter" /></Node>
+<Node ToolID="37"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="1650" y="470" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="t" selected="True" /><SelectField field="t_label" selected="True" /><SelectField field="is_ap" selected="True" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>thresholds</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+</ChildNodes></Node>
+<Node ToolID="38"><GuiSettings Plugin="AlteryxGuiToolkit.ToolContainer.ToolContainer"><Position x="60" y="620" width="300" height="160" /></GuiSettings><Properties><Configuration><Caption>04a.2 Python tool: candidates, statistics, selection, inverse-survival grid (tools/python/sevfit.py)</Caption><Style TextColor="#314c4a" FillColor="#ecf2f2" BorderColor="#314c4a" Transparency="25" Margin="25" /><Disabled value="False" /><Folded value="False" /></Configuration><Annotation DisplayMode="0"><Name /><AnnotationText>04a.2 Python tool: candidates, statistics, selection, inverse-survival grid (tools/python/sevfit.py)</AnnotationText><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><ChildNodes>
+<Node ToolID="39"><GuiSettings Plugin="JupyterCode"><Position x="90" y="670" /></GuiSettings><Properties><Configuration><JupyterProduction>true</JupyterProduction><LastExecutedByEngineVersion>*</LastExecutedByEngineVersion><Notebook><![CDATA[{}]]></Notebook><productionModeScript><![CDATA[from ayx import Alteryx
+"""Per-person severity fitting above the threshold u (stage 04a; scope §6, methodology §8.1).
+
+Runs inside Alteryx's Python tool (the builder embeds this file verbatim in 04a_fit_severity.yxmd) and in the tests.
+Needs numpy, pandas and scipy only (all in Designer's base Python environment: Designer 2026.2 ships scipy 1.16).
+
+Data: the fit units of stage 04 - adjusted amounts above u (trended, pre-AP completed, capped at the benefit / policy
+limit); a unit is right-censored at its cap when its uncapped amount reaches the cap. Every candidate is fitted by
+maximum likelihood to the distribution conditional on X > u (left truncation at u):
+    log L = sum_uncensored log f(x) + sum_censored log S(c) - n log S(u)
+Candidates (fit_candidates): LOGNORMAL (mu, sigma), GAMMA (shape, scale), WEIBULL (shape, scale), PARETO (alpha;
+single-parameter with scale u: the native fit), GPD (xi, sigma; on the excess x - u).
+Statistics: log-likelihood, AIC = 2k - 2 log L, BIC = k ln n - 2 log L, KS = largest distance between the fitted
+conditional survival and the Kaplan-Meier estimate, mean excess over each AP (fitted with the units' caps and limited
+at the largest observed claim M, against the data), survival at fixed thresholds.
+Boundary fits: a candidate whose optimum runs to an extreme of its parameter range (|log parameter| > 30, or the GPD
+xi at -0.9 / 5) has no proper maximum: above u it imitates another shape (typically a power law). It is reported and
+flagged (F06) and left out of the automatic selection; fit_selected can still choose it.
+Selection: fit_selected if given, else the lowest AIC among the converged, non-boundary candidates.
+Output for the simulation: the selected conditional survival inverted on a grid s_k = 10^(-k/K), k = 0 .. K*D;
+stage 04 draws X from U by interpolating ln x linearly in log10 U (exact for the Pareto).
+"""
+import math
+
+import numpy as np
+import pandas as pd
+from scipy import integrate, optimize, special
+
+DISTS = ("LOGNORMAL", "GAMMA", "WEIBULL", "PARETO", "GPD")
+K_PER_DECADE = 50          # grid points per decade of conditional survival
+DECADES = 10               # down to s = 1e-10 (MINSTD's smallest uniform is 4.7e-10; beyond: last segment extended)
+MIN_UNCENSORED = 30        # fewer uncensored units: F05 flag
+ME_BAND = (0.8, 1.25)      # fitted / empirical mean excess outside: F04 flag (same band as check S05)
+NEG = -1e300
+
+
+# ---------------------------------------------------------------------------------------------- distributions
+def _ln_logpdf(x, mu, sg):
+    z = (np.log(x) - mu) / sg
+    return -np.log(x) - math.log(sg) - 0.5 * math.log(2 * math.pi) - 0.5 * z * z
+
+
+def _ln_logsf(x, mu, sg):
+    return special.log_ndtr(-(np.log(x) - mu) / sg)
+
+
+def _ga_logpdf(x, a, th):
+    return (a - 1) * np.log(x) - x / th - special.gammaln(a) - a * math.log(th)
+
+
+def _ga_logsf(x, a, th):
+    with np.errstate(divide="ignore"):
+        return np.log(special.gammaincc(a, np.asarray(x, dtype=float) / th))
+
+
+def _we_logpdf(x, c, lam):
+    r = x / lam
+    return math.log(c) - math.log(lam) + (c - 1) * np.log(r) - r ** c
+
+
+def _we_logsf(x, c, lam):
+    return -(np.asarray(x, dtype=float) / lam) ** c
+
+
+def _gpd_core(y, xi, sg):
+    z = xi * np.asarray(y, dtype=float) / sg
+    ok = z > -1
+    return z, ok
+
+
+def _gpd_logsf(y, xi, sg):
+    y = np.asarray(y, dtype=float)
+    if abs(xi) < 1e-12:
+        return -y / sg
+    z, ok = _gpd_core(y, xi, sg)
+    out = np.full(y.shape, -np.inf)
+    out[ok] = -np.log1p(z[ok]) / xi
+    return out
+
+
+def _gpd_logpdf(y, xi, sg):
+    y = np.asarray(y, dtype=float)
+    if abs(xi) < 1e-12:
+        return -math.log(sg) - y / sg
+    z, ok = _gpd_core(y, xi, sg)
+    out = np.full(y.shape, -np.inf)
+    out[ok] = -math.log(sg) - (1 / xi + 1) * np.log1p(z[ok])
+    return out
+
+
+class Model:
+    """A candidate: parameters theta (natural scale); log density / survival of X (not yet conditional on X > u)."""
+
+    def __init__(self, name, u):
+        self.name, self.u = name, u
+        self.k = 1 if name == "PARETO" else 2
+        self.pnames = {"LOGNORMAL": ("mu", "sigma"), "GAMMA": ("shape", "scale"), "WEIBULL": ("shape", "scale"),
+                       "PARETO": ("alpha", ""), "GPD": ("xi", "sigma")}[name]
+
+    def logpdf(self, x, th):
+        u, n = self.u, self.name
+        if n == "LOGNORMAL":
+            return _ln_logpdf(x, *th)
+        if n == "GAMMA":
+            return _ga_logpdf(x, *th)
+        if n == "WEIBULL":
+            return _we_logpdf(x, *th)
+        if n == "PARETO":
+            return math.log(th[0]) - np.log(x) - th[0] * np.log(x / u)
+        return _gpd_logpdf(np.asarray(x, dtype=float) - u, *th)
+
+    def logsf(self, x, th):
+        u, n = self.u, self.name
+        if n == "LOGNORMAL":
+            return _ln_logsf(x, *th)
+        if n == "GAMMA":
+            return _ga_logsf(x, *th)
+        if n == "WEIBULL":
+            return _we_logsf(x, *th)
+        if n == "PARETO":
+            return -th[0] * np.log(np.asarray(x, dtype=float) / u)
+        return _gpd_logsf(np.asarray(x, dtype=float) - u, *th)
+
+    def cond_logsf(self, x, th):
+        """log P(X > x | X > u)."""
+        return self.logsf(x, th) - float(self.logsf(np.array([self.u]), th)[0])
+
+    def cond_isf(self, s, th):
+        """x with P(X > x | X > u) = s (s in (0, 1]); vectorised, computed in log space."""
+        s = np.asarray(s, dtype=float)
+        u, n = self.u, self.name
+        logp = np.log(s) + float(self.logsf(np.array([u]), th)[0])     # unconditional log survival
+        if n == "LOGNORMAL":
+            mu, sg = th
+            return np.maximum(u, np.exp(mu - sg * special.ndtri_exp(logp)))
+        if n == "GAMMA":
+            a, sc = th
+            return np.maximum(u, sc * special.gammainccinv(a, np.exp(logp)))
+        if n == "WEIBULL":
+            c, lam = th
+            return np.maximum(u, lam * (-logp) ** (1 / c))
+        if n == "PARETO":
+            return u * np.exp(-np.log(s) / th[0])
+        xi, sg = th
+        if abs(xi) < 1e-12:
+            return u - sg * np.log(s)
+        return u + sg / xi * np.expm1(-xi * np.log(s))
+
+    # optimisation on an unconstrained scale
+    def to_theta(self, z):
+        if self.name == "LOGNORMAL":
+            return (z[0], math.exp(z[1]))
+        if self.name == "GPD":
+            return (z[0], math.exp(z[1]))
+        return tuple(math.exp(v) for v in z)
+
+    def starts(self, x, unc):
+        lx = np.log(x[unc])
+        m, sd = float(lx.mean()), max(float(lx.std()), 0.1)
+        xm, xv = float(x[unc].mean()), float(x[unc].var()) or float(x[unc].mean()) ** 2
+        a0 = alpha_closed(x, unc, self.u)
+        if self.name == "LOGNORMAL":
+            return [(m, math.log(sd)), (m - 1.0, math.log(sd * 1.5)), (math.log(self.u), math.log(sd * 2))]
+        if self.name == "GAMMA":
+            return [(math.log(xm * xm / xv), math.log(xv / xm)), (math.log(0.5), math.log(xm)),
+                    (math.log(2.0), math.log(xm / 2))]
+        if self.name == "WEIBULL":
+            c0 = min(max(math.pi / (math.sqrt(6) * sd), 0.05), 20)
+            return [(math.log(c0), m + 0.5772 / c0), (math.log(0.5), math.log(xm)), (math.log(1.0), math.log(xm))]
+        if self.name == "GPD":
+            return [(1 / a0, math.log(self.u / a0)), (0.1, math.log(xm - self.u)), (0.5, math.log(xm - self.u))]
+        return []
+
+
+def alpha_closed(x, unc, u):
+    """Single-parameter Pareto MLE with censoring: n_uncensored / sum ln(x / u) (as the native fit)."""
+    sl = float(np.log(x / u).sum())
+    return unc.sum() / sl if sl > 0 and unc.sum() > 0 else float("nan")
+
+
+def loglik(model, th, x, unc):
+    with np.errstate(all="ignore"):
+        ll = model.logpdf(x[unc], th).sum() + model.logsf(x[~unc], th).sum() \
+            - len(x) * float(model.logsf(np.array([model.u]), th)[0])
+    return float(ll) if np.isfinite(ll) else NEG
+
+
+BOUND = 30.0
+
+
+def fit(model, x, unc):
+    """MLE. Returns (theta, log L, converged, boundary)."""
+    if model.name == "PARETO":
+        a = alpha_closed(x, unc, model.u)
+        return ((a,), loglik(model, (a,), x, unc), bool(np.isfinite(a)), False)
+
+    def nll(z):
+        if model.name == "GPD" and not (-0.9 < z[0] < 5):
+            return 1e300
+        if model.name != "GPD" and np.any(np.abs(z) > 50):
+            return 1e300
+        return -loglik(model, model.to_theta(z), x, unc)
+
+    best = None
+    opts = {"xatol": 1e-10, "fatol": 1e-11, "maxiter": 20000, "maxfev": 40000}
+    for z0 in model.starts(x, unc):
+        r = optimize.minimize(nll, np.array(z0, dtype=float), method="Nelder-Mead", options=opts)
+        r = optimize.minimize(nll, r.x, method="Nelder-Mead", options=opts)      # restart: polish
+        if best is None or r.fun < best.fun:
+            best = r
+    ok = bool(best.fun < 1e299)
+    th = model.to_theta(best.x)
+    z = best.x
+    edge = (not (-0.89 < z[0] < 4.99) or abs(z[1]) > BOUND) if model.name == "GPD" else bool(np.any(np.abs(z) > BOUND))
+    return (th, -best.fun if ok else NEG, ok, bool(edge))
+
+
+# ---------------------------------------------------------------------------------------------- statistics
+def kaplan_meier(x, unc):
+    """Event times t_j and S_KM(t_j) (right limit) of the conditional survival above u."""
+    t = np.unique(x[unc])
+    at_risk = np.array([(x >= tj).sum() for tj in t], dtype=float)
+    d = np.array([((x == tj) & unc).sum() for tj in t], dtype=float)
+    return t, np.cumprod(1 - d / at_risk)
+
+
+def ks_stat(model, th, x, unc):
+    t, skm = kaplan_meier(x, unc)
+    if len(t) == 0:
+        return float("nan")
+    sf = np.exp(model.cond_logsf(t, th))
+    left = np.concatenate([[1.0], skm[:-1]])
+    return float(max(np.abs(skm - sf).max(), np.abs(left - sf).max()))
+
+
+def km_at(x, unc, pts):
+    t, skm = kaplan_meier(x, unc)
+    out = []
+    for p in pts:
+        i = np.searchsorted(t, p, side="right") - 1      # S_KM(p) = product over event times <= p ... survival > p
+        out.append(1.0 if i < 0 else float(skm[i]))
+    return np.array(out)
+
+
+def mean_excess(model, th, x, caps, ap, mx):
+    """Fitted E[min(X, cap, M) - AP | min(X, cap) > AP], caps of the fit units; and the data's mean excess."""
+    above = x > ap
+    emp = float((np.minimum(x[above], mx) - ap).mean()) if above.any() else float("nan")
+    cs = np.minimum(caps[caps > ap], mx)
+    if len(cs) == 0 or not above.any():
+        return emp, float("nan")
+    s_ap = math.exp(float(model.cond_logsf(np.array([ap]), th)[0]))
+    if s_ap <= 0:
+        return emp, float("nan")
+    num = 0.0
+    for c, m in zip(*np.unique(cs, return_counts=True)):
+        if c > ap:
+            f = lambda v: math.exp(float(model.cond_logsf(np.array([v]), th)[0]))  # noqa: E731
+            num += m * integrate.quad(f, ap, c, limit=200, epsabs=0, epsrel=1e-10)[0]
+    return emp, num / (len(cs) * s_ap)
+
+
+def table(model, th):
+    k = np.arange(K_PER_DECADE * DECADES + 1)
+    lx = np.log(model.cond_isf(10.0 ** (-k / K_PER_DECADE), th))
+    return pd.DataFrame({"k": k[:-1].astype("int64"), "lx0": lx[:-1], "lx1": lx[1:]})
+
+
+# ---------------------------------------------------------------------------------------------- driver
+def run(units, ctx, thr):
+    """units: adj, adj_uncapped, cap (units above u); ctx: one row u_fit, max_observed, fit_candidates, fit_selected;
+    thr: t, t_label, is_ap (thresholds above u). Returns candidates, mean_excess, survival, sev_table, flags."""
+    c0 = ctx.iloc[0]
+    u, mx = float(c0["u_fit"]), float(c0["max_observed"])
+    cand = [d.strip().upper() for d in str(c0["fit_candidates"] or "").split(",") if d.strip()]
+    sel_in = "" if pd.isna(c0["fit_selected"]) else str(c0["fit_selected"]).strip().upper()
+    units = units.sort_values(["adj", "cap", "adj_uncapped"], kind="mergesort")
+    x = units["adj"].to_numpy(dtype=float)
+    caps = units["cap"].to_numpy(dtype=float)
+    unc = units["adj_uncapped"].to_numpy(dtype=float) < caps
+    flags = []
+
+    def flag(code, sev, item, msg):
+        flags.append((code, sev, item, msg))
+
+    for d in cand:
+        if d not in DISTS:
+            flag("F02", "STOP", d, "unknown candidate in fit_candidates (" + ", ".join(DISTS) + ")")
+    cand = [d for d in DISTS if d in cand]
+    if int(unc.sum()) < MIN_UNCENSORED:
+        flag("F05", "STOP" if unc.sum() == 0 else "FLAG", f"u = {u:,.0f}",
+             f"{int(unc.sum())} uncensored units above u: the fits rest on few points")
+    rows, fits = [], {}
+    if unc.sum() > 0:
+        for d in cand:
+            m = Model(d, u)
+            th, ll, okk, edge = fit(m, x, unc)
+            fits[d] = (m, th, okk)
+            if not okk:
+                flag("F01", "FLAG", d, "fit did not converge: candidate left out of the selection")
+            elif edge:
+                flag("F06", "INFO", d, "boundary fit (parameters at an extreme: no proper maximum above u); "
+                                       "left out of the automatic selection")
+            rows.append({"dist": d, "n_params": m.k, "p1_name": m.pnames[0], "p1": th[0], "p2_name": m.pnames[1],
+                         "p2": th[1] if m.k == 2 else np.nan, "loglik": ll if okk else np.nan,
+                         "aic": 2 * m.k - 2 * ll if okk else np.nan,
+                         "bic": m.k * math.log(len(x)) - 2 * ll if okk else np.nan,
+                         "ks": ks_stat(m, th, x, unc) if okk else np.nan, "converged": int(okk),
+                         "boundary": int(edge)})
+    cdf = pd.DataFrame(rows, columns=["dist", "n_params", "p1_name", "p1", "p2_name", "p2", "loglik", "aic", "bic",
+                                      "ks", "converged", "boundary"])
+    good = cdf[(cdf.converged == 1) & (cdf.boundary == 0)]
+    selected = ""
+    if sel_in:
+        if sel_in not in fits or not fits[sel_in][2]:
+            flag("F02", "STOP", sel_in, "fit_selected is not a converged candidate")
+        else:
+            selected = sel_in
+    elif len(good):
+        selected = good.sort_values(["aic", "dist"]).dist.iloc[0]
+    for col in ("aic", "bic", "ks"):
+        cdf["rank_" + col] = cdf[col].rank(method="min").astype("float64")
+    cdf["selected"] = (cdf.dist == selected).astype("int64")
+    if selected and len(good) > 1:
+        for col, lab in (("bic", "BIC"), ("ks", "KS")):
+            best = good.sort_values([col, "dist"]).dist.iloc[0]
+            if best != selected:
+                flag("F03", "INFO", selected, f"lowest {lab} is {best}, selected {selected}")
+    # mean excess at the APs, survival at the thresholds
+    me_rows, sv_rows = [], []
+    aps = sorted(set(float(t) for t, a in zip(thr["t"], thr["is_ap"]) if int(a) == 1 and float(t) >= u))
+    pts = thr.sort_values("t")
+    skm = km_at(x, unc, pts["t"].to_numpy(dtype=float))
+    for d in cand:
+        if d not in fits or not fits[d][2]:
+            continue
+        m, th, _ = fits[d]
+        for ap in aps:
+            emp, fv = mean_excess(m, th, x, caps, ap, mx)
+            me_rows.append({"dist": d, "ap": ap, "n_above": int((x > ap).sum()), "mean_excess_empirical": emp,
+                            "mean_excess_fitted": fv, "ratio": fv / emp if emp and emp == emp and fv == fv else np.nan})
+        sf = np.exp(m.cond_logsf(pts["t"].to_numpy(dtype=float), th))
+        for (t, lab), s_k, s_f in zip(zip(pts["t"], pts["t_label"]), skm, sf):
+            sv_rows.append({"dist": d, "t": float(t), "t_label": str(lab), "s_km": s_k, "s_fitted": float(s_f)})
+    me = pd.DataFrame(me_rows, columns=["dist", "ap", "n_above", "mean_excess_empirical", "mean_excess_fitted", "ratio"])
+    sv = pd.DataFrame(sv_rows, columns=["dist", "t", "t_label", "s_km", "s_fitted"])
+    for col in ("me_ratio_min", "me_ratio_max"):
+        cdf[col] = np.nan
+    for i, d in enumerate(cdf.dist):
+        r = me[me.dist == d].ratio.dropna()
+        if len(r):
+            cdf.loc[i, "me_ratio_min"], cdf.loc[i, "me_ratio_max"] = r.min(), r.max()
+    for _, r in me[(me.dist == selected) & me.ratio.notna()].iterrows():
+        if not ME_BAND[0] <= r.ratio <= ME_BAND[1]:
+            flag("F04", "FLAG", f"{selected} AP {r.ap:,.0f}",
+                 f"fitted / empirical mean excess {r.ratio:.2f} (outside {ME_BAND[0]}-{ME_BAND[1]})")
+    for col, val in (("u_fit", u), ("max_observed", mx), ("n_fit", float(len(x))), ("n_uncensored", float(unc.sum()))):
+        cdf[col] = val
+    if selected:
+        m, th, _ = fits[selected]
+        tab = table(m, th)
+        tab["dist"] = selected
+    else:
+        tab = pd.DataFrame({"k": pd.Series([], dtype="int64"), "lx0": pd.Series([], dtype="float64"),
+                            "lx1": pd.Series([], dtype="float64"), "dist": pd.Series([], dtype="object")})
+        if not any(f[1] == "STOP" for f in flags):
+            flag("F02", "STOP", "-", "no candidate converged")
+    fl = pd.DataFrame(flags, columns=["code", "severity", "item", "message"]).astype(str)
+    me = me.astype({c: "float64" for c in me.columns if c != "dist"})
+    sv = sv.astype({c: "float64" for c in sv.columns if c not in ("dist", "t_label")})
+    num = [c for c in cdf.columns if c not in ("dist", "p1_name", "p2_name")]
+    cdf = cdf.astype({c: "float64" for c in num})
+    return cdf, me, sv, tab, fl
+
+# ---- driver (generated by tools/alteryx/build_stage04a.py) ----
+units, ctx, thr = Alteryx.read("#1"), Alteryx.read("#2"), Alteryx.read("#3")
+cand, me, surv, tab, flags = run(units, ctx, thr)
+Alteryx.write(cand, 1)
+Alteryx.write(me, 2)
+Alteryx.write(surv, 3)
+Alteryx.write(tab, 4)
+Alteryx.write(flags, 5)
+]]></productionModeScript><vEnvName>designerbasetools_venv</vEnvName></Configuration><Annotation DisplayMode="0"><Name>severity fit (sevfit.py)</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxJupyterPluginEngine.dll" EngineDllEntryPoint="AlteryxJupyter" /></Node>
+</ChildNodes></Node>
+<Node ToolID="40"><GuiSettings Plugin="AlteryxGuiToolkit.ToolContainer.ToolContainer"><Position x="60" y="820" width="660" height="790" /></GuiSettings><Properties><Configuration><Caption>04a.3 Outputs (typed) and checks</Caption><Style TextColor="#314c4a" FillColor="#ecf2f2" BorderColor="#314c4a" Transparency="25" Margin="25" /><Disabled value="False" /><Folded value="False" /></Configuration><Annotation DisplayMode="0"><Name /><AnnotationText>04a.3 Outputs (typed) and checks</AnnotationText><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><ChildNodes>
+<Node ToolID="41"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="90" y="870" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="dist" selected="True" type="V_WString" size="1073741823" /><SelectField field="n_params" selected="True" type="Int64" size="8" /><SelectField field="p1_name" selected="True" type="V_WString" size="1073741823" /><SelectField field="p1" selected="True" type="Double" size="8" /><SelectField field="p2_name" selected="True" type="V_WString" size="1073741823" /><SelectField field="p2" selected="True" type="Double" size="8" /><SelectField field="loglik" selected="True" type="Double" size="8" /><SelectField field="aic" selected="True" type="Double" size="8" /><SelectField field="bic" selected="True" type="Double" size="8" /><SelectField field="ks" selected="True" type="Double" size="8" /><SelectField field="converged" selected="True" type="Int64" size="8" /><SelectField field="boundary" selected="True" type="Int64" size="8" /><SelectField field="rank_aic" selected="True" type="Int64" size="8" /><SelectField field="rank_bic" selected="True" type="Int64" size="8" /><SelectField field="rank_ks" selected="True" type="Int64" size="8" /><SelectField field="selected" selected="True" type="Int64" size="8" /><SelectField field="me_ratio_min" selected="True" type="Double" size="8" /><SelectField field="me_ratio_max" selected="True" type="Double" size="8" /><SelectField field="u_fit" selected="True" type="Double" size="8" /><SelectField field="max_observed" selected="True" type="Double" size="8" /><SelectField field="n_fit" selected="True" type="Int64" size="8" /><SelectField field="n_uncensored" selected="True" type="Int64" size="8" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>out_fit_candidates: types</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+<Node ToolID="42"><GuiSettings Plugin="AlteryxBasePluginsGui.DbFileOutput.DbFileOutput"><Position x="210" y="870" /></GuiSettings><Properties><Configuration><File MaxRecords="" FileFormat="0">..\..\data\output\live\results\out_fit_candidates.csv</File><Passwords /><Disable>False</Disable><FormatSpecificOptions><LineEndStyle>CRLF</LineEndStyle><Delimeter>,</Delimeter><ForceQuotes>False</ForceQuotes><HeaderRow>True</HeaderRow><CodePage>65001</CodePage><WriteBOM>True</WriteBOM><SuppressBlankFile>False</SuppressBlankFile></FormatSpecificOptions><MultiFile value="False" /></Configuration><Annotation DisplayMode="0"><Name>out_fit_candidates.csv</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxDbFileOutput" /></Node>
+<Node ToolID="43"><GuiSettings Plugin="AlteryxBasePluginsGui.DbFileOutput.DbFileOutput"><Position x="210" y="960" /></GuiSettings><Properties><Configuration><File MaxRecords="" FileFormat="19">..\..\data\output\live\stage\res_out_fit_candidates.yxdb</File><Passwords /><Disable>False</Disable><FormatSpecificOptions /><MultiFile value="False" /></Configuration><Annotation DisplayMode="0"><Name>res_out_fit_candidates</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxDbFileOutput" /></Node>
+<Node ToolID="44"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="90" y="960" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="dist" selected="True" type="V_WString" size="1073741823" /><SelectField field="ap" selected="True" type="Double" size="8" /><SelectField field="n_above" selected="True" type="Int64" size="8" /><SelectField field="mean_excess_empirical" selected="True" type="Double" size="8" /><SelectField field="mean_excess_fitted" selected="True" type="Double" size="8" /><SelectField field="ratio" selected="True" type="Double" size="8" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>out_fit_mean_excess: types</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+<Node ToolID="45"><GuiSettings Plugin="AlteryxBasePluginsGui.DbFileOutput.DbFileOutput"><Position x="210" y="1050" /></GuiSettings><Properties><Configuration><File MaxRecords="" FileFormat="0">..\..\data\output\live\results\out_fit_mean_excess.csv</File><Passwords /><Disable>False</Disable><FormatSpecificOptions><LineEndStyle>CRLF</LineEndStyle><Delimeter>,</Delimeter><ForceQuotes>False</ForceQuotes><HeaderRow>True</HeaderRow><CodePage>65001</CodePage><WriteBOM>True</WriteBOM><SuppressBlankFile>False</SuppressBlankFile></FormatSpecificOptions><MultiFile value="False" /></Configuration><Annotation DisplayMode="0"><Name>out_fit_mean_excess.csv</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxDbFileOutput" /></Node>
+<Node ToolID="46"><GuiSettings Plugin="AlteryxBasePluginsGui.DbFileOutput.DbFileOutput"><Position x="210" y="1140" /></GuiSettings><Properties><Configuration><File MaxRecords="" FileFormat="19">..\..\data\output\live\stage\res_out_fit_mean_excess.yxdb</File><Passwords /><Disable>False</Disable><FormatSpecificOptions /><MultiFile value="False" /></Configuration><Annotation DisplayMode="0"><Name>res_out_fit_mean_excess</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxDbFileOutput" /></Node>
+<Node ToolID="47"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="90" y="1050" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="dist" selected="True" type="V_WString" size="1073741823" /><SelectField field="t" selected="True" type="Double" size="8" /><SelectField field="t_label" selected="True" type="V_WString" size="1073741823" /><SelectField field="s_km" selected="True" type="Double" size="8" /><SelectField field="s_fitted" selected="True" type="Double" size="8" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>out_fit_survival: types</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+<Node ToolID="48"><GuiSettings Plugin="AlteryxBasePluginsGui.DbFileOutput.DbFileOutput"><Position x="210" y="1230" /></GuiSettings><Properties><Configuration><File MaxRecords="" FileFormat="0">..\..\data\output\live\results\out_fit_survival.csv</File><Passwords /><Disable>False</Disable><FormatSpecificOptions><LineEndStyle>CRLF</LineEndStyle><Delimeter>,</Delimeter><ForceQuotes>False</ForceQuotes><HeaderRow>True</HeaderRow><CodePage>65001</CodePage><WriteBOM>True</WriteBOM><SuppressBlankFile>False</SuppressBlankFile></FormatSpecificOptions><MultiFile value="False" /></Configuration><Annotation DisplayMode="0"><Name>out_fit_survival.csv</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxDbFileOutput" /></Node>
+<Node ToolID="49"><GuiSettings Plugin="AlteryxBasePluginsGui.DbFileOutput.DbFileOutput"><Position x="210" y="1320" /></GuiSettings><Properties><Configuration><File MaxRecords="" FileFormat="19">..\..\data\output\live\stage\res_out_fit_survival.yxdb</File><Passwords /><Disable>False</Disable><FormatSpecificOptions /><MultiFile value="False" /></Configuration><Annotation DisplayMode="0"><Name>res_out_fit_survival</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxDbFileOutput" /></Node>
+<Node ToolID="50"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="90" y="1140" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="k" selected="True" type="Int64" size="8" /><SelectField field="lx0" selected="True" type="Double" size="8" /><SelectField field="lx1" selected="True" type="Double" size="8" /><SelectField field="dist" selected="True" type="V_WString" size="1073741823" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>sev_table: types</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+<Node ToolID="51"><GuiSettings Plugin="AlteryxBasePluginsGui.Sort.Sort"><Position x="210" y="1410" /></GuiSettings><Properties><Configuration><SortInfo locale="1033"><Field field="k" order="Ascending" /></SortInfo></Configuration><Annotation DisplayMode="0"><Name>by k</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSort" /></Node>
+<Node ToolID="52"><GuiSettings Plugin="AlteryxBasePluginsGui.DbFileOutput.DbFileOutput"><Position x="330" y="1410" /></GuiSettings><Properties><Configuration><File MaxRecords="" FileFormat="19">..\..\data\output\live\stage\sev_table.yxdb</File><Passwords /><Disable>False</Disable><FormatSpecificOptions /><MultiFile value="False" /></Configuration><Annotation DisplayMode="0"><Name>sev_table</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxDbFileOutput" /></Node>
+<Node ToolID="53"><GuiSettings Plugin="AlteryxBasePluginsGui.DbFileOutput.DbFileOutput"><Position x="330" y="1500" /></GuiSettings><Properties><Configuration><File MaxRecords="" FileFormat="0">..\..\data\output\live\results\out_sev_table.csv</File><Passwords /><Disable>False</Disable><FormatSpecificOptions><LineEndStyle>CRLF</LineEndStyle><Delimeter>,</Delimeter><ForceQuotes>False</ForceQuotes><HeaderRow>True</HeaderRow><CodePage>65001</CodePage><WriteBOM>True</WriteBOM><SuppressBlankFile>False</SuppressBlankFile></FormatSpecificOptions><MultiFile value="False" /></Configuration><Annotation DisplayMode="0"><Name>out_sev_table.csv</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxDbFileOutput" /></Node>
+<Node ToolID="54"><GuiSettings Plugin="AlteryxBasePluginsGui.Formula.Formula"><Position x="90" y="1230" /></GuiSettings><Properties><Configuration><FormulaFields><FormulaField expression='"S04a"' field="stage" size="1073741823" type="V_WString" /></FormulaFields></Configuration><Annotation DisplayMode="0"><Name>check records</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxFormula" /></Node>
+<Node ToolID="55"><GuiSettings Plugin="AlteryxBasePluginsGui.AlteryxSelect.AlteryxSelect"><Position x="210" y="1500" /></GuiSettings><Properties><Configuration><OrderChanged value="False" /><CommaDecimal value="False" /><SelectFields><SelectField field="stage" selected="True" type="V_WString" size="1073741823" /><SelectField field="code" selected="True" type="V_WString" size="1073741823" /><SelectField field="severity" selected="True" type="V_WString" size="1073741823" /><SelectField field="item" selected="True" type="V_WString" size="1073741823" /><SelectField field="message" selected="True" type="V_WString" size="1073741823" /><SelectField field="*Unknown" selected="False" /></SelectFields></Configuration><Annotation DisplayMode="0"><Name>check fields</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxSelect" /></Node>
+<Node ToolID="56"><GuiSettings Plugin="AlteryxBasePluginsGui.TextInput.TextInput"><Position x="90" y="1320" /></GuiSettings><Properties><Configuration><NumRows value="1" /><Fields><Field name="stage" /><Field name="code" /><Field name="severity" /><Field name="item" /><Field name="message" /></Fields><Data><r><c>S04a</c><c>OK</c><c>INFO</c><c>-</c><c>stage 04a checks ran</c></r></Data></Configuration><Annotation DisplayMode="0"><Name>check header row</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxTextInput" /></Node>
+<Node ToolID="57"><GuiSettings Plugin="AlteryxBasePluginsGui.Union.Union"><Position x="330" y="1320" /></GuiSettings><Properties><Configuration><ByName_ErrorMode>Ignore</ByName_ErrorMode><ByName_OutputMode>All</ByName_OutputMode><Mode>ByName</Mode><SetOutputOrder value="False" /></Configuration><Annotation DisplayMode="0"><Name>all checks</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxUnion" /></Node>
+<Node ToolID="58"><GuiSettings Plugin="AlteryxBasePluginsGui.DbFileOutput.DbFileOutput"><Position x="450" y="1320" /></GuiSettings><Properties><Configuration><File MaxRecords="" FileFormat="0">..\..\data\output\live\checks\checks_04a.csv</File><Passwords /><Disable>False</Disable><FormatSpecificOptions><LineEndStyle>CRLF</LineEndStyle><Delimeter>,</Delimeter><ForceQuotes>False</ForceQuotes><HeaderRow>True</HeaderRow><CodePage>65001</CodePage><WriteBOM>True</WriteBOM><SuppressBlankFile>False</SuppressBlankFile></FormatSpecificOptions><MultiFile value="False" /></Configuration><Annotation DisplayMode="0"><Name>checks_04a.csv</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxDbFileOutput" /></Node>
+<Node ToolID="59"><GuiSettings Plugin="AlteryxBasePluginsGui.DbFileOutput.DbFileOutput"><Position x="450" y="1410" /></GuiSettings><Properties><Configuration><File MaxRecords="" FileFormat="19">..\..\data\output\live\stage\chk_04a.yxdb</File><Passwords /><Disable>False</Disable><FormatSpecificOptions /><MultiFile value="False" /></Configuration><Annotation DisplayMode="0"><Name>chk_04a (for the Results workbook)</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxDbFileOutput" /></Node>
+<Node ToolID="60"><GuiSettings Plugin="AlteryxBasePluginsGui.Filter.Filter"><Position x="450" y="1500" /></GuiSettings><Properties><Configuration><Expression>[severity] = "STOP"</Expression><Mode>Custom</Mode></Configuration><Annotation DisplayMode="0"><Name>STOP checks</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxFilter" /></Node>
+<Node ToolID="61"><GuiSettings Plugin="AlteryxBasePluginsGui.Message.Message"><Position x="570" y="1500" /></GuiSettings><Properties><Configuration><When>All</When><Filter /><Type>Error</Type><Priority>High</Priority><Transient>False</Transient><MessageExpression>"[" + [code] + "] " + [item] + ": " + [message]</MessageExpression></Configuration><Annotation DisplayMode="0"><Name>stop the run</Name><DefaultAnnotationText /><Left value="False" /></Annotation></Properties><EngineSettings EngineDll="AlteryxBasePluginsEngine.dll" EngineDllEntryPoint="AlteryxMessage" /></Node>
+</ChildNodes></Node>
+</Nodes><Connections>
+<Connection><Origin ToolID="2" Connection="Output" /><Destination ToolID="3" Connection="Input" /></Connection>
+<Connection><Origin ToolID="3" Connection="Output" /><Destination ToolID="4" Connection="Input" /></Connection>
+<Connection><Origin ToolID="5" Connection="Output" /><Destination ToolID="6" Connection="Input" /></Connection>
+<Connection><Origin ToolID="6" Connection="True" /><Destination ToolID="7" Connection="Input" /></Connection>
+<Connection><Origin ToolID="7" Connection="Output" /><Destination ToolID="8" Connection="Input" /></Connection>
+<Connection><Origin ToolID="8" Connection="Output" /><Destination ToolID="9" Connection="Input" /></Connection>
+<Connection><Origin ToolID="4" Connection="Output" /><Destination ToolID="10" Connection="Left" /></Connection>
+<Connection><Origin ToolID="9" Connection="Output" /><Destination ToolID="10" Connection="Right" /></Connection>
+<Connection><Origin ToolID="10" Connection="Join" /><Destination ToolID="11" Connection="Input" /></Connection>
+<Connection><Origin ToolID="12" Connection="Output" /><Destination ToolID="13" Connection="Input" /></Connection>
+<Connection><Origin ToolID="11" Connection="Output" /><Destination ToolID="14" Connection="Input" /></Connection>
+<Connection><Origin ToolID="13" Connection="Output" /><Destination ToolID="15" Connection="Left" /></Connection>
+<Connection><Origin ToolID="14" Connection="Output" /><Destination ToolID="15" Connection="Right" /></Connection>
+<Connection><Origin ToolID="15" Connection="Join" /><Destination ToolID="16" Connection="Input" /></Connection>
+<Connection><Origin ToolID="16" Connection="True" /><Destination ToolID="17" Connection="Input" /></Connection>
+<Connection><Origin ToolID="17" Connection="Output" /><Destination ToolID="18" Connection="Input" /></Connection>
+<Connection><Origin ToolID="17" Connection="Output" /><Destination ToolID="19" Connection="Input" /></Connection>
+<Connection><Origin ToolID="19" Connection="Output" /><Destination ToolID="20" Connection="Input" /></Connection>
+<Connection><Origin ToolID="11" Connection="Output" /><Destination ToolID="21" Connection="Left" /></Connection>
+<Connection><Origin ToolID="20" Connection="Output" /><Destination ToolID="21" Connection="Right" /></Connection>
+<Connection><Origin ToolID="21" Connection="Join" /><Destination ToolID="22" Connection="Input" /></Connection>
+<Connection><Origin ToolID="8" Connection="Output" /><Destination ToolID="23" Connection="Input" /></Connection>
+<Connection><Origin ToolID="8" Connection="Output" /><Destination ToolID="24" Connection="Input" /></Connection>
+<Connection><Origin ToolID="24" Connection="True" /><Destination ToolID="25" Connection="Input" /></Connection>
+<Connection><Origin ToolID="26" Connection="Output" /><Destination ToolID="27" Connection="Input" /></Connection>
+<Connection><Origin ToolID="23" Connection="Output" /><Destination ToolID="28" Connection="Input" /></Connection>
+<Connection><Origin ToolID="25" Connection="Output" /><Destination ToolID="29" Connection="Input" /></Connection>
+<Connection name="#1"><Origin ToolID="28" Connection="Output" /><Destination ToolID="30" Connection="Input" /></Connection>
+<Connection name="#2"><Origin ToolID="29" Connection="Output" /><Destination ToolID="30" Connection="Input" /></Connection>
+<Connection name="#3"><Origin ToolID="27" Connection="Output" /><Destination ToolID="30" Connection="Input" /></Connection>
+<Connection><Origin ToolID="30" Connection="Output" /><Destination ToolID="31" Connection="Input" /></Connection>
+<Connection><Origin ToolID="31" Connection="Output" /><Destination ToolID="32" Connection="Input" /></Connection>
+<Connection><Origin ToolID="32" Connection="Unique" /><Destination ToolID="33" Connection="Input" /></Connection>
+<Connection><Origin ToolID="11" Connection="Output" /><Destination ToolID="34" Connection="Input" /></Connection>
+<Connection><Origin ToolID="33" Connection="Output" /><Destination ToolID="35" Connection="Left" /></Connection>
+<Connection><Origin ToolID="34" Connection="Output" /><Destination ToolID="35" Connection="Right" /></Connection>
+<Connection><Origin ToolID="35" Connection="Join" /><Destination ToolID="36" Connection="Input" /></Connection>
+<Connection><Origin ToolID="36" Connection="True" /><Destination ToolID="37" Connection="Input" /></Connection>
+<Connection name="#1"><Origin ToolID="18" Connection="Output" /><Destination ToolID="39" Connection="Input" /></Connection>
+<Connection name="#2"><Origin ToolID="22" Connection="Output" /><Destination ToolID="39" Connection="Input" /></Connection>
+<Connection name="#3"><Origin ToolID="37" Connection="Output" /><Destination ToolID="39" Connection="Input" /></Connection>
+<Connection><Origin ToolID="39" Connection="Output1" /><Destination ToolID="41" Connection="Input" /></Connection>
+<Connection><Origin ToolID="41" Connection="Output" /><Destination ToolID="42" Connection="Input" /></Connection>
+<Connection><Origin ToolID="41" Connection="Output" /><Destination ToolID="43" Connection="Input" /></Connection>
+<Connection><Origin ToolID="39" Connection="Output2" /><Destination ToolID="44" Connection="Input" /></Connection>
+<Connection><Origin ToolID="44" Connection="Output" /><Destination ToolID="45" Connection="Input" /></Connection>
+<Connection><Origin ToolID="44" Connection="Output" /><Destination ToolID="46" Connection="Input" /></Connection>
+<Connection><Origin ToolID="39" Connection="Output3" /><Destination ToolID="47" Connection="Input" /></Connection>
+<Connection><Origin ToolID="47" Connection="Output" /><Destination ToolID="48" Connection="Input" /></Connection>
+<Connection><Origin ToolID="47" Connection="Output" /><Destination ToolID="49" Connection="Input" /></Connection>
+<Connection><Origin ToolID="39" Connection="Output4" /><Destination ToolID="50" Connection="Input" /></Connection>
+<Connection><Origin ToolID="50" Connection="Output" /><Destination ToolID="51" Connection="Input" /></Connection>
+<Connection><Origin ToolID="51" Connection="Output" /><Destination ToolID="52" Connection="Input" /></Connection>
+<Connection><Origin ToolID="51" Connection="Output" /><Destination ToolID="53" Connection="Input" /></Connection>
+<Connection><Origin ToolID="39" Connection="Output5" /><Destination ToolID="54" Connection="Input" /></Connection>
+<Connection><Origin ToolID="54" Connection="Output" /><Destination ToolID="55" Connection="Input" /></Connection>
+<Connection name="#1"><Origin ToolID="56" Connection="Output" /><Destination ToolID="57" Connection="Input" /></Connection>
+<Connection name="#2"><Origin ToolID="55" Connection="Output" /><Destination ToolID="57" Connection="Input" /></Connection>
+<Connection><Origin ToolID="57" Connection="Output" /><Destination ToolID="58" Connection="Input" /></Connection>
+<Connection><Origin ToolID="57" Connection="Output" /><Destination ToolID="59" Connection="Input" /></Connection>
+<Connection><Origin ToolID="57" Connection="Output" /><Destination ToolID="60" Connection="Input" /></Connection>
+<Connection><Origin ToolID="60" Connection="True" /><Destination ToolID="61" Connection="Input" /></Connection>
+</Connections><Properties>
+<Memory default="True" /><GlobalRecordLimit value="0" /><TempFiles default="True" /><Annotation on="True" includeToolName="False" /><ConvErrorLimit value="10" /><ConvErrorLimit_Stop value="False" /><CancelOnError value="True" /><DisableBrowse value="False" /><EnablePerformanceProfiling value="False" /><RunWithE2 value="True" /><DefaultTZ value="Local" /><PredictiveToolsCodePage value="1252" /><DisableAllOutput value="False" /><ShowAllMacroMessages value="False" /><ShowConnectionStatusIsOn value="True" /><ShowConnectionStatusOnlyWhenRunning value="True" /><ZoomLevel value="0" /><LayoutType>Horizontal</LayoutType>
+<Constants></Constants>
+<MetaInfo><NameIsFileName value="True" /><Name>04a_fit_severity</Name><Description>Stage 04a: severity candidates fitted by the Python tool (truncated, censored MLE)</Description><RootToolName /><ToolVersion /><ToolInDb value="False" /><CategoryName /><SearchTags /><Author /><Company /><Copyright /><DescriptionLink actual="" displayed="" /><Example><Description /><File /></Example></MetaInfo><Events><Enabled value="True" /></Events></Properties></AlteryxDocument>
