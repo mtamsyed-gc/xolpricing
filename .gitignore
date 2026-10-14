@@ -1,0 +1,29 @@
+# ---- Data: never commit real cedant data ----
+data/input/*
+data/output/*
+!data/input/.gitkeep
+!data/output/.gitkeep
+
+# ---- Excel ----
+~$*
+*.tmp
+*.xlk
+# Workbook outputs produced by runs (templates live in excel/templates)
+excel/**/*_run_*.xls*
+excel/**/output/
+
+# ---- Alteryx ----
+*.bak
+*.yxdb
+*.yxzp
+# Alteryx temp / log artefacts
+*.log
+Engine_*/
+alteryx/**/temp/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

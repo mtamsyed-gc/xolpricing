@@ -1,0 +1,23 @@
+# Alteryx workflows, macros and apps are XML: diff them as text
+*.yxmd text diff
+*.yxmc text diff
+*.yxwz text diff
+
+# VBA modules exported from the workbook (diffable source of truth for macros)
+*.bas text eol=crlf
+*.cls text eol=crlf
+*.frm text eol=crlf
+
+# Excel and packaged Alteryx files are binary
+*.xlsx binary
+*.xlsm binary
+*.xlsb binary
+*.xltx binary
+*.xltm binary
+*.yxzp binary
+*.yxdb binary
+
+# Plain text
+*.md  text
+*.csv text
+*.json text
