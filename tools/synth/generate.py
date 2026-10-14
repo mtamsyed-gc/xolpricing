@@ -448,6 +448,8 @@ def write_ete_sample(out: Path, mem_obs: pd.DataFrame, obs: pd.DataFrame, n_sche
         "OS": np.where(oc.status == "Outstanding", oc.amount, 0.0), "ICD Code": oc.icd_code,
     })
     fmt_dates(fc).to_csv(p / "fact_claims.csv", index=False)
+    (p / "run_meta.csv").write_text("valuation_date,listing_threshold,currency_basis,data_source_note\n"
+                                    f"{VAL.date().isoformat()},0,AED,ETE extract (synthetic)\n")
 
 
 def write_templates(out: Path) -> None:

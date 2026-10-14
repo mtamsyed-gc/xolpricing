@@ -21,6 +21,8 @@ PARAMS = [
     ("treaty_start", "General", "date", "DATE", "", True, "Treaty / risk start date (yyyy-mm-dd)"),
     ("quote_year", "General", "year", "INT", "", True, "Treaty year being priced"),
     ("run_label", "General", "", "TEXT", "", False, "Free label carried into the run log"),
+    ("scenario_id", "General", "", "INT", "", False,
+     "Sensitivity run: apply the Scenarios rows with this id (blank or 0 = best estimate)"),
     ("source_mode", "Mode", "", "LIST", "L,C,E", True, "L = standalone line data, C = claimant listing, E = ETE extension"),
     ("premium_basis", "Mode", "", "LIST", "GROSS,GROSSNET,NET", True, "Premium basis for rates and EPI"),
     ("segment_field", "Mode", "", "TEXT", "", False, "Segmentation field (ETE: dim_life attribute)"),
@@ -48,6 +50,8 @@ PARAMS = [
     ("fit_cutoff", "Stochastic", "quote ccy", "NUMBER", "", False, "Severity fitting cut-off (blank = AP)"),
     ("fit_candidates", "Stochastic", "", "CSV", "", True, "Candidate severity distributions"),
     ("freq_model", "Stochastic", "", "LIST", "POISSON,NEGBIN", True, "Frequency distribution"),
+    ("ev_freq_source", "Stochastic", "", "LIST", "EXPERIENCE,SCENARIOS,BOTH", True,
+     "Per-event simulation: historical events, EvScenarios (with a return period), or both"),
     ("sl_attritional_threshold", "Stochastic", "quote ccy", "NUMBER", "", True, "Stop loss: attritional / large split"),
     ("sl_cov_floor", "Stochastic", "", "NUMBER", "", True, "Stop loss: minimum CoV of the attritional cost per life"),
     ("sl_attritional_dist", "Stochastic", "", "LIST", "LOGNORMAL,NORMAL", True,
@@ -67,7 +71,7 @@ DEFAULTS = {
     "iqr_multiplier": "1.5", "full_cred_n": "64", "complement_source": "STOCHASTIC", "incidence_adj": "1",
     "qs_cedant_retention_pct": "1", "evaluate_mode": "STANDALONE", "iterations": "10000", "seed": "12345",
     "fit_candidates": "LOGNORMAL,GAMMA,WEIBULL,PARETO,GPD", "freq_model": "POISSON",
-    "sl_attritional_threshold": "100000", "sl_cov_floor": "0.05", "sl_attritional_dist": "LOGNORMAL",
+    "sl_attritional_threshold": "100000", "sl_cov_floor": "0.05", "sl_attritional_dist": "LOGNORMAL", "ev_freq_source": "BOTH",
     "return_periods": "5,50,250",
     "currency_display": "QUOTE", "source_mode": "L",
 }
@@ -126,12 +130,17 @@ TABLES = {
     "Programme": ("Programme order", "Order of application when evaluate_mode = PROGRAMME.",
                   [("step", "INT", "", True), ("cover", "LIST", "QS,PP,EV,SL", True), ("option_id", "INT", "", False),
                    ("active", "INT", "0,1", True)]),
-    "EventRule": ("Per-event definition", "SUPPLIED uses event_id from the data; CLUSTER groups claims of the same "
-                  "group key whose admissions fall within window_days.",
+    "EventRule": ("Per-event definition",
+                  "SUPPLIED uses event_id from the data only. CLUSTER also groups accident-coded claim lines "
+                  "(cause_code present, no event_id) of the same group key and cause whose admission (else treatment) "
+                  "dates fall within window_days of the cluster's first date. Events need at least min_lives lives.",
                   [("id_source", "LIST", "SUPPLIED,CLUSTER", True), ("window_days", "INT", "", True),
                    ("group_key", "LIST", "SCHEME,SITE,CAUSE,SCHEME+SITE,SCHEME+CAUSE", True),
                    ("min_lives", "INT", "", True)]),
-    "EvScenarios": ("Per-event deterministic scenarios", "Lives x cost per life; return period for context.",
+    "EvScenarios": ("Per-event scenarios",
+                    "Lives x cost per life (quote-year money). Shown deterministically against every EV option; with "
+                    "a return period they are also simulated (Poisson, 1 / return period) when ev_freq_source is "
+                    "SCENARIOS or BOTH.",
                     [("scenario_name", "TEXT", "", True), ("lives", "NUMBER", "", True),
                      ("cost_per_life", "NUMBER", "", True), ("return_period_yrs", "NUMBER", "", False),
                      ("site", "TEXT", "", False)]),
@@ -146,10 +155,12 @@ TABLES = {
                   ("rate", "NUMBER", "", False), ("premium", "NUMBER", "", False),
                   ("recoveries_by_year", "TEXT", "", False)]),
     "Scenarios": ("Sensitivity scenarios",
-                  "Scenario 0 is the best estimate (implicit). Each row overrides one input: SET replaces, ADD adds, "
-                  "MULT multiplies. target_key filters rows of the target table (ALL, or column=value).",
+                  "Scenario 0 is the best estimate (implicit). Set Params scenario_id to run one scenario. Each row "
+                  "overrides one numeric column: SET replaces, MULT multiplies (> 0), ADD adds; applied in that order. "
+                  "target_key: ALL, or column=value (Params: param_id=<id>, column value).",
                   [("scenario_id", "INT", "", True), ("scenario_name", "TEXT", "", True),
-                   ("target_table", "LIST", "Trend,Completion,Weights,Params,FX", True), ("target_key", "TEXT", "", True),
+                   ("target_table", "LIST", "Trend,Completion,Weights,Params,FX,Layers,EvScenarios", True),
+                   ("target_key", "TEXT", "", True),
                    ("target_column", "TEXT", "", True), ("operation", "LIST", "SET,ADD,MULT", True),
                    ("override_value", "TEXT", "", True)]),
 }

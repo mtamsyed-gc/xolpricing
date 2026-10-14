@@ -218,7 +218,7 @@ class WF:
         return (t, "True"), (t, "False")
 
     def select(self, src, keep=None, rename=None, drop=None, keep_unknown=True, types=None, label=""):
-        rename, drop, types = rename or {}, set(drop or []), types or {}
+        rename, drop, types = rename or {}, list(dict.fromkeys(drop or [])), types or {}   # keep order: same build, same bytes
         sf = []
         for k in (keep or []):
             attrs = f' rename={q(rename[k])}' if k in rename else ""

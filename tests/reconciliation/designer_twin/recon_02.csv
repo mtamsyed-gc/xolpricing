@@ -1,4 +1,4 @@
-stage,table,measure,value
+﻿stage,table,measure,value
 S02,int_claims,rows_in,53915
 S02,int_claims,amount_q_in,113331762.50825079
 S02,excluded,late_paid_amount_q,0

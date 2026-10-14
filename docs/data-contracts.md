@@ -1,6 +1,6 @@
 # Data contracts
 
-Version 0.2 · 2026-10-14 · companion to [`scope.md`](scope.md)
+Version 0.3 · 2026-10-14 · companion to [`scope.md`](scope.md)
 
 This document defines:
 - §2: the input templates (standalone mode) and the ETE mapping (extension mode)
@@ -125,7 +125,7 @@ Reads the payer-level outputs of the ete-dashboard pipeline (SPEC P7 names; the 
 | segment | Configurable: any dim_life attribute (default `Policy Type`) | |
 | event_id | x_EventID | When the engine supplies it (SPEC §8) |
 | admission_date, discharge_date | Admission Date, Discharge Date | When supplied (SPEC §8 optional fields) |
-| **members** | `dim_life` | One row per LifeKey × UWY |
+| **members** | `dim_life` | One row per LifeKey (a repeated LifeKey stops the run: A14) |
 | policy_start | PolicyStart | RA cohort |
 | policy_end | PolicyEndAdj | |
 | cover_start / cover_end | CovStart / CovEnd | |
@@ -138,6 +138,15 @@ Reads the payer-level outputs of the ete-dashboard pipeline (SPEC P7 names; the 
 | *reference only* | `cf_selected`, `ultimates` | Portfolio CFs are shown next to the IBNR inputs as **reference**, with the large-claim caveat (D3); never applied automatically |
 
 Mix of TPAs: a payer-level ETE output can contain several TPAs. `TPA` is carried as an attribute, and a per-TPA filter is available in Control.
+
+Files and parameters (stage `01c_adapter_ete.yxmd`, folder `data/input/ete/`, synthetic `data/synthetic/ete/`):
+`dim_life.csv`, `fact_claims.csv`, `fact_member_month.csv` as exported by the ete pipeline, plus `run_meta.csv`
+(valuation_date, listing_threshold, currency_basis, data_source_note), which the ETE pipeline does not write.
+`ete_tpa_filter` (comma list, blank = all), `segment_field` (one of Policy Type, Plan / Category, TPA, Payer Name,
+Master Contract ID, Currency, UWY; default Policy Type) and `premium_basis` (GROSS / GROSSNET / NET) are Params.
+member_id = LifeKey; FX at the member's currency. Claim lines with `InExperience = 0` or `StatusClass = Rejected`
+are excluded and counted in `recon_01c.csv`. Member months of a LifeKey with no `dim_life` row (or outside the TPA
+filter) are excluded and flagged (A15).
 
 ## 3. Internal schema (adapter output)
 
@@ -206,12 +215,12 @@ Every input block is an **Excel Table** (or a named range) with a fixed name, wh
 | `tbl_completion` | Year × component × side × ap_band | year, component (`IBNR` / `UNEARNED` / `UNWRITTEN`), side (`PRE_AP` / `POST_AP_AMOUNT` / `POST_AP_COUNT` / `ATTRITIONAL` — total claims below the stop-loss large threshold, stop loss only), ap_band_from (default 0), selected_factor, indicated_factor (written back by Alteryx, read-only), justification |
 | `tbl_weights` | Year | year, months_complete, use_default (1/0), custom_weight, justification |
 | `tbl_layers` | Cover × option × layer | cover (`PP` / `EV` / `SL`), option_id (1–4), layer (1/2), label (O), limit_basis (`AMOUNT` / `TO_BENEFIT_LIMIT`), ap, limit, aal, aad, co_participation_pct, reinstatements_n (blank = unlimited), reinstatement_cost_pct, reinst_pro_rata_time (1/0), sl_claims_basis (`GROSS` / `NET_OF_XOL`), sl_measure (`PCT_BUDGET` / `PCT_EPI` / `AMOUNT`), sl_ap, sl_limit, active |
-| `tbl_programme` | Order | step, cover (`QS` / `PP` / `EV` / `SL`), active |
-| `tbl_event_rule` | Scalar set | id_source (`SUPPLIED` / `CLUSTER`), window_days, group_key (`SCHEME` / `SITE` / `CAUSE` combinations), min_lives |
-| `tbl_ev_scenarios` | Scenario | scenario_name, lives, cost_per_life, return_period_yrs, site |
+| `tbl_programme` | Order | step, cover (`QS` / `PP` / `EV` / `SL`; a QS step is informative, the retention is `qs_cedant_retention_pct`), option_id, active. Used by `evaluate_mode = PROGRAMME` (structure `4 PROGRAMME`) and by NET_OF_XOL stop losses; order PP → EV → SL (G12) |
+| `tbl_event_rule` | Exactly one row (E01) | id_source (`SUPPLIED` / `CLUSTER`), window_days, group_key (`SCHEME` / `SITE` / `CAUSE` / `SCHEME+SITE` / `SCHEME+CAUSE`), min_lives |
+| `tbl_ev_scenarios` | Scenario | scenario_name, lives, cost_per_life (quote ccy), return_period_yrs (blank = deterministic only), site. lives and cost > 0 (E02) |
 | `tbl_loadings` | Cover | cover, reinsurer_expense_pct, brokerage_pct, profit_margin_pct, premium_tax_pct, risk_load_k |
-| `tbl_expiring` | Cover × layer | ap, limit, rate_basis, rate, premium, recoveries_by_year (text) |
-| `tbl_scenarios` | Scenario × override | scenario_id, scenario_name, target_table, target_key, target_column, override_value |
+| `tbl_expiring` | Cover × layer | cover, layer, ap, limit (blank = to benefit limit), rate_basis (`PPPY` / `PCT_EPI` / `FLAT`), rate, premium (FLAT), recoveries_by_year (text, `2023:120000; 2024:0`) |
+| `tbl_scenarios` | Scenario × override | scenario_id (≥ 1), scenario_name, target_table (`Trend` / `Completion` / `Weights` / `Params` / `FX` / `Layers` / `EvScenarios`), target_key (`ALL` or `column=value`; Params: `param_id=x`), target_column (numeric column; Params: `value`), operation (`SET` / `MULT` / `ADD`), override_value. Checks X01–X04 |
 
 **`tbl_params` minimum set**
 
@@ -226,37 +235,39 @@ Every input block is an **Excel Table** (or a named range) with a fixed name, wh
 | Credibility | full_cred_n, complement_source (STOCHASTIC/BENCHMARK/EXPIRING), benchmark_rate | 64 |
 | Incidence | incidence_adj | 1.00 |
 | QS | qs_cedant_retention_pct | 100% |
-| Stochastic | iterations, seed, fit_cutoff (blank = AP), fit_candidates, fit_years, freq_model (POISSON/NEGBIN), sl_attritional_threshold, sl_cov_floor, sl_attritional_dist (LOGNORMAL/NORMAL) | 10000, 12345, 100000, 0.05, LOGNORMAL |
+| General | scenario_id (blank / 0 = best estimate; n = apply Scenarios rows with that id) | — |
+| Programme | evaluate_mode (STANDALONE / PROGRAMME) | STANDALONE |
+| Stochastic | iterations, seed, fit_cutoff (blank = lowest PP AP), fit_candidates, fit_years, freq_model (POISSON/NEGBIN), ev_freq_source (EXPERIENCE/SCENARIOS/BOTH), sl_attritional_threshold, sl_cov_floor, sl_attritional_dist (LOGNORMAL/NORMAL) | 10000, 12345, POISSON, BOTH, 100000, 0.05, LOGNORMAL |
 | Cedant impact | net_claims_budget (blank = best-estimate gross claims), reference_lives, return_periods (comma list), currency_display (QUOTE/USD) | 20000; "5,50,250" |
 
 ## 5. Results workbook (`excel/templates/XoL_Results.xlsx`)
 
-Alteryx overwrites the `out_*` data sheets in full each run. Presentation sheets reference them by formula, and loadings are applied in Excel (scope §7).
+Copy the template once to `data/output/<variant>/XoL_Results.xlsx`. Stage 07 replaces the data sheets in full each run
+(Overwrite Sheet, one sheet at a time); the presentation sheets are formulas over them, through defined names that
+find each column by its header, so a column added at the end never breaks a formula. Columns of every data sheet:
+`tools/excel/results_spec.py` (single source; stage 07 and the template builder both read it). Each table is also
+written as `results/<name>.csv`.
 
-| Sheet / table | Grain | Content |
+| Data sheet | Grain | Content (stage) |
 |---|---|---|
-| `out_run_log` | Run | Parameters, justifications, seed, capability flags, stages run, versions, file hashes |
-| `out_warnings` | Warning | stage, code, severity (STOP/FLAG), message, measure, value |
-| `out_recon` | Stage × year × measure | Rows, amounts, lives: in / out / excluded / explained / unexplained |
-| `out_completion_indicated` | Year × component | Indicated unearned/unwritten factors (also written to `tbl_completion.indicated_factor`) |
-| `out_annualisation` | Cover × option × year × step | Paid/reported → +IBNR → +unearned → +unwritten: amount, count, frequency, severity |
-| `out_large_claims` | Claimant-period (or event) | FGU, as-if, trended, completed, capped, outlier flag, XL by option |
-| `out_bc_by_year` | Scenario × cover × option × layer × year | Exposure, count, frequency/1000, severity, XL amount, BC pppy, BC % EPI, weight |
-| `out_bc_summary` | Scenario × cover × option × layer | Weighted BC (non-outlier, outlier, total), Z, sensitivity variants, min/max, leveraged trend |
-| `out_fit` | Cover × candidate | Parameters, log-likelihood, AIC, BIC, KS, AD, fitted vs deterministic mean excess, selected flag |
-| `out_sim_summary` | Scenario × cover × option × layer | Mean, SD, CoV, P(0), P50–P99.5, E[reinstatement premium], λ used, iterations, seed |
-| `out_sim_quantiles` | Scenario × cover × option × measure × q | q = 0.001 … 0.999 for recoveries, reinstatement premium, retained claims, retained LR (Excel lookups for cedant impact) |
-| `out_asif_by_year` | Scenario × cover × option × year | As-if recoveries vs as-if premium, cumulative |
-| `out_ev_scenarios` | Scenario | Deterministic per-event losses by option |
-| `out_exposed_lives` | Cover × option | Exposed lives for the quote year (per-person: lives with annual limit > AP), reference lives |
-| `out_attritional_by_year` | Treaty year | Total claims, large units above t_sl, attritional raw / adjusted, trend and completion factors, cost per life, weight (stage 05) |
-| `out_gross_summary` | Run | t_sl, attritional mean and CoV (history and used), distribution parameters, mean attritional / large / gross, SD, net claims budget and its source, EPI, lives |
-| `out_gross_iterations` | Iteration | Attritional, large above t_sl, gross |
-| `out_sl_iterations` | SL option × iteration | Gross, PP recoveries used (NET_OF_XOL), base, SL recovery, net claims |
-| `out_struct_summary` | Structure (without RI, PP option, SL option) | Mean / SD of the cover's recovery and of net claims, P(no recovery), mean reinstatement usage by layer, SL attachment and limit (amount, % budget, % EPI), budget |
-| `out_struct_quantiles` | Structure × q (0.001 … 0.999) | Net claims, reinstatement usage at that iteration (layer 1 / 2), the cover's recovery quantile — Excel derives Exhibit C2 and "recoveries exceed premium 1 in N" |
+| `out_params`, `out_loadings` | Run | Params and Loadings as used, after scenario overrides (00) |
+| `out_run_log` | Item | Tool version, run time, scenario id and name, run meta, every parameter with its justification (07) |
+| `out_warnings` | Check | stage, code, severity (STOP / FLAG / INFO), item, message, of stages 00–06 |
+| `out_recon` | Stage × table × measure | Control totals of stages 01–06 |
+| `out_completion_indicated` | Year × component | Indicated unearned / unwritten factors (02) |
+| `out_bc_by_year`, `out_bc_summary`, `out_annualisation`, `out_large_claims` | PP option × layer (× year) | Burning cost (03) |
+| `out_fit`, `out_sim_summary`, `out_sim_quantiles` | PP option × layer (× q) | Severity fit and per-person simulation (04), incl. `freq_dist`, `phi` |
+| `out_ev_events`, `out_ev_bc_by_year`, `out_ev_bc_summary`, `out_ev_scenarios`, `out_ev_sim_summary`, `out_ev_sim_quantiles` | Event / EV option × layer | Per-event XoL (05) |
+| `out_attritional_by_year`, `out_gross_summary`, `out_exposed_lives` | Year / run / option | Attritional model, gross claims, exposed lives (06) |
+| `out_struct_summary` | Structure (`0 NONE`, `1 PP k`, `3 EV k`, `2 SL k`, `4 PROGRAMME`) | Mean / SD of recovery and net claims, P(no recovery), mean reinstatement usage (PP and EV layers), SL terms, budget, EPI, the options in the structure (06) |
+| `out_struct_quantiles` | Structure × q (`qm` per mille) | Net claims, reinstatement usage at that iteration, recovery quantile (06) |
+| `out_expiring`, `out_asif_by_year` | Expiring row (× year) | Matched option, expiring premium at the quote year and trended; as-if recoveries and premium at the quote-year level, premium at the year's level, actual recoveries (07) |
+| `scn_summary` | Scenario × structure | One block per scenario_id; a run replaces only its own block (07) |
 
-Presentation sheets: **Reinsurance Structures** (Exhibit C1) and **Cedant Impact** (Exhibit C2), laid out as in scope §8. They are formula-driven from `out_sim_summary`, `out_sim_quantiles`, `out_exposed_lives` and the loadings, so a loading change updates both without a re-run.
+Presentation sheets: **Inputs** (currency and unit, lives, EPI, budget, return periods, expected-loss basis, loadings
+from Control with overrides), **Pricing** (premium by option, methodology §11), **Reinsurance Structures**
+(Exhibit C1), **Cedant Impact** (Exhibit C2), **Expiring**, **Scenarios**, **README**. A loading or input change
+recalculates them without a re-run. Close the workbook in Excel before running stage 07.
 
 ## 6. Validation at the adapters (stage 01)
 
@@ -275,9 +286,11 @@ Presentation sheets: **Reinsurance Structures** (Exhibit C1) and **Cedant Impact
 | A11 | Claim status value not mapped (Paid / Outstanding / Rejected / Reversed, with common synonyms) | STOP |
 | A12 | Required date or amount blank or not ISO (row excluded) | STOP |
 | A13 | Claims whose member has no member record (excluded; listed by member) | FLAG |
+| A14 | ETE: LifeKey repeated in `dim_life` | STOP |
+| A15 | ETE: member months without a `dim_life` row (excluded; also outside the TPA filter) | FLAG |
 
 Matching (line mode): tier 1 on member_id + policy_id; tier 2 on member_id with treatment inside the cover period
-(latest cover wins). Each adapter also writes `recon_01a.csv` / `recon_01b.csv`: rows in, rejected, unmatched, out,
+(latest cover wins). Each adapter also writes `recon_01a.csv` / `recon_01b.csv` / `recon_01c.csv`: rows in, rejected, unmatched, out,
 and amount and exposure totals, so stage 02 can reconcile to it.
 
 Missing columns: every input is unioned with an empty template of all contract columns, so an absent optional column

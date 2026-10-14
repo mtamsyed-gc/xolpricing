@@ -1,0 +1,2 @@
+﻿scenario_name,lives,cost_per_life,return_period_yrs,loss,loss_net_pp,option_id,layer,l_label,layer_loss,layer_loss_net_pp
+Worksite transport accident,10,150000,50,1500000,1e+06,1,1,1m xs 250k per event,1e+06,750000

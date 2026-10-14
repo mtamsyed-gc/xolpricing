@@ -1,4 +1,4 @@
-stage,table,measure,value
+﻿stage,table,measure,value
 S01a,claims_lines,rows_in,55370
 S01a,int_exposure,earned_ly,31891.76986301379
 S01a,int_exposure,written_premium,225211385.99089998

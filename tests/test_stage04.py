@@ -77,10 +77,20 @@ def oracle():
     lives = load("bc_summary").lives_quote_year.max()
     lam = freq.sum() * lives * inc
 
-    k_max = math.ceil(lam + 10 * math.sqrt(lam) + 20)
-    pk = [math.exp(-lam)]
-    for k in range(1, k_max + 1):
-        pk.append(pk[-1] * lam / k)
+    n_y, e_y = n_u.reindex(w.index, fill_value=0), ex.reindex(w.index)
+    m_pool = n_y.sum() / e_y.sum()
+    phi = ((n_y - e_y * m_pool) ** 2 / (e_y * m_pool)).sum() / (len(w) - 1) if len(w) > 1 else 1.0
+    nb = prm["freq_model"] == "NEGBIN" and phi > 1
+    k_max = math.ceil(lam + 10 * math.sqrt(lam * (phi if nb else 1)) + 20)
+    if nb:
+        r, qq = lam / (phi - 1), 1 / phi
+        pk = [math.exp(r * math.log(qq))]
+        for k in range(1, k_max + 1):
+            pk.append(pk[-1] * (r + k - 1) / k * (1 - qq))
+    else:
+        pk = [math.exp(-lam)]
+        for k in range(1, k_max + 1):
+            pk.append(pk[-1] * lam / k)
     cdf = np.cumsum(pk)
     u1 = minstd(starts[1], iters)
     n_claims = np.searchsorted(cdf, u1, side="left")       # #{k: cdf_k < U}
@@ -114,8 +124,43 @@ def oracle():
         ru = (np.zeros(iters) if pd.isna(cost) or pd.isna(L.limit) else
               cost * (rec if pd.isna(n_r) else np.minimum(rec, n_r * L.limit)) / L.limit)
         out[int(L.option_id)] = dict(rec=rec, above=(xl - xlb) * f, ru=ru)
-    return dict(alpha=alpha, lam=lam, n_claims=n_claims, u1=u1, out=out, claims_sum=claim.sum(), claim=claim,
+    return dict(alpha=alpha, lam=lam, phi=phi, nb=nb, n_claims=n_claims, u1=u1, out=out, claims_sum=claim.sum(), claim=claim,
                 it_idx=it_idx, iters=iters, u=u, lives=lives)
+
+
+def negbin():
+    """freq_model NEGBIN: the synthetic yearly counts are overdispersed (phi > 1), so the count draws follow a negative
+    binomial with mean lambda and variance phi x lambda; exact match to the oracle."""
+    global OUT, CTL
+    keep = OUT, CTL
+    OUT = ROOT / "data/output/t4n"
+    CTL = OUT / "XoL_Control_t4n.xlsx"
+    OUT.mkdir(parents=True, exist_ok=True)
+    shutil.copy(keep[1], CTL)
+    wb = load_workbook(CTL)
+    ws = wb["Params"]
+    for r in range(5, ws.max_row + 1):
+        if ws.cell(r, 1).value == "freq_model":
+            ws.cell(r, 3).value = "NEGBIN"
+    wb.save(CTL)
+    vn = C.Variant("T4N", OUT / "wf", "..\\..\\..\\..\\", "data/output/t4n/XoL_Control_t4n.xlsx",
+                   "data/synthetic/line", "data/synthetic/claimant", "data/output/t4n")
+    for b in (build_stage00.build(vn), build_stage01.build_line(vn), build_stage02.build(vn), build_stage03.build(vn),
+              build_stage04.build(vn)):
+        sim.run(b)
+    e = oracle()
+    summ = pd.read_csv(OUT / "results/out_sim_summary.csv").set_index("option_id")
+    its = pd.read_csv(OUT / "results/out_sim_iterations.csv")
+    results.append((f"NEGBIN used (phi {e['phi']:.2f})", e["nb"] and (summ.freq_dist == "NEGBIN").all()))
+    close("NEGBIN total claims", [pd.read_csv(OUT / "checks/recon_04.csv").set_index(["table", "measure"]).value[
+        ("iterations", "claims")]], [e["n_claims"].sum()])
+    for o, d in e["out"].items():
+        g = its[its.option_id == o].sort_values("iter")
+        close(f"NEGBIN option {o} recovery by iteration", g.recovery, d["rec"])
+    n = e["n_claims"]
+    results.append((f"NEGBIN counts: mean {n.mean():.1f} vs lambda {e['lam']:.1f}, variance / mean {n.var() / n.mean():.2f}"
+                    f" vs phi {e['phi']:.2f}", abs(n.mean() / e["lam"] - 1) < 0.05 and abs(n.var() / n.mean() / e["phi"] - 1) < 0.3))
+    OUT, CTL = keep
 
 
 def main() -> int:
@@ -160,6 +205,8 @@ def main() -> int:
         close(f"option {o} quantiles", q.values, exp_q)
         close(f"option {o} above largest observed", [summ.loc[o, "mean_above_max_observed"]], [d["above"].mean()])
         close(f"option {o} reinstatement usage", [summ.loc[o, "mean_reinst_usage"]], [d["ru"].mean()])
+    close("dispersion phi", [summ.phi.iloc[0]], [e["phi"]])
+    negbin()
     # statistical sense
     a = summ.alpha.iloc[0]
     results.append((f"alpha {a:.3f} within 1.6 +/- 0.15", abs(a - 1.6) < 0.15))

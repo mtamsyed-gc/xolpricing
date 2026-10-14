@@ -26,21 +26,30 @@ class Variant:
     line_dir: str        # standalone line-mode files
     claimant_dir: str    # standalone claimant-mode files
     out_dir: str         # staging + results
+    ete_dir: str = "data/synthetic/ete"     # ETE extension files (fact_claims, dim_life, fact_member_month)
 
     def p(self, rel: str) -> str:
         return self.up + rel.replace("/", "\\")
 
 
 LIVE = Variant("LIVE", ROOT / "alteryx/workflows", "..\\..\\", "data/input/XoL_Control.xlsx",
-               "data/input/line", "data/input/claimant", "data/output/live")
+               "data/input/line", "data/input/claimant", "data/output/live", "data/input/ete")
 SYNTH = Variant("SYNTH", ROOT / "alteryx/workflows/synth", "..\\..\\..\\", "data/synthetic/XoL_Control_synthetic.xlsx",
-                "data/synthetic/line", "data/synthetic/claimant", "data/output/synth")
+                "data/synthetic/line", "data/synthetic/claimant", "data/output/synth", "data/synthetic/ete")
+VERSION = "0.4"          # tool version carried into the run log
 VARIANTS = (LIVE, SYNTH)
 
 
 def stage(v: Variant, name: str) -> str:
     """Staging .yxdb written by one stage and read by later ones."""
     return v.p(f"{v.out_dir}/stage/{name}.yxdb")
+
+
+def result(wf, src, v: Variant, name: str, label: str = ""):
+    """A results table: results/<name>.csv for people, stage/res_<name>.yxdb (typed) for the Results workbook."""
+    wf.output_csv(src, v.p(f"{v.out_dir}/results/{name}.csv"), label=label or f"{name}.csv")
+    wf.output_yxdb(src, stage(v, f"res_{name}"), label=f"res_{name}")
+    return src
 
 
 def checks_csv(v: Variant, stage_no: str) -> str:
@@ -65,6 +74,7 @@ def finish_checks(wf, check_srcs: list, v: Variant, stage_no: str):
                         label="check header row")
     allc = wf.union([hdr] + check_srcs, label="all checks", differ="Ignore")
     wf.output_csv(allc, checks_csv(v, stage_no), label=f"checks_{stage_no}.csv")
+    wf.output_yxdb(allc, stage(v, f"chk_{stage_no[:2]}"), label=f"chk_{stage_no[:2]} (for the Results workbook)")
     stop, _ = wf.filter(allc, '[severity] = "STOP"', label="STOP checks")
     wf.message(stop, '"[" + [code] + "] " + [item] + ": " + [message]', kind="Error", label="stop the run")
     return allc
@@ -138,3 +148,4 @@ def recon_rows(wf, parts, v, stage_no):
                                  label=f"recon {table} {measure}"))
     u = wf.union(outs, label="recon rows")
     wf.output_csv(u, v.p(f"{v.out_dir}/checks/recon_{stage_no}.csv"), label=f"recon_{stage_no}.csv")
+    wf.output_yxdb(u, stage(v, f"rec_{stage_no[:2]}"), label=f"rec_{stage_no[:2]} (for the Results workbook)")

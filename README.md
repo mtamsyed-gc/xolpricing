@@ -8,7 +8,10 @@ loadings, and (C) cedant impact — recoveries vs premium and retained-claims vo
 **Excel** holds the inputs (Control workbook) and the loadings, cedant-impact exhibits and charts
 (Results workbook).
 
-> Status: phase 1 in progress — stages 00 (Control) and 01 (standalone adapters) built and tested.
+> Status (0.4, 2026-10-14): all phases built — Control (00), adapters for line, claimant and ETE data (01a/b/c),
+> experience (02), per-person burning cost (03) and simulation (04), per-event XoL (05), stop loss and programme
+> structures (06), Results workbook with pricing, C1, C2, expiring and scenarios (07). Every workflow runs clean in
+> Designer 2026.2 and matches the independent oracles exactly.
 > How to run: [`docs/RUNNING.md`](docs/RUNNING.md). Design: [`docs/scope.md`](docs/scope.md),
 > [`docs/data-contracts.md`](docs/data-contracts.md).
 
@@ -30,8 +33,7 @@ alteryx/
   macros/         .yxmc  reusable macros (e.g. trending, capping, layer loss split)
   apps/           .yxwz  analytic apps, if a user-facing front end is needed
 excel/
-  templates/      pricing workbook template(s) (.xlsm / .xltx)
-  vba/            exported VBA modules (.bas/.cls) — the diffable copy of workbook code
+  templates/      XoL_Control.xlsx (inputs) and XoL_Results.xlsx (exhibits), both generated
 data/
   templates/      header-only CSV input templates (standalone mode)
   synthetic/      synthetic portfolio in every input mode: line/, claimant/, ete/ (committed)
@@ -39,12 +41,14 @@ data/
   output/         run outputs (git-ignored)
 docs/             scope.md, data-contracts.md, RUNNING.md, CHANGELOG.md
 tools/alteryx/    workflow builders (build_all.py), xmlkit + strict simulator (vendored from ete-dashboard)
-tools/excel/      Control workbook spec and builder
+tools/excel/      Control and Results workbook specs and builders
 tools/synth/      synthetic data generator (seeded, reproducible)
 tests/
   run_all.py              every test + structural check of the generated workflows
   validate_synthetic.py   reference implementation of the stage-01 adapter checks
-  test_stage00.py / test_stage01.py   simulator runs vs pandas oracle, incl. broken-input cases
+  test_stage00.py … test_stage07.py   simulator runs vs independent oracles, incl. broken-input cases
+  test_designer_twin.py   the simulator and oracles reproduce Designer's stored outputs
+  twin_stage04/05/06.py   compare a Designer run with the numpy oracles
   reconciliation/         synthetic_controls.json (observed totals), synthetic_truth.json (ultimates)
 ```
 
@@ -66,5 +70,5 @@ tests/
 
 1. Clone the repo.
 2. Open workflows in Alteryx Designer from `alteryx/workflows/`.
-3. Open the pricing template from `excel/templates/` (enable macros).
+3. Follow [`docs/RUNNING.md`](docs/RUNNING.md): Control workbook, then workflows 00 → 07, then the Results workbook.
 4. Point inputs at `data/synthetic/` for test runs, or `data/input/` for live runs.

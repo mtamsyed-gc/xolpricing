@@ -1,8 +1,7 @@
 ﻿stage,table,measure,value
-S05,attritional_by_year,attritional_adj,96008291.61653613
-S05,gross_iterations,rows,10000
-S05,gross_iterations,gross,401882007637.3782
-S05,sim_gross,rows,10000
-S05,sl_iterations,rows,40000
-S05,sl_iterations,recovery,21389539804.684982
-S05,structures,rows,90000
+S05,events,rows,3
+S05,events,loss_adj,1835594.4855443714
+S05,event_lives,rows,29
+S05,simulated_events,rows,9149
+S05,simulated_events,loss,5841097695.935933
+S05,ev_iterations,recovery,3463200261.610707

@@ -105,6 +105,33 @@ def claimant_mode():
           (ag.paid_amount + ag.os_amount).groupby(ag.incurred_month.dt.year).sum())
 
 
+def ete_mode(line_ic):
+    """The ETE sample is 8 schemes of the line-mode book under ETE names: every claim line must equal its line-mode
+    twin (same claim key), and exposure / premium must equal the ETE tables on the gross basis."""
+    dl = pd.read_csv(SYN / "ete/dim_life.csv")
+    fmm = pd.read_csv(SYN / "ete/fact_member_month.csv", parse_dates=["MonthStart"])
+    fc = pd.read_csv(SYN / "ete/fact_claims.csv")
+    ic = load("int_claims")
+    results.append(("E int_claims rows = non-rejected fact_claims", len(ic) == (fc.StatusClass != "Rejected").sum()))
+    j = ic.merge(line_ic, on="claim_key", suffixes=("", "_l"))
+    results.append(("E every claim found in line mode", len(j) == len(ic)))
+    for c in ("amount_paid_q", "amount_os_q", "annual_limit"):
+        close(f"E {c} = line mode", j[c].fillna(0), j[f"{c}_l"].fillna(0))
+    results.append(("E cohort, scheme, treatment date = line mode",
+                    bool((j.cohort_month == j.cohort_month_l).all() and (j.scheme_id == j.scheme_id_l).all()
+                         and (j.treatment_date == j.treatment_date_l).all())))
+    fx = dl.set_index("LifeKey").Currency.map(FX)
+    ex = load("int_exposure")
+    close("E earned LY total", [ex.earned_ly.sum()], [fmm.EarnedLY_Gross.sum()])
+    close("E earned premium total (quote ccy)", [ex.earned_premium.sum()],
+          [(fmm.EarnedPrem_Gross * fmm.LifeKey.map(fx)).sum()])
+    close("E written premium total (quote ccy)", [ex.written_premium.sum()],
+          [(dl.WrittenPrem_Gross * dl.Currency.map(FX)).sum()])
+    im = load("int_members")
+    results.append(("E members = dim_life rows; segment = Policy Type",
+                    len(im) == len(dl) and set(im.segment) == set(dl["Policy Type"].str.strip())))
+
+
 def broken_line():
     """Unmapped status (A11), missing optional->required column (A01), 10% unknown members (A03, A13),
     a non-ISO date (A12) must all be caught."""
@@ -136,9 +163,13 @@ def main() -> int:
     sim.run(build_stage01.build_line(C.SYNTH))
     results.append(("L no STOP errors", not errors()))
     line_mode()
+    line_ic = load("int_claims")
     sim.run(build_stage01.build_claimant(C.SYNTH))
     results.append(("C no STOP errors", not errors()))
     claimant_mode()
+    sim.run(build_stage01.build_ete(C.SYNTH))
+    results.append(("E no STOP errors", not errors()))
+    ete_mode(line_ic)
     # A01 alone (members file without written_premium) - expected to stop the run
     codes = broken_line()
     print("  broken line-mode checks:", sorted(codes))

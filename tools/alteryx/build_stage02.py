@@ -145,6 +145,7 @@ def build(v):
     ind = wf.select(ind, keep=["ty", "component", "measure", "months_elapsed", "indicated_factor"],
                     keep_unknown=False, label="indicated factor fields")
     wf.output_csv(ind, v.p(f"{v.out_dir}/checks/out_completion_indicated.csv"), label="out_completion_indicated.csv")
+    wf.output_yxdb(ind, C.stage(v, "res_out_completion_indicated"), label="res_out_completion_indicated")
 
     # ------------------------------------------------------------------ checks and recon
     wf.container("02.3 Checks and recon")

@@ -18,6 +18,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import control_spec as S  # noqa: E402
+import xlsx_norm  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 NAVY, INPUT, NOTE = "1F3864", "FFF2CC", "F2F2F2"
@@ -110,6 +111,7 @@ def build(path: Path, values: dict, tables: dict, synthetic: bool) -> None:
     _readme(wb, synthetic)
     path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(path)
+    xlsx_norm.normalise(path)
 
 
 # --------------------------------------------------------------------------------------------- content
@@ -190,7 +192,8 @@ def synthetic_content() -> tuple[dict, dict]:
              for i, (l, a) in enumerate([(0.10, 1.00), (0.20, 1.00), (0.10, 1.10), (0.20, 1.10)])],
         "EvScenarios": [{"scenario_name": "Worksite transport accident", "lives": 10, "cost_per_life": 150_000,
                          "return_period_yrs": 50}],
-        "Expiring": [{"cover": "PP", "layer": 1, "ap": 100_000, "limit": 400_000, "rate_basis": "PPPY", "rate": 120}],
+        "Expiring": [{"cover": "PP", "layer": 1, "ap": 100_000, "limit": 400_000, "rate_basis": "PPPY", "rate": 950,
+                      "recoveries_by_year": "2021:2650000; 2022:3480000; 2023:3610000; 2024:2900000"}],
         "Scenarios": [
             {"scenario_id": 1, "scenario_name": "Trend +2pp", "target_table": "Trend", "target_key": "ALL",
              "target_column": "residual_pct", "operation": "ADD", "override_value": "0.02"},

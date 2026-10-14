@@ -74,8 +74,84 @@ def main() -> int:
     expect = ["L01", "L02", "P01", "P02", "P03", "P04", "P05", "T02", "T03", "T04"]
     print("broken:", codes, "STOP errors raised:", len(errs))
     ok &= codes == expect and len(errs) > 0
+    ok &= scenarios()
     print("PASS" if ok else "FAIL")
     return 0 if ok else 1
+
+
+def load_stage(v, name):
+    import pandas as pd
+    with open(ROOT / v.out_dir / f"stage/{name}.yxdb", "rb") as f:
+        fields, rows = pickle.load(f)
+    return pd.DataFrame(rows, columns=list(fields))
+
+
+def set_param(wb, pid, value):
+    ps = wb["Params"]
+    ps.cell(row=find_row(ps, 1, pid), column=3).value = value
+
+
+def scenarios() -> bool:
+    """Scenario overrides: scenario 1 adds 2pp to every trend residual, scenario 2 multiplies IBNR factors by 1.1;
+    scenario 3 (added here) sets a parameter, multiplies an INT parameter, keys on one year; scenario 4 is broken."""
+    import numpy as np
+    sv = C.Variant("SCN", ROOT / "data/output/scn/wf", "..\\..\\..\\..\\", "data/output/scn/XoL_Control_scn.xlsx",
+                   "data/synthetic/line", "data/synthetic/claimant", "data/output/scn")
+    ctl = ROOT / sv.control
+    ctl.parent.mkdir(parents=True, exist_ok=True)
+    base_tr = load_stage(C.SYNTH, "ctl_trend").set_index("year")
+    base_cp = load_stage(C.SYNTH, "ctl_completion")
+    good = True
+
+    def run_scn(sid, extra=()):
+        shutil.copy(ROOT / C.SYNTH.control, ctl)
+        wb = load_workbook(ctl)
+        set_param(wb, "scenario_id", str(sid))
+        sc = wb["Scenarios"]
+        for row in extra:
+            r = sc.max_row + 1
+            for c, val in enumerate(row, 1):
+                sc.cell(row=r, column=c).value = val
+        wb.save(ctl)
+        return run(sv)
+
+    rows, errs = run_scn(1)
+    tr = load_stage(sv, "ctl_trend").set_index("year")
+    r1 = bool(np.allclose(tr.residual_pct, base_tr.residual_pct.fillna(0) + 0.02)) and not errs
+    print(f"{'PASS' if r1 else 'FAIL'}  scenario 1: trend residual + 0.02 on every year")
+    rows, errs = run_scn(2)
+    cp = load_stage(sv, "ctl_completion")
+    ib = (base_cp.component == "IBNR").to_numpy()
+    r2 = bool(np.allclose(cp.selected_factor[ib], base_cp.selected_factor[ib] * 1.1) and
+              np.allclose(cp.selected_factor[~ib], base_cp.selected_factor[~ib])) and not errs
+    print(f"{'PASS' if r2 else 'FAIL'}  scenario 2: IBNR factors x 1.1, others unchanged")
+    rows, errs = run_scn(3, [(3, "mixed", "Params", "param_id=incidence_adj", "value", "SET", "1.15"),
+                             (3, "mixed", "Params", "param_id=iterations", "value", "MULT", "0.5"),
+                             (3, "mixed", "Trend", "year=2024", "residual_pct", "SET", "0.1"),
+                             (3, "mixed", "Trend", "year=2024", "residual_pct", "ADD", "0.01"),
+                             (3, "mixed", "Layers", "option_id=1", "ap", "MULT", "1.5")])
+    pr = load_stage(sv, "ctl_params").iloc[0]
+    tr = load_stage(sv, "ctl_trend").set_index("year")
+    ly = load_stage(sv, "ctl_layers")
+    ap_pp1 = ly[(ly.cover == "PP") & (ly.option_id == 1)].ap.iloc[0]
+    r3 = (pr.incidence_adj == 1.15 and pr.iterations == 5000 and abs(tr.residual_pct[2024] - 0.11) < 1e-12 and
+          abs(tr.residual_pct[2023] - base_tr.residual_pct[2023]) < 1e-12 and ap_pp1 == 150000 and not errs)
+    ap = list(csv.DictReader(open(ROOT / sv.out_dir / "checks/out_scenario_applied.csv", encoding="utf-8")))
+    r3 &= [float(a["rows_matched"]) for a in ap] == [1, 1, 1, 1, 3]     # option_id=1: PP, EV and SL rows
+    r3 &= bool(ly[(ly.cover == "SL") & (ly.option_id == 1)].ap.isna().all())     # MULT leaves a blank blank
+    print(f"{'PASS' if r3 else 'FAIL'}  scenario 3: SET / MULT params, SET then ADD on one trend year, "
+          f"MULT on a layer AP (option 1, both covers keyed); rows matched listed")
+    rows, errs = run_scn(4, [(4, "bad", "Trend", "ALL", "year_typo", "ADD", "0.01"),
+                             (4, "bad", "Completion", "ALL", "selected_factor", "MULT", "-1"),
+                             (4, "bad", "Trend", "year=1999", "residual_pct", "ADD", "0.01")])
+    codes = sorted({r["code"] for r in rows} - {"OK"})
+    r4 = codes == ["X02", "X03", "X04"] and len(errs) > 0
+    print(f"{'PASS' if r4 else 'FAIL'}  scenario 4 broken: {codes}")
+    rows, errs = run_scn(9)
+    r5 = "X01" in {r["code"] for r in rows}
+    print(f"{'PASS' if r5 else 'FAIL'}  scenario 9 has no rows: X01")
+    good &= r1 and r2 and r3 and r4 and r5
+    return good
 
 
 if __name__ == "__main__":

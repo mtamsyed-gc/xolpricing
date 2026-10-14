@@ -1,6 +1,6 @@
 # Scope — XoL Pricing Tool (broker view)
 
-Version 0.2 · 2026-10-14 · decisions D1–D9 agreed (§12)
+Version 0.3 · 2026-10-14 · decisions D1–D9 agreed (§12); all phases built (§11)
 Framework: adapted from a reinsurer-side health WCXL pricing workshop (14 sections). This tool is
 built for a **broker**, so the reinsurer's capital, risk-transfer and target-metric solve are dropped
 and a cedant-impact module is added.
@@ -267,15 +267,19 @@ One row per option, grouped by cover type. Stop loss rows are labelled in both f
 - **Reconciliation pack:** raw → standardised → accumulated → adjusted → layered totals by year and cover.
 - **Spreadsheet standards:** a single input colour; no hard-codes in formulas; caveat text next to judgement-based inputs.
 
-## 11. Build phasing (proposed)
+## 11. Build phasing
 
-| Phase | Content |
-|---|---|
-| 1 | Internal schema and data contracts; standalone adapter; RA/LO exposure; per-person XoL deterministic chain (stages 00–07); Control and Results workbooks; synthetic data set |
-| 2 | Stochastic per-person (fit, simulate, L2, unused capacity, reinstatements); RI cost; cedant impact |
-| 3 | Aggregate stop loss (attritional + large); stop loss net of a PP option; net-claims quantiles for cedant impact — **built (stage 05)**. Full programme stacking with per-event follows phase 4 |
-| 4 | Per-event XoL (event grouping, lives-per-event, scenarios) |
-| 5 | ETE adapter; summary-data mode hardening |
+| Phase | Content | Status |
+|---|---|---|
+| 1 | Internal schema and data contracts; standalone adapters; RA/LO exposure; per-person XoL deterministic chain; Control workbook; synthetic data set | **Built** (stages 00–03) |
+| 2 | Stochastic per-person (fit, simulate, L2, unused capacity, reinstatements, NEGBIN frequency); AP-band completion | **Built** (stage 04) |
+| 3 | Aggregate stop loss (attritional + large), net of the programme's XoLs; net-claims quantiles for cedant impact | **Built** (stage 06) |
+| 4 | Per-event XoL (event grouping, lives per event, scenarios); programme stacking PP → EV → SL | **Built** (stages 05, 06) |
+| 5 | ETE adapter; scenario overrides; expiring comparison and as-if; Results workbook with RI cost (B), C1 and C2 | **Built** (stages 01c, 00, 07; Results template) |
+| 6 | Python severity candidates (lognormal / GPD) if the Python tool is permitted (D6); first live run on GC data; Designer twin on the GC machine | Open |
+
+Every stage runs in Designer 2026.2 with 0 errors and 0 warnings and matches the simulator / numpy oracles exactly
+(`tests/test_designer_twin.py`, 2026-10-14).
 
 ## 12. Decisions
 
@@ -295,5 +299,5 @@ One row per option, grouped by cover type. Stop loss rows are labelled in both f
 - [ ] Alteryx Designer version
 - [ ] Predictive Tools (R) installed?
 - [ ] Python tool permitted? Is scipy available in the bundled environment?
-- [ ] Can the Output tool overwrite named ranges while preserving formatting in the installed version?
+- [x] Output tool: Overwrite Sheet replaces data sheets and keeps the other sheets and their formulas (Designer 2026.2, 2026-10-14; the workbook's relationships must be relative, as Excel writes them — the template is built so)
 - [ ] ETE-dashboard output location/format reachable from Alteryx

@@ -21,7 +21,8 @@ from xol_common import X
 BIG = "1000000000000000"
 PARAMS = ["quote_year", "policy_limit", "output_threshold_pct_min_ap", "outlier_method", "outlier_value",
           "iqr_multiplier", "full_cred_n", "incidence_adj", "epi_quote_year", "expected_lives_quote_year",
-          "years_included"]
+          "years_included", "fit_cutoff"]
+POST = [(c, s) for c in ("IBNR", "UNEARNED", "UNWRITTEN") for s in ("POST_AP_AMOUNT", "POST_AP_COUNT")]
 DEFAULT_WEIGHTS = {5: [0.10, 0.15, 0.20, 0.30, 0.25], 4: [0.15, 0.20, 0.35, 0.30], 3: [0.25, 0.40, 0.35],
                    2: [0.50, 0.50], 1: [1.0]}
 COMP = [("IBNR", "PRE_AP"), ("UNEARNED", "PRE_AP"), ("UNWRITTEN", "PRE_AP"),
@@ -87,6 +88,29 @@ def completion_factors(wf, v):
     return cp
 
 
+def band_factors(wf, v, targets):
+    """POST_AP factors by AP band: for each target (b_opt, b_lay, b_ap) and year, each component x side takes the row
+    with the largest ap_band_from <= b_ap (blank band = 0). Missing factor = 1."""
+    cp = wf.input_yxdb(C.stage(v, "ctl_completion"), label="ctl_completion (stage 00)")
+    cp, _ = wf.filter(cp, 'Left([side], 8) = "POST_AP_"', label="post-AP rows")
+    cp = wf.formula(cp, [("band", X.DBL, "IIF(IsNull([ap_band_from]), 0, [ap_band_from])"), ("kb", X.INT, "1")],
+                    label="band")
+    x = wf.join(cp, targets, ["kb"], ["kt"], label="rows x targets")["J"]
+    x, _ = wf.filter(x, "[band] <= [b_ap]", label="bands at or below the AP")
+    x = wf.sort(x, [("year", "Ascending"), ("component", "Ascending"), ("side", "Ascending"), ("b_opt", "Ascending"),
+                    ("b_lay", "Ascending"), ("band", "Descending")], label="highest band first")
+    x, _ = wf.unique(x, ["year", "component", "side", "b_opt", "b_lay"], label="one band per factor")
+    x = wf.formula(x, [(fname(c, s), X.DBL, f'IIF([component] = "{c}" AND [side] = "{s}", [selected_factor], Null())')
+                       for c, s in POST], label="one column per component x side")
+    x = wf.summarize(x, [("year", "GroupBy", "bf_year"), ("b_opt", "GroupBy", "bf_opt"), ("b_lay", "GroupBy", "bf_lay")]
+                     + [(fname(c, s), "Max", fname(c, s)) for c, s in POST], label="factors by year x target")
+    one = lambda c, s: f"IIF(IsNull([{fname(c, s)}]), 1, [{fname(c, s)}])"  # noqa: E731
+    return wf.formula(x, [(fname(c, s), X.DBL, one(c, s)) for c, s in POST] + [
+        ("post_amt_fb", X.DBL, " * ".join(f"[{fname(c, 'POST_AP_AMOUNT')}]" for c in ("IBNR", "UNEARNED", "UNWRITTEN"))),
+        ("post_cnt_fb", X.DBL, " * ".join(f"[{fname(c, 'POST_AP_COUNT')}]" for c in ("IBNR", "UNEARNED", "UNWRITTEN")))],
+        label="products (missing factor = 1)")
+
+
 def build(v):
     wf = X.WF("03_burning_cost", "Stage 03: per-person XoL deterministic burning cost")
     wf.dag = True
@@ -112,11 +136,26 @@ def build(v):
     wf.container("03.2 Claimants: trend, pre-AP completion, limits")
     u = wf.input_yxdb(C.stage(v, "exp_claimants"), label="exp_claimants (stage 02)")
     u = wf.join(u, trend, ["ty"], ["tr_year"], label="+ trend factor")["J"]
-    u = wf.left_join(u, comp, ["ty"], ["cf_year"], label="+ completion (left)")
+    u = wf.left_join(u, wf.select(comp, keep=["cf_year", "pre_f"], keep_unknown=False, label="pre-AP"), ["ty"],
+                     ["cf_year"], label="+ pre-AP completion (left)")
+    # post-AP factors by AP band: per layer, and at the fitting threshold u (= fit_cutoff, else the lowest AP)
+    ut = C.append(wf, wf.formula(par, [("kq", X.INT, "1")], label="key"), minap, "kq", "kmin", "+ lowest AP")
+    ut = wf.formula(ut, [("b_ap", X.DBL, "IIF(IsNull([p_fit_cutoff]), [min_ap], [p_fit_cutoff])"),
+                         ("b_opt", X.INT64, "-1"), ("b_lay", X.INT64, "0"), ("kt", X.INT, "1")], label="threshold u")
+    lt = wf.formula(lay, [("b_ap", X.DBL, "[ap]"), ("b_opt", X.INT64, "[option_id]"), ("b_lay", X.INT64, "[layer]"),
+                          ("kt", X.INT, "1")], label="layer APs")
+    tg = wf.union([wf.select(ut, keep=["kt", "b_opt", "b_lay", "b_ap"], keep_unknown=False, label="u target"),
+                   wf.select(lt, keep=["kt", "b_opt", "b_lay", "b_ap"], keep_unknown=False, label="layer targets")],
+                  label="band targets")
+    bf = band_factors(wf, v, tg)
+    bfu, bfl = wf.filter(bf, "[bf_opt] = -1", label="factors at u / by layer")
+    u = wf.left_join(u, wf.select(bfu, keep=["bf_year", "post_amt_fb", "post_cnt_fb"], keep_unknown=False,
+                                  label="post-AP at u"), ["ty"], ["bf_year"], label="+ post-AP factors at u (left)")
     u = wf.formula(u, [("pre_f_", X.DBL, "IIF(IsNull([pre_f]), 1, [pre_f])"),
-                       ("post_amt_f_", X.DBL, "IIF(IsNull([post_amt_f]), 1, [post_amt_f])"),
-                       ("post_cnt_f_", X.DBL, "IIF(IsNull([post_cnt_f]), 1, [post_cnt_f])"),
+                       ("post_amt_f_", X.DBL, "IIF(IsNull([post_amt_fb]), 1, [post_amt_fb])"),
+                       ("post_cnt_f_", X.DBL, "IIF(IsNull([post_cnt_fb]), 1, [post_cnt_fb])"),
                        ("ku", X.INT, "1")], label="missing completion = 1")
+    u = wf.select(u, drop=["post_amt_fb", "post_cnt_fb", "bf_year"], label="drop join fields")
     u = C.append(wf, u, par, "ku", "kp", "+ parameters")
     u = C.append(wf, u, minap, "ku", "kmin", "+ lowest AP")
     cap_expr = ("IIF(IsNull([annual_limit]) AND IsNull([p_policy_limit]), " + BIG + ", "
@@ -166,13 +205,17 @@ def build(v):
     lc = wf.select(lc, keep=["acc_key", "member_id", "ty", "segment", "scheme_id", "first_treatment", "amount_q",
                              "trend_f", "trended", "pre_f_", "adj_uncapped", "cap", "adj", "outlier", "outlier_thr"],
                    rename={"pre_f_": "pre_ap_f"}, keep_unknown=False, label="out_large_claims fields")
-    wf.output_csv(wf.sort(lc, [("ty", "Ascending"), ("adj", "Descending")], label="listing order"),
-                  results(v, "out_large_claims"), label="out_large_claims.csv")
+    C.result(wf, wf.sort(lc, [("ty", "Ascending"), ("adj", "Descending")], label="listing order"), v,
+             "out_large_claims")
 
     # ------------------------------------------------------------------ layering
     wf.container("03.4 Layering: unit x layer, post-AP completion, outlier split")
     xs, _ = wf.filter(u, "[adj] > [min_ap]", label="units above the lowest AP")
     xl = C.append(wf, xs, lay, "ku", "kl", "units x layers")
+    xl = wf.left_join(xl, wf.select(bfl, keep=["bf_year", "bf_opt", "bf_lay", "post_amt_fb", "post_cnt_fb"],
+                                    rename={"post_amt_fb": "post_amt_fl", "post_cnt_fb": "post_cnt_fl"},
+                                    keep_unknown=False, label="post-AP by layer band"),
+                      ["ty", "option_id", "layer"], ["bf_year", "bf_opt", "bf_lay"], label="+ post-AP factors (band)")
 
     def xl_of(adj):
         lim = ('IIF([lim_basis] = "TO_BENEFIT_LIMIT", IIF(IsNull([annual_limit]), ' + BIG + ', [annual_limit] - [ap]), '
@@ -182,7 +225,8 @@ def build(v):
     xl = wf.formula(xl, [
         ("xl", X.DBL, xl_of("[adj]")), ("xl_less1", X.DBL, xl_of("[adj_less1]")),
         ("n_xl", X.DBL, "IIF([xl] > 0, 1, 0)"),
-        ("xl_c", X.DBL, "[xl] * [post_amt_f_]"), ("n_c", X.DBL, "[n_xl] * [post_cnt_f_]"),
+        ("xl_c", X.DBL, "[xl] * IIF(IsNull([post_amt_fl]), 1, [post_amt_fl])"),
+        ("n_c", X.DBL, "[n_xl] * IIF(IsNull([post_cnt_fl]), 1, [post_cnt_fl])"),
         ("xl_non", X.DBL, "IIF([outlier] = 1, 0, [xl_c])"), ("xl_out", X.DBL, "IIF([outlier] = 1, [xl_c], 0)"),
         ("n_non", X.DBL, "IIF([outlier] = 1, 0, [n_c])"), ("n_out", X.DBL, "IIF([outlier] = 1, [n_c], 0)")],
         label="layer loss")
@@ -258,7 +302,7 @@ def build(v):
                               "severity", "xl_aa", "xl_non", "xl_out", "bc_pppy", "bc_pppy_non", "bc_pppy_out",
                               "bc_pct_prem", "weight", "weight_out"], keep_unknown=False, label="out_bc_by_year fields")
     byo = wf.sort(byo, [("option_id", "Ascending"), ("layer", "Ascending"), ("ty", "Ascending")], label="order")
-    wf.output_csv(byo, results(v, "out_bc_by_year"), label="out_bc_by_year.csv")
+    C.result(wf, byo, v, "out_bc_by_year")
 
     # ------------------------------------------------------------------ summary
     wf.container("03.7 Summary: weighted BC, credibility, sensitivities, leveraged trend, quote-year cost")
@@ -309,13 +353,31 @@ def build(v):
                               "outlier_thr", "lives_quote_year", "expected_cost_det", "expected_cost_pct_epi",
                               "expected_cost_from_pct"], keep_unknown=False, label="out_bc_summary fields")
     smo = wf.sort(smo, [("option_id", "Ascending"), ("layer", "Ascending")], label="order")
-    wf.output_csv(smo, results(v, "out_bc_summary"), label="out_bc_summary.csv")
+    C.result(wf, smo, v, "out_bc_summary")
     wf.output_yxdb(smo, C.stage(v, "bc_summary"), label="bc_summary")
+
+    # lives in the quote year, independent of the layers (per-event and stop-loss stages)
+    lv = wf.join(wf.select(ex, keep=["ty", "exposure_ly_full", "exposure_prem_full"], rename={"ty": "v_ty"},
+                           keep_unknown=False, label="exposure"),
+                 wf.select(trend, keep=["tr_year", "prem_trend_f"], keep_unknown=False, label="premium trend"),
+                 ["v_ty"], ["tr_year"], label="exposure + premium trend")["J"]
+    ly_ = wf.summarize(wf.formula(yrs, [("kz", X.INT, "1")], label="key"), [("kz", "GroupBy", "kz"),
+                                                                          ("g_ty", "Max", "latest_ty")],
+                       label="latest experience year")
+    lv = wf.join(lv, ly_, ["v_ty"], ["latest_ty"], label="latest year")["J"]
+    lv = C.append(wf, lv, par, "kz", "kp", "+ parameters")
+    lv = wf.formula(lv, [("lives_quote_year", X.DBL, "IIF(IsNull([p_expected_lives_quote_year]), [p_epi_quote_year] / "
+                                                     "([exposure_prem_full] / [exposure_ly_full] * [prem_trend_f]), "
+                                                     "[p_expected_lives_quote_year])")], label="lives in the quote year")
+    wf.output_yxdb(wf.select(lv, keep=["latest_ty", "exposure_ly_full", "exposure_prem_full", "prem_trend_f",
+                                       "lives_quote_year"], keep_unknown=False, label="bc_lives fields"),
+                   C.stage(v, "bc_lives"), label="bc_lives")
 
     # ------------------------------------------------------------------ annualisation exhibit
     wf.container("03.8 Annualisation of each treaty year (reported -> + IBNR -> + unearned -> + unwritten)")
     an = wf.join(wf.select(by, keep=["option_id", "layer", "l_label", "ty", "xl", "n_xl"], keep_unknown=False,
-                           label="reported layer loss"), comp, ["ty"], ["cf_year"], label="+ completion")
+                           label="reported layer loss"), bfl, ["ty", "option_id", "layer"], ["bf_year", "bf_opt", "bf_lay"],
+                 label="+ completion (band of the layer AP)")
     an = wf.union([an["J"], an["L"]], label="(left join)", differ="Ignore")
     one = lambda f: f"IIF(IsNull([{f}]), 1, [{f}])"  # noqa: E731
     an = wf.formula(an, [
@@ -331,8 +393,8 @@ def build(v):
     an = wf.select(an, keep=["option_id", "layer", "l_label", "ty", "xl_reported", "xl_ibnr", "xl_unearned",
                              "xl_unwritten", "n_reported", "n_ibnr", "n_unearned", "n_unwritten"], keep_unknown=False,
                    label="out_annualisation fields")
-    wf.output_csv(wf.sort(an, [("option_id", "Ascending"), ("layer", "Ascending"), ("ty", "Ascending")], label="order"),
-                  results(v, "out_annualisation"), label="out_annualisation.csv")
+    C.result(wf, wf.sort(an, [("option_id", "Ascending"), ("layer", "Ascending"), ("ty", "Ascending")], label="order"),
+             v, "out_annualisation")
 
     # ------------------------------------------------------------------ checks and recon
     wf.container("03.9 Checks and recon")

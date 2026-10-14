@@ -1,2 +1,4 @@
 ﻿stage,code,severity,item,message
 S05,OK,INFO,-,stage 05 checks ran
+S05,V04,INFO,treaty_basis,risks attaching: events are allocated to the treaty year of the event date
+S05,V06,FLAG,1m xs 250k per event,credibility 0.22 (3 events in the layer): the stochastic result carries the weight

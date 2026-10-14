@@ -1,0 +1,3 @@
+﻿stage,code,severity,item,message
+S06,OK,INFO,-,stage 06 checks ran
+S06,G08,INFO,1m xs 250k per event,reinstatement premium in Exhibit C2 taken from the iteration at each net-claims quantile (approximation)

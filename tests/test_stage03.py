@@ -64,10 +64,16 @@ def oracle():
     trend_f1 = trend_f / (1 + t[q])
     prem_f = idx_p[q] / idx_p
 
-    cp = sheet("Completion")
-    cp = cp[cp.ap_band_from.fillna(0) == 0]
+    cp_all = sheet("Completion")
+    cp_all["band"] = cp_all.ap_band_from.fillna(0)
+    cp = cp_all[cp_all.band == 0]
     prod = lambda side: cp[cp.side == side].groupby("year").selected_factor.prod()  # noqa: E731
-    pre, post_a, post_n = prod("PRE_AP"), prod("POST_AP_AMOUNT"), prod("POST_AP_COUNT")
+    pre = prod("PRE_AP")
+
+    def post(side, ap):
+        """Factor product by year using, per component, the highest band at or below the AP."""
+        c = cp_all[(cp_all.side == side) & (cp_all.band <= ap)].sort_values("band")
+        return c.groupby(["year", "component"]).selected_factor.last().groupby("year").prod()
 
     lay = sheet("Layers")
     lay = lay[(lay.cover == "PP") & (lay.active == 1)].copy()
@@ -99,8 +105,8 @@ def oracle():
         xl1 = np.clip(np.minimum(u.adj1 - L.ap, lim), 0, None)
         xl = np.where(u.adj - L.ap <= 0, 0, xl)
         d = pd.DataFrame({"ty": u.ty, "xl": xl, "xl1": xl1, "n": (xl > 0).astype(float), "out": u.outlier})
-        d["xl_c"] = d.xl * d.ty.map(post_a).fillna(1)
-        d["n_c"] = d.n * d.ty.map(post_n).fillna(1)
+        d["xl_c"] = d.xl * d.ty.map(post("POST_AP_AMOUNT", L.ap)).fillna(1)
+        d["n_c"] = d.n * d.ty.map(post("POST_AP_COUNT", L.ap)).fillna(1)
         g = d.groupby("ty").agg(xl=("xl", "sum"), xl_c=("xl_c", "sum"), n=("n", "sum"), n_c=("n_c", "sum"),
                                 xl1=("xl1", "sum")).reindex(years, fill_value=0)
         g["xl_non"] = d[~d.out].groupby("ty").xl_c.sum().reindex(years, fill_value=0)
@@ -131,6 +137,39 @@ def main() -> int:
               build_stage03.build(C.SYNTH)):
         sim.run(b)
         results.append((f"{b.stem}: no STOP", not [m for m in sim.MESSAGES if m[0] == "Error"]))
+    compare("")
+    bands()
+    for n, ok in results:
+        print(f"{'PASS' if ok else 'FAIL'}  {n}")
+    return 0 if all(ok for _, ok in results) else 1
+
+
+def bands():
+    """AP-band completion: extra POST_AP rows at bands 120k and 200k change only the layers whose AP reaches them."""
+    global STAGE, RES, CTL
+    import shutil
+    from openpyxl import load_workbook
+    out = ROOT / "data/output/t3b"
+    out.mkdir(parents=True, exist_ok=True)
+    ctl = out / "XoL_Control_t3b.xlsx"
+    shutil.copy(CTL, ctl)
+    wb = load_workbook(ctl)
+    ws = wb["Completion"]
+    for row in [(2025, "IBNR", "POST_AP_AMOUNT", 200000, 3.5), (2024, "IBNR", "POST_AP_COUNT", 120000, 1.4),
+                (2025, "UNEARNED", "POST_AP_AMOUNT", 120000, 2.2)]:
+        r = ws.max_row + 1
+        for c, val in enumerate(row, 1):
+            ws.cell(row=r, column=c).value = val
+    wb.save(ctl)
+    vb = C.Variant("T3B", out / "wf", "..\\..\\..\\..\\", "data/output/t3b/XoL_Control_t3b.xlsx", "data/synthetic/line",
+                   "data/synthetic/claimant", "data/output/t3b")
+    for b in (build_stage00.build(vb), build_stage01.build_line(vb), build_stage02.build(vb), build_stage03.build(vb)):
+        sim.run(b)
+    STAGE, RES, CTL = out / "stage", out / "results", ctl
+    compare("bands: ")
+
+
+def compare(tag):
     exp = oracle()
     got = pd.read_csv(RES / "out_bc_summary.csv").set_index("option_id")
     by = pd.read_csv(RES / "out_bc_by_year.csv")
@@ -140,15 +179,11 @@ def main() -> int:
         for col in ("bc_pppy_total", "bc_pct_prem_weighted", "credibility_z", "n_xl_claims", "sens_straight_mean",
                     "sens_wfreq_x_sev", "sens_sfreq_x_sev", "bc_min", "bc_max", "lev_trend", "lives_quote_year",
                     "expected_cost_det", "outlier_thr"):
-            close(f"option {o} {col}", [g[col]], [e[col]])
+            close(f"{tag}option {o} {col}", [g[col]], [e[col]])
         yb = by[by.option_id == o].set_index("ty")
-        close(f"option {o} xl_c by TY", yb.xl_c, e["by_year"].xl_c)
-        close(f"option {o} bc_pppy by TY", yb.bc_pppy, e["by_year"].bc)
-        close(f"option {o} weights", yb.weight, e["weights"])
-
-    for n, ok in results:
-        print(f"{'PASS' if ok else 'FAIL'}  {n}")
-    return 0 if all(ok for _, ok in results) else 1
+        close(f"{tag}option {o} xl_c by TY", yb.xl_c, e["by_year"].xl_c)
+        close(f"{tag}option {o} bc_pppy by TY", yb.bc_pppy, e["by_year"].bc)
+        close(f"{tag}option {o} weights", yb.weight, e["weights"])
 
 
 if __name__ == "__main__":

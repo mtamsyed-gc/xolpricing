@@ -1,7 +1,8 @@
-# Methodology — per-person XoL and aggregate stop loss (stages 02–05)
+# Methodology — per-person XoL, per-event XoL, aggregate stop loss and pricing (stages 00–07)
 
-Version 0.3 · 2026-10-14. Every formula below is implemented in `tools/alteryx/build_stage02.py`–`build_stage05.py`
-and independently re-implemented in `tests/test_stage02.py`–`test_stage05.py`.
+Version 0.4 · 2026-10-14. Every formula below is implemented in `tools/alteryx/build_stage00.py`–`build_stage07.py`
+and `tools/excel/build_results.py`, and independently re-implemented in `tests/test_stage00.py`–`test_stage07.py`.
+Designer 2026.2 reproduces the simulator and the oracles exactly (`tests/test_designer_twin.py`).
 Notation: TY = treaty year, Q = quote year, AP = attachment point, L = layer limit.
 
 ## 1. Treaty year and accumulation (stage 02)
@@ -40,6 +41,7 @@ user's selections in the Control workbook (D3), whose caveat about portfolio dev
 | Trend index | `I_k = I_{k−1} · (1 + t_k)(1 + one_off_k)`, first year = 1 |
 | Trend to quote year | `T(ty) = I_Q / I_ty` |
 | Pre-AP completion | `P(ty) = IBNR_PRE · UNEARNED_PRE · UNWRITTEN_PRE` (missing factor = 1, B04 flags) |
+| Post-AP factors by AP band | A Completion row may carry `ap_band_from`. A layer with attachment AP uses, per year, component and side, the row with the largest `ap_band_from ≤ AP` (blank = 0). The stage-04 frequency uses the bands at u. One row per year without bands gives the same factor to every layer |
 | Adjusted amount | `adj = min( amount · T(ty) · P(ty), benefit limit, policy_limit )` |
 
 ## 4. Outliers
@@ -87,12 +89,14 @@ the stochastic stage (scope §7).
 
 | Item | Rule |
 |---|---|
-| Fitting threshold u | `fit_cutoff`, else the lowest active per-person AP |
+| Fitting threshold u | `fit_cutoff`, else the lowest active per-person AP (post-AP completion bands at u, §3) |
 | Fitting data | Adjusted units (stage 03: trended, pre-AP completed, capped) with `adj > u`, all experience years |
 | Severity | Single-parameter Pareto above u: `S(x) = (u/x)^α`. MLE with right-censoring at each unit's cap (a unit is censored when its uncapped amount reaches its cap): `α = n_uncensored / Σ ln(adj/u)`, standard error `α/√n_uncensored` |
 | Fit diagnostics | `out_fit.csv`: empirical vs fitted exceedances at every AP, exhaustion point and 250k/500k/1m/2m; check S05 flags a layer whose deterministic / stochastic ratio (below the largest observed claim) is outside 0.8–1.25 |
-| Frequency | Poisson. `λ = Σ_ty w_ty · (units > u in ty × POST_AP_COUNT(ty)) / full-year exposure_ty × lives_Q × incidence_adj`, weights as in §6. NEGBIN is not available natively (S03) |
-| Claim count | Inverse CDF: `N = #{k : CDF(k) < U}` from a Poisson table k = 0…⌈λ + 10√λ + 20⌉ (λ > 700 stops: S02) |
+| Frequency | `λ = Σ_ty w_ty · (units > u in ty × POST_AP_COUNT(ty)) / full-year exposure_ty × lives_Q × incidence_adj`, weights as in §6 |
+| Dispersion | Pearson `φ = Σ_ty (n_ty − e_ty·n/e)² / (e_ty·n/e) / (k − 1)` over the k experience years (n = counts above u, e = full-year exposure); φ = 1 with one year. Reported as `phi` |
+| Count distribution | `freq_model = POISSON`: Poisson(λ). `NEGBIN` and φ > 1: negative binomial with mean λ and variance φ·λ (`r = λ/(φ − 1)`, `p = 1/φ`); NEGBIN with φ ≤ 1 falls back to Poisson (S03, INFO). `freq_dist` in the outputs says which was used |
+| Claim count | Inverse CDF: `N = #{k : CDF(k) < U}` from a pmf table k = 0…⌈λ + 10√(φλ) + 20⌉ (λ > 700 stops: S02) |
 | Claim | `X = u · U^(−1/α)`; cap drawn uniformly from the fitted units' caps (benefit / policy limit, preserving the plan mix); `claim = min(X, cap)` |
 | Layer loss | As §5 on each simulated claim (TO_BENEFIT_LIMIT uses the drawn cap); annual `recovery = min(max(Σ xl − AAD, 0), AAL)`, AAL as in §5 |
 | Reinstatements | Usage per iteration `r = cost% · min(recovery, n·L)/L` (unlimited: `recovery/L`), as a fraction of the upfront premium P. Excel solves P from the target: `P = target / (1 + E[r])`. Pro rata as to time not modelled (S06) |
@@ -102,9 +106,9 @@ the stochastic stage (scope §7).
 | Outputs | `out_sim_summary.csv` (λ, α, mean, SD, CoV, P(0), P50–P99.5, above-M, reinstatement usage, blend), `out_sim_quantiles.csv` (q = 0.001, 0.005 … 0.995, 0.999, nearest rank), `out_sim_iterations.csv` (per iteration and layer: recovery, above-M, reinstatement usage, large-claim gross), `out_fit.csv` |
 
 Independence of severity and cap is an approximation (higher-limit plans may also have higher severities); the
-lognormal / GPD candidates and negative binomial frequency need the Python tool (D6) and are not in this version.
+lognormal / GPD severity candidates need the Python tool (D6) and are not in this version.
 
-## 9. Aggregate stop loss and cedant-impact inputs (stage 05, native Alteryx)
+## 9. Aggregate stop loss, programme and cedant-impact inputs (stage 06, native Alteryx)
 
 | Item | Rule |
 |---|---|
@@ -119,11 +123,11 @@ lognormal / GPD candidates and negative binomial frequency need the Python tool 
 | Gross claims | `G = attritional + large above t_sl`, per iteration. Attritional and large are independent |
 | Net claims budget | `net_claims_budget`, else the mean simulated gross (so the average-year surplus without RI is 0) |
 | SL attachment / limit | `sl_measure`: PCT_BUDGET × budget, PCT_EPI × EPI, AMOUNT as entered (blank limit = unlimited) |
-| SL base claims | `sl_claims_basis`: GROSS = G; NET_OF_XOL = G − recoveries of the per-person option named in the Programme sheet (first active PP step; G04 stops if none) |
+| SL base claims | `sl_claims_basis`: GROSS = G; NET_OF_XOL = G − recoveries of the Programme sheet's PP option − recoveries of its EV option, the EV recoveries computed on event losses net of that PP option (G04 stops if the programme has neither) |
 | SL recovery | `min(max(base − AP, 0), L) × (1 − co-participation)`; one layer per option (G10 flags a layer 2) |
-| Structures | Without RI; each PP option (net = G − PP recoveries); each SL option (net = base − SL recovery; with its PP option when NET_OF_XOL) |
-| Quantiles | Per structure, q = 0.001 … 0.999 (nearest rank, `rank = ⌈q·n⌉` computed as ⌈q_milli·n/1000⌉): net claims, the reinstatement usage of the iteration at that rank (by layer), and the cover's own recovery |
-| Exhibit C2 | Surplus at return period N = budget − premium − (net claims quantile at 1 − 1/N); average year = budget − premium − mean net. Exact for structures without reinstatement premium; with reinstatements, the reinstatement premium is taken from the iteration at the net-claims quantile (G08) |
+| Structures | `0 NONE` (without RI); `1 PP k` (net = G − PP recoveries); `3 EV k` (net = G − EV recoveries, gross events); `2 SL k` (net = base − SL recovery, with the programme's XoLs when NET_OF_XOL); `4 PROGRAMME` when `evaluate_mode = PROGRAMME`: the Programme sheet's options in order PP → EV (net of PP) → SL (net of both), net = G − all recoveries. Columns `pp_option`, `ev_option`, `sl_option` name the options in each structure (G12 stops on a programme out of order) |
+| Quantiles | Per structure, q = 0.001 … 0.999 (nearest rank, `rank = ⌈q·n⌉` computed as ⌈q_milli·n/1000⌉, `qm` = q in per mille): net claims, the reinstatement usage of the iteration at that rank (`ru_l1/2_at_q` for the PP layers, `ru_ev1/2_at_q` for the EV layers), and the cover's own recovery |
+| Exhibit C2 inputs | Mean net claims and mean reinstatement usage per layer (average year); net-claims quantiles with the usage of the iteration at that rank (return periods). The surplus itself is computed in the Results workbook (§11) |
 | Exposed lives | PP: share of the latest treaty year's member days whose benefit limit > AP (unknown limit counts as exposed), × lives_Q. EV and SL: all lives. Claimant data has no member limits: share 1 (G07) |
 | Outputs | `out_attritional_by_year.csv`, `out_gross_summary.csv`, `out_gross_iterations.csv`, `out_sl_iterations.csv`, `out_struct_summary.csv`, `out_struct_quantiles.csv`, `out_exposed_lives.csv` |
 
@@ -133,7 +137,55 @@ so with NET_OF_XOL and an AP below t_sl the PP recoveries on those claims are dr
 amount (set t_sl at or below the lowest AP to avoid it). A stop loss needs the stage-04 simulation, so a PP layer or a
 `fit_cutoff` must be present.
 
-## 10. Not yet in this version
+## 10. Per-event XoL (stage 05, native Alteryx)
 
-Scenario overrides (sensitivity runs), AP-band completion factors, the expiring-rate comparison, per-event cover
-(phase 4) and the Results workbook exhibits.
+| Item | Rule |
+|---|---|
+| Events, SUPPLIED | Claim lines carrying an `event_id`: one event per id |
+| Events, CLUSTER | SUPPLIED events plus accident-coded lines (`cause_code` given, no `event_id`) grouped by the EventRule `group_key` (SCHEME, SITE, CAUSE, SCHEME+SITE or SCHEME+CAUSE) and cause; a new event starts when the admission date (else treatment date) is more than `window_days` after the current cluster's first date. Any event needs `min_lives` distinct lives. Treaty year = that of the event's first date (RA or LO) |
+| Per-life cost | Σ the life's event lines × QS retention × large-claim trend to Q, capped at the benefit / policy limit. Event loss = Σ over its lives. For the programme view also each life's cost net of the Programme sheet's PP option (through that option's layers) |
+| Layer loss | `xl = max(0, min(L, loss − AP)) · (1 − co-participation)`, AAD / AAL on each treaty year's total as §5 |
+| Burning cost | Per treaty year: recovery / full-year exposure (stage 02), weights of §6; `E_det = BC × lives_Q × incidence_adj`; Z = min(1, √(events hitting the layer / full_cred_n)) |
+| Frequency, experience | Poisson, `λ = Σ w_ty · events_ty / exposure_ty × lives_Q × incidence_adj` |
+| Frequency, scenarios | Each EvScenarios row: Poisson(1 / return period); size = lives × cost per life. `ev_freq_source`: EXPERIENCE, SCENARIOS or BOTH (default) |
+| Size, experience | Lives drawn from the historical events' life counts; each life's cost drawn from the pooled historical per-life costs (both trended and capped) |
+| Annual result | Per iteration: Σ layer losses of all events, AAD / AAL; reinstatement usage as §8. Also net of the programme's PP option (`recovery_net`, `reinst_usage_net`), used by stage 06 |
+| RNG | MINSTD streams at offsets 2²⁴ (experience counts), 2²⁵ (lives), 2²⁶ (per-life costs), 2²⁷ (scenario counts): below the stop-loss (2²⁸…) and per-person (2²⁹…) streams |
+| Blend | `E[L] = Z · E_det + (1 − Z) · E_stoch` |
+| Outputs | `out_ev_events.csv`, `out_ev_bc_by_year.csv`, `out_ev_bc_summary.csv`, `out_ev_scenarios.csv` (each scenario's layer loss, gross and net of PP), `out_ev_sim_summary.csv`, `out_ev_sim_quantiles.csv`, `out_ev_iterations.csv` |
+
+Limitations: experience events are few (synthetic data: three), so the experience λ and the empirical size
+distribution are thin; the scenarios carry the tail. Per-life costs are resampled independently of the event size.
+
+## 11. Pricing and exhibits (Results workbook, stage 07)
+
+Stage 07 writes every result table into the data sheets of `XoL_Results.xlsx`; the presentation sheets are formulas
+over those sheets (defined names look columns up by header), so the workbook recalculates when an input changes.
+
+| Item | Rule |
+|---|---|
+| Expected loss used | Inputs sheet, expected-loss basis: DETERMINISTIC, STOCHASTIC or BLENDED (default) per option, summed over its layers. Stop loss: stochastic only |
+| Loadings | Control Loadings by cover (reinsurer expenses, brokerage, profit, premium tax, risk load k), overridable on the Inputs sheet |
+| Target premium | `P_target = (E[L] + k · SD) / (1 − Σ loadings)`, SD = SD of the option's total annual recovery |
+| Upfront premium | `P = P_target / (1 + E[r])`, E[r] = layer reinstatement usage weighted by layer expected recovery (§8); `E[reinstatement premium] = P · E[r]`. Stop loss: no reinstatements |
+| Layer split | P split between layers 1 and 2 pro rata to their simulated expected recoveries (used for reinstatement premium by layer) |
+| Rates | per life = P / lives_Q; % EPI = P / EPI; per exposed life = P / exposed lives (§9); per reference lives = per exposed life × reference lives |
+| C1 (Reinsurance Structures) | Per option: exposed lives, premium, premium per exposed life and per reference lives, expected recoveries, expected cost of cover = P + E[reinstatement premium] − E[L], "recoveries exceed premium 1 in N years" = 1 / share of the 999 recovery quantiles above P |
+| C2 (Cedant Impact) | Per structure: surplus = budget − (net claims + Σ upfront premiums + Σ_layers P_layer · reinstatement usage). Average year: mean net claims and mean usage. Return period N: net claims at q = 1 − 1/N with the usage of that iteration. Display in the chosen currency and unit |
+| Expiring | Expiring row matched to the PP option with the same layer, AP and limit. Expiring premium at the quote year: PPPY rate × lives_Q; PCT_EPI rate × EPI; FLAT the premium; trended by (1 + the matched option's leveraged trend, else base trend), compared with the indicated upfront premium |
+| As-if by year | Matched option's layer loss after AAD / AAL (`xl_aa`, trended to Q) against the expiring premium on that year's exposure, also at the quote-year level: PPPY rate × (1 + lev) × exposure; PCT_EPI rate × year's premium × premium trend; FLAT premium × (1 + lev) × exposure / lives_Q. Actual recoveries (`recoveries_by_year`, untrended) against the same premium at the year's own level (÷ (1 + lev)^(Q − ty); PCT_EPI: rate × year's premium) |
+| Scenarios sheet | `scn_summary` keeps one block of rows per `scenario_id`: a run replaces its own scenario's rows and keeps the others, so base and sensitivities sit side by side |
+| Run log / warnings | `out_run_log` (tool version, run time, scenario, data mode, every parameter with its justification), `out_warnings` (all checks of stages 00–06), `out_recon` |
+
+## 12. Scenario overrides (stage 00)
+
+With `scenario_id` > 0 in Params, each Scenarios row of that id changes one numeric column of its target table
+(Trend, Completion, Weights, Params, FX, Layers, EvScenarios) in the rows matching `target_key` (`ALL` or
+`column=value`; for Params `param_id=x`, column `value`). Order: SET replaces, then MULT multiplies (product of the
+MULT rows), then ADD adds; a blank cell stays blank unless SET or ADD applies. Params are overridden before
+validation. `checks/out_scenario_applied.csv` lists the rows each override matched (X04 flags none).
+
+## 13. Not in this version
+
+Lognormal / GPD severity candidates and fit comparison (Python tool, D6), dependence between large and attritional
+claims, pro rata as to time reinstatements, a correlation between event size and per-life cost.

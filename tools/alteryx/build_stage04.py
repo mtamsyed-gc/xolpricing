@@ -135,7 +135,7 @@ def build(v):
     fit_out = wf.select(emp, keep=["t", "t_label", "u_fit", "alpha", "alpha_se", "n_fit", "n_uncensored", "n_censored",
                                    "max_observed", "n_ge", "expected_n", "s_empirical", "s_fitted"],
                         keep_unknown=False, label="out_fit fields")
-    wf.output_csv(wf.sort(fit_out, [("t", "Ascending")], label="by threshold"), results(v, "out_fit"), label="out_fit.csv")
+    C.result(wf, wf.sort(fit_out, [("t", "Ascending")], label="by threshold"), v, "out_fit")
 
     # ------------------------------------------------------------------ frequency
     wf.container("04.3 Frequency: lambda for the quote year")
@@ -149,24 +149,45 @@ def build(v):
                       ["g_ty"], ["n_ty"], label="+ counts")
     fy = wf.formula(fy, [("freq_u", X.DBL, "IIF(IsNull([n_u]), 0, [n_u]) / [exposure_ly_full]"),
                          ("w_freq", X.DBL, "[weight] * [freq_u]"), ("kw", X.INT, "1")], label="frequency above u")
-    lam = wf.summarize(fy, [("kw", "GroupBy", "kw"), ("w_freq", "Sum", "freq_u_weighted")], label="weighted frequency")
+    fy = wf.formula(fy, [("n_y", X.DBL, "IIF(IsNull([n_u]), 0, [n_u])"), ("one", X.DBL, "1")], label="count by year")
+    lam = wf.summarize(fy, [("kw", "GroupBy", "kw"), ("w_freq", "Sum", "freq_u_weighted"), ("n_y", "Sum", "n_all"),
+                            ("exposure_ly_full", "Sum", "e_all"), ("one", "Sum", "k_years")],
+                       label="weighted frequency, pooled rate")
+    # Pearson dispersion of the yearly counts around the pooled rate (negative binomial when > 1)
+    dp = C.append(wf, fy, wf.select(lam, keep=["kw", "n_all", "e_all"], rename={"kw": "kd"}, keep_unknown=False,
+                                    label="pooled"), "kw", "kd", "+ pooled rate")
+    dp = wf.formula(dp, [("pearson", X.DBL, "IIF([n_all] > 0, Pow([n_y] - [exposure_ly_full] * [n_all] / [e_all], 2) / "
+                                            "([exposure_ly_full] * [n_all] / [e_all]), 0)")], label="Pearson terms")
+    dp = wf.summarize(dp, [("kw", "GroupBy", "kd2"), ("pearson", "Sum", "pearson_sum")], label="Pearson sum")
+    lam = wf.join(lam, dp, ["kw"], ["kd2"], label="+ dispersion")["J"]
     bsum = wf.input_yxdb(C.stage(v, "bc_summary"), label="bc_summary (stage 03)")
     lives = wf.summarize(wf.formula(bsum, [("kv", X.INT, "1")], label="key"),
                          [("kv", "GroupBy", "kv"), ("lives_quote_year", "Max", "lives_q")], label="lives in quote year")
     lam = C.append(wf, lam, lives, "kw", "kv", "+ lives")
     lam = C.append(wf, lam, ctx, "kw", "kp", "+ context")
-    lam = wf.formula(lam, [("lambda", X.DBL, "[freq_u_weighted] * [lives_q] * [p_incidence_adj]"),
-                           ("k_max", X.INT64, "Ceil([lambda] + 10 * Sqrt([lambda]) + 20)")], label="lambda")
+    lam = wf.formula(lam, [
+        ("lambda", X.DBL, "[freq_u_weighted] * [lives_q] * [p_incidence_adj]"),
+        ("phi", X.DBL, "IIF([k_years] > 1, [pearson_sum] / ([k_years] - 1), 1)"),
+        ("nb", X.BOOL, '[p_freq_model] = "NEGBIN" AND [phi] > 1'),
+        ("nb_r", X.DBL, "IIF([nb], [lambda] / ([phi] - 1), Null())"),
+        ("nb_q", X.DBL, "IIF([nb], 1 / [phi], Null())"),
+        ("freq_dist", X.STR, 'IIF([nb], "NEGBIN", "POISSON")'),
+        ("k_max", X.INT64, "Ceil([lambda] + 10 * Sqrt([lambda] * IIF([nb], [phi], 1)) + 20)")],
+        label="lambda, dispersion, distribution")
     lam = C.append(wf, lam, fitc, "kw", "kf", "+ fit")
     lam = wf.select(lam, keep=["kw", "lambda", "k_max", "freq_u_weighted", "lives_q", "u_fit", "alpha", "max_observed",
-                               "n_fit", "p_iterations", "p_freq_model", "start1", "start2", "start3", "t_sl"],
+                               "n_fit", "p_iterations", "p_freq_model", "start1", "start2", "start3", "t_sl", "phi",
+                               "nb", "nb_r", "nb_q", "freq_dist"],
                     keep_unknown=False, label="simulation constants")
 
     # ------------------------------------------------------------------ Poisson draws
-    wf.container("04.4 Poisson claim counts by inverse CDF (merge of CDF table and iteration uniforms)")
+    wf.container("04.4 Claim counts by inverse CDF (merge of CDF table and iteration uniforms)")
     ks = wf.generate_rows(lam, "k", X.INT64, "0", "[k] <= [k_max]", "[k] + 1", label="k = 0 .. k_max")
-    ks = wf.multirow(ks, "pk", X.DBL, "IIF([k] = 0, Exp(-[lambda]), [Row-1:pk] * [lambda] / [k])", label="Poisson pmf")
-    ks = wf.multirow(ks, "cdf", X.DBL, "[Row-1:cdf] + [pk]", label="Poisson CDF")
+    ks = wf.multirow(ks, "pk", X.DBL, "IIF([nb], IIF([k] = 0, Exp([nb_r] * Log([nb_q])), "
+                                      "[Row-1:pk] * ([nb_r] + [k] - 1) / [k] * (1 - [nb_q])), "
+                                      "IIF([k] = 0, Exp(-[lambda]), [Row-1:pk] * [lambda] / [k]))",
+                     label="pmf (Poisson, or negative binomial when overdispersed)")
+    ks = wf.multirow(ks, "cdf", X.DBL, "[Row-1:cdf] + [pk]", label="CDF")
     its = wf.generate_rows(lam, "iter", X.INT64, "1", "[iter] <= [p_iterations]", "[iter] + 1", label="iterations")
     its = stream(wf, its, "s1", "start1", "iteration uniforms")
     a_ = wf.formula(ks, [("val", X.DBL, "[cdf]"), ("typ", X.INT, "1"), ("iter", X.INT64, "0")], label="CDF records")
@@ -248,7 +269,7 @@ def build(v):
                               "n_claims_layer", "large_gross_"], rename={"large_gross_": "large_gross"},
                     keep_unknown=False, label="out_sim_iterations fields")
     ito = wf.sort(ito, [("option_id", "Ascending"), ("layer", "Ascending"), ("iter", "Ascending")], label="order")
-    wf.output_csv(ito, results(v, "out_sim_iterations"), label="out_sim_iterations.csv")
+    wf.output_csv(ito, results(v, "out_sim_iterations"), label="out_sim_iterations.csv")    # large: CSV only
     wf.output_yxdb(ito, C.stage(v, "sim_iterations"), label="sim_iterations")
 
     # ------------------------------------------------------------------ quantiles and summary
@@ -267,8 +288,8 @@ def build(v):
                  label="quantile rows")["J"]
     qo = wf.select(qj, keep=["option_id", "layer", "l_label", "q", "recovery"], keep_unknown=False,
                    label="out_sim_quantiles fields")
-    wf.output_csv(wf.sort(qo, [("option_id", "Ascending"), ("layer", "Ascending"), ("q", "Ascending")], label="order"),
-                  results(v, "out_sim_quantiles"), label="out_sim_quantiles.csv")
+    C.result(wf, wf.sort(qo, [("option_id", "Ascending"), ("layer", "Ascending"), ("q", "Ascending")], label="order"),
+             v, "out_sim_quantiles")
 
     st = wf.formula(ito, [("r2", X.DBL, "[recovery] * [recovery]"), ("zero", X.DBL, "IIF([recovery] = 0, 1, 0)")],
                     label="moments")
@@ -301,14 +322,15 @@ def build(v):
         ("expected_loss_blended", X.DBL, "[credibility_z] * [expected_cost_det] + (1 - [credibility_z]) * "
                                          "[mean_below_max_observed] + [mean_above_max_observed]"),
         ("expected_loss_pppy", X.DBL, "[expected_loss_blended] / [lives_q]")], label="credibility blend")
-    sto = wf.select(st, keep=["option_id", "layer", "l_label", "p_iterations", "lambda", "u_fit", "alpha", "max_observed",
+    sto = wf.select(st, keep=["option_id", "layer", "l_label", "p_iterations", "lambda", "freq_dist", "phi", "u_fit",
+                              "alpha", "max_observed",
                               "lives_q", "mean_recovery", "sd_recovery", "cov", "p_zero", "p50", "p75", "p90", "p95",
                               "p99", "p995", "max_recovery", "mean_below_max_observed", "mean_above_max_observed",
                               "mean_reinst_usage", "expected_cost_det", "credibility_z", "det_to_stoch_below",
                               "expected_loss_blended", "expected_loss_pppy"],
                     rename={"p_iterations": "iterations"}, keep_unknown=False, label="out_sim_summary fields")
     sto = wf.sort(sto, [("option_id", "Ascending"), ("layer", "Ascending")], label="order")
-    wf.output_csv(sto, results(v, "out_sim_summary"), label="out_sim_summary.csv")
+    C.result(wf, sto, v, "out_sim_summary")
     wf.output_yxdb(sto, C.stage(v, "sim_summary"), label="sim_summary")
 
     # ------------------------------------------------------------------ checks
@@ -319,9 +341,10 @@ def build(v):
     s2, _ = wf.filter(lam, "[lambda] > 700", label="S02 lambda too large")
     checks.append(C.check_formula(wf, s2, sn, "S02", "STOP", '"frequency"',
                                   '"lambda > 700: raise fit_cutoff (Poisson table underflows)"'))
-    s3, _ = wf.filter(lam, '[p_freq_model] = "NEGBIN"', label="S03 NEGBIN")
-    checks.append(C.check_formula(wf, s3, sn, "S03", "FLAG", '"frequency"',
-                                  '"NEGBIN not available in the native engine: Poisson used"'))
+    s3, _ = wf.filter(lam, '[p_freq_model] = "NEGBIN" AND ![nb]', label="S03 NEGBIN without overdispersion")
+    checks.append(C.check_formula(wf, s3, sn, "S03", "INFO", '"frequency"',
+                                  '"NEGBIN requested but the yearly counts are not overdispersed (phi = " + '
+                                  'ToString([phi], 2) + "): Poisson used"'))
     s4, _ = wf.filter(lam, "[n_fit] < 30", label="S04 few claims")
     checks.append(C.check_formula(wf, s4, sn, "S04", "FLAG", '"severity fit"',
                                   'ToString([n_fit], 0) + " claims above u: fit is uncertain (see alpha_se)"'))

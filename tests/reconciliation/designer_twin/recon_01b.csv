@@ -1,4 +1,4 @@
-stage,table,measure,value
+﻿stage,table,measure,value
 S01b,claimants,rows_in,549
 S01b,int_claims,rows_out,549
 S01b,int_claims,amount_paid_q,55561457.750000015
