@@ -118,8 +118,9 @@ def build(v):
     tx = C.append(wf, fu, wf.select(thr, keep=["kt", "t", "t_label"], keep_unknown=False, label="thr"), "kx", "kt",
                   "units x thresholds")
     tx = wf.formula(tx, [("ge", X.DBL, "IIF([adj] >= [t], 1, 0)")], label="exceeds t")
-    emp = wf.summarize(tx, [("t", "GroupBy", "t"), ("t_label", "First", "t_label"), ("ge", "Sum", "n_ge"),
-                            ("acc_key", "Count", "n")], label="empirical exceedances")
+    tx = wf.formula(tx, [("t_key", X.STR, "ToString([t], 0)")], label="threshold key (text: no Group By on Double)")
+    emp = wf.summarize(tx, [("t_key", "GroupBy", "t_key"), ("t", "First", "t"), ("t_label", "First", "t_label"),
+                            ("ge", "Sum", "n_ge"), ("acc_key", "Count", "n")], label="empirical exceedances")
     emp = wf.formula(emp, [("kf2", X.INT, "1")], label="key")
     emp = C.append(wf, emp, fitc, "kf2", "kf", "+ fit")
     emp = C.append(wf, emp, wf.select(ctx, keep=["kp", "u_fit"], keep_unknown=False, label="u"), "kf2", "kp", "+ u")

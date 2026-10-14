@@ -1,0 +1,8 @@
+stage,table,measure,value
+S04,fit_units,rows,387
+S04,iterations,rows,10000
+S04,iterations,claims,1232974
+S04,claims,rows,1232974
+S04,claims,amount,189347973678.521
+S04,out_sim_iterations,rows,40000
+S04,out_sim_iterations,recovery,233999226656.68073

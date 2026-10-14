@@ -1259,6 +1259,9 @@ def run(path, verbose=False, trace=None):
     for tid in nodes:
         if tid not in done:
             evaluate(tid)
+    # XOL: Designer warnings are defects in generated workflows (a Group By on Double warned in Designer 2026.2)
+    if WARNINGS and not getattr(sys.modules[__name__], "ALLOW_WARNINGS", False):
+        raise SimError(f"{path.name}: Designer would warn: {WARNINGS[:3]}")
     return written
 
 

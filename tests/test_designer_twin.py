@@ -33,8 +33,27 @@ def main() -> int:
     sim.run(build_stage01.build_claimant(C.SYNTH))
     for f in ("checks_01b", "recon_01b"):
         ok &= compare(f)
+    ok &= stage04()
     print("PASS" if ok else "FAIL")
     return 0 if ok else 1
+
+
+def stage04() -> bool:
+    """Designer's 10,000-iteration stage-04 run vs the numpy oracle (exact RNG replica)."""
+    import subprocess
+    import gzip
+    import shutil
+    d = TWIN / "stage04"
+    tmp = ROOT / "data/output/twin04"
+    tmp.mkdir(parents=True, exist_ok=True)
+    for f in ("out_sim_summary.csv", "out_sim_quantiles.csv"):
+        shutil.copy(d / f, tmp / f)
+    with gzip.open(d / "out_sim_iterations.csv.gz", "rb") as a, open(tmp / "out_sim_iterations.csv", "wb") as b:
+        shutil.copyfileobj(a, b)
+    r = subprocess.run([sys.executable, str(ROOT / "tests/twin_stage04.py"), str(tmp)], capture_output=True, text=True)
+    good = r.returncode == 0
+    print(f"{'PASS' if good else 'FAIL'}  stage 04, 10,000 iterations (Designer 2026.2 vs oracle)")
+    return good
 
 
 def compare_table(f) -> bool:

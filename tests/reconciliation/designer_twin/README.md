@@ -13,3 +13,5 @@ change that would alter Designer's result is caught here.
 | 03_burning_cost | 1.5 s, 0 errors, 0 warnings | summary, by-year, annualisation, 544 large-claim rows, checks (B02): max rel diff 2e-15 |
 
 First attempt found one defect the simulator had allowed: `True`/`False` are not Designer constants (fixed in b4e4162).
+| 03_burning_cost (re-run, derived AAL + staged units/weights) | 1.8 s, 0 errors | summary matches (columns compared by name) |
+| 04_simulate | 6.9 s, 0 errors, 1 warning (Group By on Double; fixed afterwards, the simulator now fails on any warning) | 10,000 iterations, 1,232,974 claims: alpha, lambda, every iteration's recovery and all quantiles equal the numpy oracle (rel 1e-7) |
