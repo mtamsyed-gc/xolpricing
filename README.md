@@ -1,7 +1,7 @@
 # XoL Pricing Tool
 
 Broker-side excess-of-loss pricing tool for medical (health) portfolios. For each candidate
-structure it produces (A) expected layer claims cost, (B) an indicative RI premium on high-level
+structure (per-person XoL, per-event XoL, aggregate stop loss; RA or LO) it produces (A) expected layer claims cost, (B) an indicative RI premium on high-level
 loadings, and (C) cedant impact — recoveries vs premium and retained-claims volatility.
 
 **Alteryx** does all data preparation, burning cost, distribution fitting and simulation.
