@@ -23,12 +23,16 @@
 | 2 | **one of** `01a_adapter_line.yxmd`, `01b_adapter_claimant.yxmd`, `01c_adapter_ete.yxmd` | `stage/int_*.yxdb`, `checks/checks_01x.csv`, `checks/recon_01x.csv` |
 | 3 | `02_experience.yxmd` | `stage/exp_*`, `checks/out_completion_indicated.csv` (copy the indicated factors into the Control workbook if you accept them) |
 | 4 | `03_burning_cost.yxmd` | `results/out_bc_summary.csv`, `out_bc_by_year.csv`, `out_large_claims.csv`, `out_annualisation.csv` |
-| 5 | `04_simulate.yxmd` | `results/out_sim_*.csv`, `out_fit.csv` |
-| 6 | `05_per_event.yxmd` | `results/out_ev_*.csv` |
-| 7 | `06_stop_loss.yxmd` | `results/out_attritional_by_year.csv`, `out_gross_*.csv`, `out_sl_iterations.csv`, `out_struct_*.csv`, `out_exposed_lives.csv` |
-| 8 | `07_results.yxmd` | `XoL_Results.xlsx` data sheets (close the workbook in Excel first), `results/out_expiring.csv`, `out_asif_by_year.csv`, `out_run_log.csv`, … |
+| 5 | `04a_fit_severity.yxmd` (Python tool) | `results/out_fit_candidates.csv`, `out_fit_mean_excess.csv`, `out_fit_survival.csv`, `out_sev_table.csv`, `stage/sev_table.yxdb`, `checks/checks_04a.csv` |
+| 6 | `04_simulate.yxmd` | `results/out_sim_*.csv`, `out_fit.csv` |
+| 7 | `05_per_event.yxmd` | `results/out_ev_*.csv` |
+| 8 | `06_stop_loss.yxmd` | `results/out_attritional_by_year.csv`, `out_gross_*.csv`, `out_sl_iterations.csv`, `out_struct_*.csv`, `out_exposed_lives.csv` |
+| 9 | `07_results.yxmd` | `XoL_Results.xlsx` data sheets (close the workbook in Excel first), `results/out_expiring.csv`, `out_asif_by_year.csv`, `out_run_log.csv`, … |
 
-Run every step in order after changing the Control workbook. Stage 05 runs even without an EV layer (it then writes
+Run every step in order after changing the Control workbook. Step 5 (04a) fits the severity candidates with the Python
+tool; stage 04 uses the selected one when `severity_source = PYTHON` (default) and stops (S07) if 04a has not run
+since the last 03. Without Python, set `severity_source = NATIVE` and skip 04a: stage 04 then fits the Pareto itself.
+Read the Severity sheet (or `out_fit_candidates.csv`) before pricing; override the selection with `fit_selected`. Stage 05 runs even without an EV layer (it then writes
 empty tables); stage 06 needs a PP layer or `fit_cutoff` (the large claims come from stage 04) and the `ATTRITIONAL`
 completion factors for incomplete treaty years. `evaluate_mode = PROGRAMME` adds the stacked structure of the
 Programme sheet (PP → EV → SL).
@@ -36,6 +40,19 @@ Programme sheet (PP → EV → SL).
 A STOP check raises an Error in the Results window and cancels the run (workflow setting *Cancel running workflow on
 error*). FLAG and INFO checks are written to the checks CSV and to the `out_warnings` sheet. Read `checks_NN.csv`
 after every step.
+
+## Running everything from the command line
+`tools\run_pipeline.bat` runs the workflows in order with `AlteryxEngineCmd.exe` (no Designer window), stops at the
+first error and logs to `data\output\<variant>\engine_run.log`. Double-click it for the synthetic data, or from cmd:
+
+```
+tools\run_pipeline.bat synth 01a        (default)
+tools\run_pipeline.bat live 01b         live data, claimant adapter
+tools\run_pipeline.bat live 01a 04a     start at 04a (00-03 already run)
+```
+
+The synthetic chain takes about 25 seconds on the owner's laptop (Designer 2026.2 engine, 2026-10-14). Exit codes:
+0 ok, 1 warnings, 2 errors (a STOP check is an error).
 
 ## The Results workbook
 Open `data/output/<variant>/XoL_Results.xlsx` after stage 07. Excel recalculates on opening. **Inputs** sets the
@@ -58,18 +75,21 @@ default): with absolute ones, Designer's Overwrite Sheet stores the sheets where
 
 ## Trying it on synthetic data
 The same workflows in `alteryx/workflows/synth/` read `data/synthetic/` and write `data/output/synth/`. Copy
-`excel/templates/XoL_Results.xlsx` to `data/output/synth/` and run the eight steps with `01a_adapter_line.yxmd`.
+`excel/templates/XoL_Results.xlsx` to `data/output/synth/` (the batch file does it) and run the nine steps with
+`01a_adapter_line.yxmd`.
 Expected: `recon_01a.csv` shows 55,370 lines in, 1,455 rejected, 0 unmatched, 53,915 out; every checks file has no
-STOP; the Pricing sheet shows nine options (PP 1–4, EV 1, SL 1–4) at 10,000 iterations.
+STOP; 04a selects PARETO (lognormal, gamma and Weibull end as boundary fits, F06); the Pricing sheet shows nine
+options (PP 1–4, EV 1, SL 1–4) at 10,000 iterations.
 
 ## Twin check
-Done on the owner's laptop (Designer 2026.2, 2026-10-14): all workflows, 00 to 07 and the three adapters, run with
-0 errors and 0 warnings, and their outputs equal the simulator (stages 00–03) and the numpy oracles (04, 05, 06 at
-10,000 iterations, every iteration); the Designer-written Results workbook recalculates with 0 formula errors and its
+Done on the owner's laptop (Designer 2026.2, 2026-10-14; 0.5 through the engine with `run_pipeline.bat`): all
+workflows, 00 to 07, 04a and the three adapters, run with 0 errors and 0 warnings, and their outputs equal the
+simulator (stages 00–03, 04a) and the numpy oracles (04, 05, 06 at 10,000 iterations, every iteration); the Designer-written Results workbook recalculates with 0 formula errors and its
 exhibits equal an independent pandas computation. Designer outputs are stored in
 `tests/reconciliation/designer_twin/` and guarded by `tests/test_designer_twin.py`. Repeat on the GC machine before
 first live use: run the synthetic steps, then `python tests/twin_stage06.py <folder with the Designer CSVs>` (and
-`twin_stage04.py`, `twin_stage05.py`).
+`twin_stage04.py`, `twin_stage05.py`). On the GC machine also confirm the Python tool's environment (Designer's base environment needs
+numpy, pandas, scipy) and Designer's version: the Python tool XML is taken from Designer 2026.2.
 
 ## Rebuilding (developers)
 Workflows and both workbook templates are generated, never edited by hand: change `tools/alteryx/build_stage*.py` or

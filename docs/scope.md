@@ -1,6 +1,6 @@
 # Scope — XoL Pricing Tool (broker view)
 
-Version 0.3 · 2026-10-14 · decisions D1–D9 agreed (§12); all phases built (§11)
+Version 0.4 · 2026-10-14 · decisions D1–D9 agreed (§12); phases 1–6 built (§11)
 Framework: adapted from a reinsurer-side health WCXL pricing workshop (14 sections). This tool is
 built for a **broker**, so the reinsurer's capital, risk-transfer and target-metric solve are dropped
 and a cedant-impact module is added.
@@ -276,7 +276,8 @@ One row per option, grouped by cover type. Stop loss rows are labelled in both f
 | 3 | Aggregate stop loss (attritional + large), net of the programme's XoLs; net-claims quantiles for cedant impact | **Built** (stage 06) |
 | 4 | Per-event XoL (event grouping, lives per event, scenarios); programme stacking PP → EV → SL | **Built** (stages 05, 06) |
 | 5 | ETE adapter; scenario overrides; expiring comparison and as-if; Results workbook with RI cost (B), C1 and C2 | **Built** (stages 01c, 00, 07; Results template) |
-| 6 | Python severity candidates (lognormal / GPD) if the Python tool is permitted (D6); first live run on GC data; Designer twin on the GC machine | Open |
+| 6 | Python severity candidates (lognormal, gamma, Weibull, Pareto, GPD; truncated and censored MLE, AIC / BIC / KS, mean excess, selection) feeding the native simulation; command-line runner | **Built** (stage 04a; Python permitted on GC, 2026-10-14) |
+| 7 | First live run on GC data; Designer twin on the GC machine | Open |
 
 Every stage runs in Designer 2026.2 with 0 errors and 0 warnings and matches the simulator / numpy oracles exactly
 (`tests/test_designer_twin.py`, 2026-10-14).
@@ -298,6 +299,6 @@ Every stage runs in Designer 2026.2 with 0 errors and 0 warnings and matches the
 ## 13. Environment checks (GC machine)
 - [ ] Alteryx Designer version
 - [ ] Predictive Tools (R) installed?
-- [ ] Python tool permitted? Is scipy available in the bundled environment?
+- [x] Python tool permitted on GC (owner, 2026-10-14). Designer 2026.2's base environment has numpy 2.1, pandas 2.3, scipy 1.16 (laptop); confirm on the GC machine
 - [x] Output tool: Overwrite Sheet replaces data sheets and keeps the other sheets and their formulas (Designer 2026.2, 2026-10-14; the workbook's relationships must be relative, as Excel writes them — the template is built so)
 - [ ] ETE-dashboard output location/format reachable from Alteryx

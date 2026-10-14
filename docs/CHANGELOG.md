@@ -2,6 +2,14 @@
 
 Methodology and data-contract changes, newest first.
 
+## 2026-10-14 — 0.5: severity candidates (Python tool), engine runner
+- Python permitted on GC (owner). New stage 04a (`04a_fit_severity.yxmd`): the Python tool runs tools/python/sevfit.py (embedded) on the stage-04 fit data — LOGNORMAL, GAMMA, WEIBULL, PARETO, GPD by left-truncated, right-censored MLE; AIC, BIC, KS against Kaplan–Meier, mean excess at the APs, survival at thresholds; boundary fits flagged and not auto-selected; selection by `fit_selected`, else lowest AIC; inverse-survival grid of the selected distribution. Checks F01–F06.
+- Stage 04 draws severity from that grid when `severity_source = PYTHON` (new default) or from the native Pareto on the same grid (`NATIVE`, exact). S07 stops a PYTHON run without a fresh 04a; stage 03 empties the fit. `out_sim_summary.sev_dist`.
+- Results workbook: Severity sheet; data sheets out_fit_candidates, out_fit_mean_excess, out_fit_survival; warnings include checks_04a.
+- Simulator: Python tool emulation (script run with a stand-in `ayx.Alteryx`), Log10. Python tool XML taken from a workflow Designer 2026.2 saved (2026-10-14: environment Python 3.13, numpy 2.1, pandas 2.3, scipy 1.16).
+- `tools/run_pipeline.bat`: the whole chain with AlteryxEngineCmd.exe, stop on first error, log file.
+- Verified: tests/test_sevfit.py (likelihood = scipy.stats, parameter recovery on five families, grid = scipy.stats survival, KS = scipy kstest, Pareto mean excess closed form, flags); stage 04 PYTHON (Pareto grid = closed form), GPD selection and S07 against the oracle; engine run on the laptop (2026-10-14 23:15, 25 s): 0 errors, 0 warnings, 04a equal to the simulator (same selection, flags, grid; log L equal), 04–06 equal to the oracles at every iteration, workbook recalculates with 0 errors and its exhibits (incl. Severity) equal pandas. Baselines refreshed.
+
 ## 2026-10-14 — 0.4: all phases built
 - **Results workbook fix (Designer):** Designer's Overwrite Sheet stored the rewritten data sheets at `xl//xl/worksheets/…` in a workbook whose relationships use absolute targets (openpyxl's default), so Excel and openpyxl saw only the presentation sheets. A probe in Designer 2026.2 confirmed it (absolute: corrupt; relative or Excel/LibreOffice-saved: correct). `tools/excel/xlsx_norm.py` now writes the Control and Results workbooks with relative relationships (and fixed timestamps, so builds are byte-identical); test_stage07 guards it.
 - **As-if fix:** the as-if premium was deflated to each treaty year's level while the as-if recoveries are trended to the quote year, which overstated the as-if loss ratio by (1 + trend)^(Q − ty). Both are now at the quote-year level (expiring rate trended one year on the year's exposure; PCT_EPI on the on-levelled premium); a new `premium_year_level` column sits against the actual, untrended recoveries.

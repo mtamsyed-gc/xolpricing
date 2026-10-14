@@ -1,6 +1,6 @@
 # Methodology — per-person XoL, per-event XoL, aggregate stop loss and pricing (stages 00–07)
 
-Version 0.4 · 2026-10-14. Every formula below is implemented in `tools/alteryx/build_stage00.py`–`build_stage07.py`
+Version 0.5 · 2026-10-14. Every formula below is implemented in `tools/alteryx/build_stage00.py`–`build_stage07.py`
 and `tools/excel/build_results.py`, and independently re-implemented in `tests/test_stage00.py`–`test_stage07.py`.
 Designer 2026.2 reproduces the simulator and the oracles exactly (`tests/test_designer_twin.py`).
 Notation: TY = treaty year, Q = quote year, AP = attachment point, L = layer limit.
@@ -97,7 +97,7 @@ the stochastic stage (scope §7).
 | Dispersion | Pearson `φ = Σ_ty (n_ty − e_ty·n/e)² / (e_ty·n/e) / (k − 1)` over the k experience years (n = counts above u, e = full-year exposure); φ = 1 with one year. Reported as `phi` |
 | Count distribution | `freq_model = POISSON`: Poisson(λ). `NEGBIN` and φ > 1: negative binomial with mean λ and variance φ·λ (`r = λ/(φ − 1)`, `p = 1/φ`); NEGBIN with φ ≤ 1 falls back to Poisson (S03, INFO). `freq_dist` in the outputs says which was used |
 | Claim count | Inverse CDF: `N = #{k : CDF(k) < U}` from a pmf table k = 0…⌈λ + 10√(φλ) + 20⌉ (λ > 700 stops: S02) |
-| Claim | `X = u · U^(−1/α)`; cap drawn uniformly from the fitted units' caps (benefit / policy limit, preserving the plan mix); `claim = min(X, cap)` |
+| Claim | X from the severity grid of §8.1 (`severity_source = PYTHON`: the distribution selected in stage 04a; `NATIVE`: the Pareto above, for which the grid reproduces `X = u · U^(−1/α)` exactly); cap drawn uniformly from the fitted units' caps (benefit / policy limit, preserving the plan mix); `claim = min(X, cap)` |
 | Layer loss | As §5 on each simulated claim (TO_BENEFIT_LIMIT uses the drawn cap); annual `recovery = min(max(Σ xl − AAD, 0), AAL)`, AAL as in §5 |
 | Reinstatements | Usage per iteration `r = cost% · min(recovery, n·L)/L` (unlimited: `recovery/L`), as a fraction of the upfront premium P. Excel solves P from the target: `P = target / (1 + E[r])`. Pro rata as to time not modelled (S06) |
 | Unused capacity | Each claim is also limited to M = largest observed adjusted claim; `recovery_aboveM` is the part of the layer the experience cannot see |
@@ -105,8 +105,24 @@ the stochastic stage (scope §7).
 | RNG | MINSTD (Lehmer, a = 48271, m = 2³¹ − 1), state `s0 = 1 + seed mod (m − 1)`; three non-overlapping streams started at `s0 · a^(j·2²⁹) mod m` (j = 1 Poisson draws, 2 severity, 3 cap), computed with 16-bit splitting so every product stays below 2⁵³. The same seed gives identical results in Designer and the simulator |
 | Outputs | `out_sim_summary.csv` (λ, α, mean, SD, CoV, P(0), P50–P99.5, above-M, reinstatement usage, blend), `out_sim_quantiles.csv` (q = 0.001, 0.005 … 0.995, 0.999, nearest rank), `out_sim_iterations.csv` (per iteration and layer: recovery, above-M, reinstatement usage, large-claim gross), `out_fit.csv` |
 
-Independence of severity and cap is an approximation (higher-limit plans may also have higher severities); the
-lognormal / GPD severity candidates need the Python tool (D6) and are not in this version.
+Independence of severity and cap is an approximation (higher-limit plans may also have higher severities).
+
+### 8.1 Severity candidates (stage 04a, Python tool)
+
+| Item | Rule |
+|---|---|
+| Data | As §8: units above u, censored at their cap when the uncapped amount reaches it; the largest observed claim M |
+| Likelihood | Conditional on X > u (left truncation): `log L = Σ_uncensored log f(x) + Σ_censored log S(c) − n log S(u)` |
+| Candidates | `fit_candidates`: LOGNORMAL (μ, σ), GAMMA (shape, scale), WEIBULL (shape, scale), PARETO (α, scale u: the closed form of §8), GPD (ξ, σ on x − u). Nelder–Mead from three starting points, polished by a restart |
+| Boundary fits | An optimum at an extreme of the parameter range (\|log parameter\| > 30, or ξ at −0.9 / 5) has no proper maximum above u: the candidate imitates another shape there (typically a power law). Flagged (F06), never selected automatically |
+| Statistics | AIC = 2k − 2 log L; BIC = k ln n − 2 log L; KS = largest distance between the fitted conditional survival and the Kaplan–Meier estimate (censoring respected); mean excess at each AP, fitted `E[min(X, cap, M) − AP \| X > AP]` over the units' caps against the data (F04 outside 0.8–1.25); survival at the diagnostic thresholds of §8 |
+| Selection | `fit_selected` when given (justify it), else the lowest AIC among converged, non-boundary candidates. F03 notes when BIC or KS rank another candidate first |
+| Grid | The selected conditional survival is inverted at `s_k = 10^(−k/50)`, k = 0 … 500 (down to 10⁻¹⁰). Stage 04: `t = −50 log10 U`, `k = min(⌊t⌋, 499)`, `ln X = lx0_k + (t − k)(lx1_k − lx0_k)` (log-linear in the survival; exact for a Pareto; beyond 10⁻¹⁰ the last segment is extended) |
+| Staleness | Stage 03 empties the fit; stage 04 stops (S07) when `severity_source = PYTHON` and no grid of the current burning cost exists |
+| Outputs | `out_fit_candidates.csv`, `out_fit_mean_excess.csv`, `out_fit_survival.csv`, `out_sev_table.csv`; Results workbook sheet Severity |
+
+Environment: Designer's base Python environment (Designer 2026.2: Python 3.13, numpy 2.1, pandas 2.3, scipy 1.16).
+On the synthetic book (Pareto by construction) Pareto is selected; lognormal, gamma and Weibull end as boundary fits.
 
 ## 9. Aggregate stop loss, programme and cedant-impact inputs (stage 06, native Alteryx)
 
@@ -187,5 +203,6 @@ validation. `checks/out_scenario_applied.csv` lists the rows each override match
 
 ## 13. Not in this version
 
-Lognormal / GPD severity candidates and fit comparison (Python tool, D6), dependence between large and attritional
-claims, pro rata as to time reinstatements, a correlation between event size and per-life cost.
+Dependence between large and attritional claims, severity depending on the plan limit, pro rata as to time
+reinstatements, a correlation between event size and per-life cost, the Anderson–Darling statistic (not defined
+under censoring as used here).

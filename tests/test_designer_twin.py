@@ -37,7 +37,8 @@ def main() -> int:
     sim.run(build_stage01.build_ete(C.SYNTH))
     for f in ("checks_01c", "recon_01c"):
         ok &= compare(f)
-    sim.run(build_stage04a.build(C.SYNTH))       # severity grid for the stage-04 oracle when Designer's is absent
+    sim.run(build_stage04a.build(C.SYNTH))       # the simulator's own 04a run, compared with Designer's
+    ok &= stage04a()
     ok &= stage04()
     ok &= twin("stage05", "twin_stage05.py", "stage 05 (per-event)")
     ok &= stage06()
@@ -84,6 +85,35 @@ def stage06() -> bool:
     return good
 
 
+def stage04a() -> bool:
+    """The Python tool's fit in Designer (scipy 1.16) vs the same module here: candidates, flags and selection equal;
+    log-likelihood, AIC, BIC equal (rel 1e-9); parameters and diagnostics of proper fits rel 1e-5 (boundary fits
+    sit on a flat ridge: only their log-likelihood is compared); the severity grid equal (rel 1e-12)."""
+    d, r = TWIN / "stage04a", ROOT / "data/output/synth/results"
+    rd = lambda p: pd.read_csv(p, encoding="utf-8-sig")  # noqa: E731
+    a, b = rd(d / "out_fit_candidates.csv"), rd(r / "out_fit_candidates.csv")
+    good = list(a.dist) == list(b.dist)
+    for c in ("converged", "boundary", "selected", "n_fit", "n_uncensored"):
+        good &= bool((a[c] == b[c]).all())
+    for c in ("loglik", "aic", "bic"):
+        good &= bool(np.allclose(a[c], b[c], rtol=1e-9, equal_nan=True))
+    proper = list(a[a.boundary == 0].dist)
+    pa, pb = a.set_index("dist").loc[proper], b.set_index("dist").loc[proper]
+    for c in ("p1", "p2", "ks", "me_ratio_min", "me_ratio_max"):
+        good &= bool(np.allclose(pa[c], pb[c], rtol=1e-5, equal_nan=True))
+    for f, cols in (("out_fit_mean_excess", ["mean_excess_fitted", "ratio"]), ("out_fit_survival", ["s_fitted", "s_km"])):
+        x, y = rd(d / f"{f}.csv"), rd(r / f"{f}.csv")
+        x, y = x[x.dist.isin(proper)].reset_index(drop=True), y[y.dist.isin(proper)].reset_index(drop=True)
+        good &= len(x) == len(y) and all(np.allclose(x[c], y[c], rtol=1e-5, equal_nan=True) for c in cols)
+    t1, t2 = rd(d / "out_sev_table.csv"), rd(r / "out_sev_table.csv")
+    good &= len(t1) == len(t2) and bool(np.allclose(t1[["lx0", "lx1"]], t2[["lx0", "lx1"]], rtol=1e-12)) and \
+        bool((t1.dist == t2.dist).all())
+    good &= rd(d / "checks_04a.csv").equals(rd(ROOT / "data/output/synth/checks/checks_04a.csv"))
+    print(f"{'PASS' if good else 'FAIL'}  stage 04a severity fit (Designer 2026.2 Python tool vs simulator): "
+          f"selected {a[a.selected == 1].dist.iloc[0]}, flags and grid equal")
+    return bool(good)
+
+
 def unpack(*subdirs) -> Path:
     """Designer's CSVs of the given baseline subfolders (gz expanded) in one folder."""
     import gzip
@@ -119,7 +149,7 @@ def stage07() -> bool:
     sys.path.insert(0, str(ROOT / "tools/excel"))
     import results_spec as RS
     import test_stage07 as T7
-    d = unpack("stage04", "stage05", "stage06")
+    d = unpack("stage04a", "stage04", "stage05", "stage06")
     for f in ("out_bc_by_year.csv", "out_bc_summary.csv"):     # stage 03 (Designer), for the as-if exhibit
         shutil.copy(TWIN / f, d / f)
     book = ROOT / "data/output/twin07.xlsx"

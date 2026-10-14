@@ -1,6 +1,6 @@
 # Data contracts
 
-Version 0.3 · 2026-10-14 · companion to [`scope.md`](scope.md)
+Version 0.4 · 2026-10-14 · companion to [`scope.md`](scope.md)
 
 This document defines:
 - §2: the input templates (standalone mode) and the ETE mapping (extension mode)
@@ -237,7 +237,7 @@ Every input block is an **Excel Table** (or a named range) with a fixed name, wh
 | QS | qs_cedant_retention_pct | 100% |
 | General | scenario_id (blank / 0 = best estimate; n = apply Scenarios rows with that id) | — |
 | Programme | evaluate_mode (STANDALONE / PROGRAMME) | STANDALONE |
-| Stochastic | iterations, seed, fit_cutoff (blank = lowest PP AP), fit_candidates, fit_years, freq_model (POISSON/NEGBIN), ev_freq_source (EXPERIENCE/SCENARIOS/BOTH), sl_attritional_threshold, sl_cov_floor, sl_attritional_dist (LOGNORMAL/NORMAL) | 10000, 12345, POISSON, BOTH, 100000, 0.05, LOGNORMAL |
+| Stochastic | iterations, seed, fit_cutoff (blank = lowest PP AP), fit_candidates, fit_selected (blank = lowest AIC), severity_source (PYTHON/NATIVE), fit_years, freq_model (POISSON/NEGBIN), ev_freq_source (EXPERIENCE/SCENARIOS/BOTH), sl_attritional_threshold, sl_cov_floor, sl_attritional_dist (LOGNORMAL/NORMAL) | 10000, 12345, POISSON, BOTH, 100000, 0.05, LOGNORMAL |
 | Cedant impact | net_claims_budget (blank = best-estimate gross claims), reference_lives, return_periods (comma list), currency_display (QUOTE/USD) | 20000; "5,50,250" |
 
 ## 5. Results workbook (`excel/templates/XoL_Results.xlsx`)
@@ -256,7 +256,8 @@ written as `results/<name>.csv`.
 | `out_recon` | Stage × table × measure | Control totals of stages 01–06 |
 | `out_completion_indicated` | Year × component | Indicated unearned / unwritten factors (02) |
 | `out_bc_by_year`, `out_bc_summary`, `out_annualisation`, `out_large_claims` | PP option × layer (× year) | Burning cost (03) |
-| `out_fit`, `out_sim_summary`, `out_sim_quantiles` | PP option × layer (× q) | Severity fit and per-person simulation (04), incl. `freq_dist`, `phi` |
+| `out_fit_candidates`, `out_fit_mean_excess`, `out_fit_survival` | Candidate (× AP / threshold) | Severity candidates (04a): parameters, log L, AIC, BIC, KS, ranks, boundary, selected; mean excess at the APs; survival vs Kaplan–Meier. Stage 03 empties them |
+| `out_fit`, `out_sim_summary`, `out_sim_quantiles` | PP option × layer (× q) | Native Pareto diagnostics and per-person simulation (04), incl. `freq_dist`, `phi`, `sev_dist` |
 | `out_ev_events`, `out_ev_bc_by_year`, `out_ev_bc_summary`, `out_ev_scenarios`, `out_ev_sim_summary`, `out_ev_sim_quantiles` | Event / EV option × layer | Per-event XoL (05) |
 | `out_attritional_by_year`, `out_gross_summary`, `out_exposed_lives` | Year / run / option | Attritional model, gross claims, exposed lives (06) |
 | `out_struct_summary` | Structure (`0 NONE`, `1 PP k`, `3 EV k`, `2 SL k`, `4 PROGRAMME`) | Mean / SD of recovery and net claims, P(no recovery), mean reinstatement usage (PP and EV layers), SL terms, budget, EPI, the options in the structure (06) |
@@ -266,7 +267,7 @@ written as `results/<name>.csv`.
 
 Presentation sheets: **Inputs** (currency and unit, lives, EPI, budget, return periods, expected-loss basis, loadings
 from Control with overrides), **Pricing** (premium by option, methodology §11), **Reinsurance Structures**
-(Exhibit C1), **Cedant Impact** (Exhibit C2), **Expiring**, **Scenarios**, **README**. A loading or input change
+(Exhibit C1), **Cedant Impact** (Exhibit C2), **Expiring**, **Severity** (methodology §8.1), **Scenarios**, **README**. A loading or input change
 recalculates them without a re-run. Close the workbook in Excel before running stage 07.
 
 ## 6. Validation at the adapters (stage 01)
@@ -295,3 +296,15 @@ and amount and exposure totals, so stage 02 can reconcile to it.
 
 Missing columns: every input is unioned with an empty template of all contract columns, so an absent optional column
 arrives as Null and an absent required column raises A01 with a readable message instead of a tool error.
+
+## 7. Severity fit checks (stage 04a) and S07
+
+| Code | Check | Severity |
+|---|---|---|
+| F01 | Candidate did not converge (left out of the selection) | FLAG |
+| F02 | Unknown candidate in fit_candidates, fit_selected not a converged candidate, or nothing converged | STOP |
+| F03 | Lowest BIC or KS is another candidate than the selected | INFO |
+| F04 | Selected candidate: fitted / empirical mean excess at an AP outside 0.8–1.25 | FLAG |
+| F05 | Fewer than 30 uncensored units above u (none: STOP) | FLAG |
+| F06 | Boundary fit (no proper maximum above u; not auto-selected) | INFO |
+| S07 | Stage 04: severity_source = PYTHON without a grid from 04a after the last 03 | STOP |

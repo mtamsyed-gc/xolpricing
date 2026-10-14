@@ -1,0 +1,6 @@
+﻿stage,code,severity,item,message
+S04a,OK,INFO,-,stage 04a checks ran
+S04a,F06,INFO,LOGNORMAL,boundary fit (parameters at an extreme: no proper maximum above u); left out of the automatic selection
+S04a,F06,INFO,GAMMA,boundary fit (parameters at an extreme: no proper maximum above u); left out of the automatic selection
+S04a,F06,INFO,WEIBULL,boundary fit (parameters at an extreme: no proper maximum above u); left out of the automatic selection
+S04a,F03,INFO,PARETO,"lowest KS is GPD, selected PARETO"

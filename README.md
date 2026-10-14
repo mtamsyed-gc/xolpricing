@@ -8,10 +8,11 @@ loadings, and (C) cedant impact — recoveries vs premium and retained-claims vo
 **Excel** holds the inputs (Control workbook) and the loadings, cedant-impact exhibits and charts
 (Results workbook).
 
-> Status (0.4, 2026-10-14): all phases built — Control (00), adapters for line, claimant and ETE data (01a/b/c),
-> experience (02), per-person burning cost (03) and simulation (04), per-event XoL (05), stop loss and programme
-> structures (06), Results workbook with pricing, C1, C2, expiring and scenarios (07). Every workflow runs clean in
-> Designer 2026.2 and matches the independent oracles exactly.
+> Status (0.5, 2026-10-14): all phases built — Control (00), adapters for line, claimant and ETE data (01a/b/c),
+> experience (02), per-person burning cost (03), severity candidates with the Python tool (04a) and simulation (04),
+> per-event XoL (05), stop loss and programme structures (06), Results workbook with pricing, C1, C2, expiring,
+> severity and scenarios (07). `tools\run_pipeline.bat` runs the chain with the Alteryx engine. Every workflow runs
+> clean in Designer 2026.2 and matches the independent oracles exactly.
 > How to run: [`docs/RUNNING.md`](docs/RUNNING.md). Design: [`docs/scope.md`](docs/scope.md),
 > [`docs/data-contracts.md`](docs/data-contracts.md).
 
@@ -42,6 +43,8 @@ data/
 docs/             scope.md, data-contracts.md, RUNNING.md, CHANGELOG.md
 tools/alteryx/    workflow builders (build_all.py), xmlkit + strict simulator (vendored from ete-dashboard)
 tools/excel/      Control and Results workbook specs and builders
+tools/python/     sevfit.py: severity fitting, embedded in the 04a Python tool
+tools/run_pipeline.bat   runs every workflow with AlteryxEngineCmd.exe
 tools/synth/      synthetic data generator (seeded, reproducible)
 tests/
   run_all.py              every test + structural check of the generated workflows
