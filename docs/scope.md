@@ -154,7 +154,7 @@ Each stage writes control totals, and the next stage reconciles to them. An unex
 | Per-event frequency | Poisson with low λ | From identified historical events where they exist; otherwise a benchmark or scenario input (e.g. 1-in-N-year event) |
 | Per-event size | Lives per event × cost per life | Lives: empirical or a discrete distribution capped by the maximum concentration per site/scheme. Cost per life: from the per-person severity distribution, or a user scenario |
 | Per-event scenarios | Deterministic | Lives at site × average claim per life × limit utilisation; reported alongside the stochastic result |
-| Stop loss aggregate | Attritional + large | Attritional LR ~ lognormal/normal fitted to adjusted LR history below the large threshold (CoV floor input for short histories). Large claims from the per-person simulation. Aggregate = attritional + large (− XoL recoveries if net) |
+| Stop loss aggregate | Attritional + large | Attritional cost per life ~ lognormal/normal fitted to the trended, completed history below the large threshold (CoV floor input for short histories; built per life rather than as a loss ratio so premium-rate changes do not enter). Large claims from the per-person simulation. Aggregate = attritional + large (− XoL recoveries if net). Built in stage 05 (methodology §9) |
 | Reinstatements | Per iteration | Consumed limit drives reinstatement premium, pro rata to amount (and optionally time) |
 | Reproducibility | Fixed seed | Recorded in the run log |
 
@@ -273,7 +273,7 @@ One row per option, grouped by cover type. Stop loss rows are labelled in both f
 |---|---|
 | 1 | Internal schema and data contracts; standalone adapter; RA/LO exposure; per-person XoL deterministic chain (stages 00–07); Control and Results workbooks; synthetic data set |
 | 2 | Stochastic per-person (fit, simulate, L2, unused capacity, reinstatements); RI cost; cedant impact |
-| 3 | Aggregate stop loss (attritional + large); stacking and order of application |
+| 3 | Aggregate stop loss (attritional + large); stop loss net of a PP option; net-claims quantiles for cedant impact — **built (stage 05)**. Full programme stacking with per-event follows phase 4 |
 | 4 | Per-event XoL (event grouping, lives-per-event, scenarios) |
 | 5 | ETE adapter; summary-data mode hardening |
 

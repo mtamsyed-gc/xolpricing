@@ -14,9 +14,11 @@ import build_stage01  # noqa: E402
 import build_stage02  # noqa: E402
 import build_stage03  # noqa: E402
 import build_stage04  # noqa: E402
+import build_stage05  # noqa: E402
 
 subprocess.run([sys.executable, str(ROOT / "tools/excel/build_control.py")], check=True)
 for v in C.VARIANTS:
     for p in (build_stage00.build(v), build_stage01.build_line(v), build_stage01.build_claimant(v),
-              build_stage02.build(v), build_stage03.build(v), build_stage04.build(v)):
+              build_stage02.build(v), build_stage03.build(v), build_stage04.build(v),
+              build_stage05.build(v)):
         print("wrote", p.relative_to(ROOT))

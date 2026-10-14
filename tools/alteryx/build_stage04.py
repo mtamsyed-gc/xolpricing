@@ -9,7 +9,8 @@ Reads bc_adjusted, bc_weights, bc_summary (stage 03), exp_exposure_ty (stage 02)
     RNG      MINSTD (Lehmer, a = 48271, m = 2^31 - 1) seeded from `seed`; three non-overlapping streams by jump-ahead
              (Poisson draws, severity, cap). Same seed -> identical results in Designer and the simulator.
 Writes results/out_fit.csv, out_sim_summary.csv, out_sim_quantiles.csv, out_sim_iterations.csv, stage sim_summary,
-checks_04.csv, recon_04.csv.
+sim_iterations and sim_gross (per iteration: all large claims, and those above the stop-loss attritional threshold
+t_sl = max(sl_attritional_threshold, u), for stage 05), checks_04.csv, recon_04.csv.
 """
 from __future__ import annotations
 
@@ -63,8 +64,8 @@ def build(v):
 
     # ------------------------------------------------------------------ inputs
     wf.container("04.1 Inputs: parameters, layers, threshold u")
-    par = C.params_stream(wf, v, ["iterations", "seed", "fit_cutoff", "freq_model", "incidence_adj", "years_included"],
-                          key="kp", label="parameters")
+    par = C.params_stream(wf, v, ["iterations", "seed", "fit_cutoff", "freq_model", "incidence_adj", "years_included",
+                                  "sl_attritional_threshold"], key="kp", label="parameters")
     lay = wf.input_yxdb(C.stage(v, "ctl_layers"), label="ctl_layers (stage 00)")
     lay, _ = wf.filter(lay, '[cover] = "PP" AND [active] = 1', label="active per-person layers")
     lay = wf.formula(lay, [("lim_basis", X.STR, 'IIF(IsNull([limit_basis]), "AMOUNT", [limit_basis])'),
@@ -79,9 +80,11 @@ def build(v):
     pu = wf.formula(pu, [("u_fit", X.DBL, "IIF(IsNull([p_fit_cutoff]), [min_ap], [p_fit_cutoff])"),
                          ("s0", X.DBL, f"[p_seed] - {M - 1} * Floor([p_seed] / {M - 1}) + 1")],
                     label="threshold u, seed state")
-    pu = wf.formula(pu, [(f"start{j}", X.DBL, jump("[s0]", JUMP[j])) for j in (1, 2, 3)], label="stream starts")
+    pu = wf.formula(pu, [(f"start{j}", X.DBL, jump("[s0]", JUMP[j])) for j in (1, 2, 3)] + [
+        ("t_sl", X.DBL, "IIF(IsNull([p_sl_attritional_threshold]) OR [p_sl_attritional_threshold] < [u_fit], [u_fit], "
+                        "[p_sl_attritional_threshold])")], label="stream starts, stop-loss large threshold")
     ctx = wf.select(pu, keep=["kp", "u_fit", "p_iterations", "p_incidence_adj", "p_freq_model", "start1", "start2",
-                              "start3", "s0"], keep_unknown=False, label="simulation context")
+                              "start3", "s0", "t_sl"], keep_unknown=False, label="simulation context")
 
     # ------------------------------------------------------------------ fit
     wf.container("04.2 Severity fit: Pareto above u with censoring at caps; diagnostics")
@@ -156,7 +159,7 @@ def build(v):
                            ("k_max", X.INT64, "Ceil([lambda] + 10 * Sqrt([lambda]) + 20)")], label="lambda")
     lam = C.append(wf, lam, fitc, "kw", "kf", "+ fit")
     lam = wf.select(lam, keep=["kw", "lambda", "k_max", "freq_u_weighted", "lives_q", "u_fit", "alpha", "max_observed",
-                               "n_fit", "p_iterations", "p_freq_model", "start1", "start2", "start3"],
+                               "n_fit", "p_iterations", "p_freq_model", "start1", "start2", "start3", "t_sl"],
                     keep_unknown=False, label="simulation constants")
 
     # ------------------------------------------------------------------ Poisson draws
@@ -180,7 +183,7 @@ def build(v):
     # ------------------------------------------------------------------ claims
     wf.container("04.5 Claims: severity and cap draws")
     cl = wf.join(
-        nn, wf.select(lam, keep=["kw", "u_fit", "alpha", "max_observed", "n_fit", "start2", "start3"],
+        nn, wf.select(lam, keep=["kw", "u_fit", "alpha", "max_observed", "n_fit", "start2", "start3", "t_sl"],
                       rename={"kw": "kw2"}, keep_unknown=False, label="claim constants"), ["kw"], ["kw2"],
         label="+ constants")["J"]
     cl = wf.generate_rows(cl, "j", X.INT64, "1", "[j] <= [n_claims]", "[j] + 1", label="one row per claim")
@@ -193,7 +196,17 @@ def build(v):
     cl = wf.formula(cl, [("claim", X.DBL, "IIF([x] < [s_cap], [x], [s_cap])")], label="claim = min(X, cap)")
     cl = wf.formula(cl, [("claim_belowM", X.DBL, "IIF([claim] < [max_observed], [claim], [max_observed])"),
                          ("kc", X.INT, "1")], label="claim limited to the largest observed")
-    gross = wf.summarize(cl, [("iter", "GroupBy", "iter"), ("claim", "Sum", "large_gross")], label="large gross by iteration")
+    cl = wf.formula(cl, [("claim_sl", X.DBL, "IIF([claim] > [t_sl], [claim], 0)")], label="claim above t_sl")
+    gross = wf.summarize(cl, [("iter", "GroupBy", "iter"), ("claim", "Sum", "large_gross"),
+                              ("claim_sl", "Sum", "large_gross_sl")], label="large gross by iteration")
+    sg = wf.left_join(wf.select(its, keep=["iter"], keep_unknown=False, label="all iterations"),
+                      wf.select(gross, keep=["iter", "large_gross", "large_gross_sl"], rename={"iter": "g_it"},
+                                keep_unknown=False, label="gross"), ["iter"], ["g_it"], label="+ gross (none = 0)")
+    sg = wf.formula(sg, [("lg", X.DBL, "IIF(IsNull([large_gross]), 0, [large_gross])"),
+                         ("lgs", X.DBL, "IIF(IsNull([large_gross_sl]), 0, [large_gross_sl])")], label="no claims = 0")
+    sg = wf.select(sg, keep=["iter", "lg", "lgs"], rename={"lg": "large_gross", "lgs": "large_gross_sl"},
+                   keep_unknown=False, label="sim_gross fields")
+    wf.output_yxdb(wf.sort(sg, [("iter", "Ascending")], label="by iteration"), C.stage(v, "sim_gross"), label="sim_gross")
 
     # ------------------------------------------------------------------ layers
     wf.container("04.6 Layers: per-claim loss, annual AAD / AAL / reinstatements, iteration totals")
@@ -236,6 +249,7 @@ def build(v):
                     keep_unknown=False, label="out_sim_iterations fields")
     ito = wf.sort(ito, [("option_id", "Ascending"), ("layer", "Ascending"), ("iter", "Ascending")], label="order")
     wf.output_csv(ito, results(v, "out_sim_iterations"), label="out_sim_iterations.csv")
+    wf.output_yxdb(ito, C.stage(v, "sim_iterations"), label="sim_iterations")
 
     # ------------------------------------------------------------------ quantiles and summary
     wf.container("04.7 Quantiles (nearest rank) and summary with the deterministic blend")

@@ -149,11 +149,12 @@ def synthetic_content() -> tuple[dict, dict]:
                      "POST_AP_COUNT": ratio(a, b, "L100xs_count")}
             if comp_name == "UNWRITTEN":
                 sides["PRE_AP"] = 1.0
+            sides["ATTRITIONAL"] = ratio(a, b, "total")
             for side, f in sides.items():
+                basis = "total claims" if side == "ATTRITIONAL" else "reference layer 400k xs 100k"
                 comp.append({"year": yr, "component": comp_name, "side": side, "ap_band_from": 0,
                              "selected_factor": f,
-                             "justification": "Synthetic: set from synthetic_truth.json, reference layer 400k xs 100k"
-                             if f != 1.0 else None})
+                             "justification": f"Synthetic: set from synthetic_truth.json, {basis}" if f != 1.0 else None})
 
     values = {
         "cedant": "Synthetic Insurance Co (fictional)", "country": "UAE", "line": "Group medical",

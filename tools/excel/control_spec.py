@@ -49,7 +49,9 @@ PARAMS = [
     ("fit_candidates", "Stochastic", "", "CSV", "", True, "Candidate severity distributions"),
     ("freq_model", "Stochastic", "", "LIST", "POISSON,NEGBIN", True, "Frequency distribution"),
     ("sl_attritional_threshold", "Stochastic", "quote ccy", "NUMBER", "", True, "Stop loss: attritional / large split"),
-    ("sl_cov_floor", "Stochastic", "", "NUMBER", "", True, "Stop loss: minimum CoV of the attritional loss ratio"),
+    ("sl_cov_floor", "Stochastic", "", "NUMBER", "", True, "Stop loss: minimum CoV of the attritional cost per life"),
+    ("sl_attritional_dist", "Stochastic", "", "LIST", "LOGNORMAL,NORMAL", True,
+     "Stop loss: distribution of the attritional cost per life"),
     ("net_claims_budget", "Cedant impact", "quote ccy", "NUMBER", "", False, "Blank = best-estimate gross claims"),
     ("reference_lives", "Cedant impact", "lives", "NUMBER", "", False, "Blank = expected lives for the quote year"),
     ("return_periods", "Cedant impact", "years", "CSV", "", True, "Return periods shown in Exhibit C2"),
@@ -65,7 +67,8 @@ DEFAULTS = {
     "iqr_multiplier": "1.5", "full_cred_n": "64", "complement_source": "STOCHASTIC", "incidence_adj": "1",
     "qs_cedant_retention_pct": "1", "evaluate_mode": "STANDALONE", "iterations": "10000", "seed": "12345",
     "fit_candidates": "LOGNORMAL,GAMMA,WEIBULL,PARETO,GPD", "freq_model": "POISSON",
-    "sl_attritional_threshold": "100000", "sl_cov_floor": "0.05", "return_periods": "5,50,250",
+    "sl_attritional_threshold": "100000", "sl_cov_floor": "0.05", "sl_attritional_dist": "LOGNORMAL",
+    "return_periods": "5,50,250",
     "currency_display": "QUOTE", "source_mode": "L",
 }
 
@@ -97,9 +100,11 @@ TABLES = {
                    "CAVEAT: portfolio-level development factors are driven by high-frequency, low-severity claims and "
                    "may UNDERSTATE development above an attachment point (later reporting, case-estimate movement, "
                    "slower settlement). Prefer large-claim development or a case review; state the basis. "
+                   "ATTRITIONAL: completion of total claims below the stop-loss large threshold (aggregate "
+                   "development, unearned and unwritten), used by the stop-loss attritional model only. "
                    "indicated_factor is written by Alteryx (reference only).",
                    [("year", "INT", "", True), ("component", "LIST", "IBNR,UNEARNED,UNWRITTEN", True),
-                    ("side", "LIST", "PRE_AP,POST_AP_AMOUNT,POST_AP_COUNT", True),
+                    ("side", "LIST", "PRE_AP,POST_AP_AMOUNT,POST_AP_COUNT,ATTRITIONAL", True),
                     ("ap_band_from", "NUMBER", "", True), ("selected_factor", "NUMBER", "", True),
                     ("indicated_factor", "NUMBER", "", False), ("justification", "TEXT", "", False)]),
     "Weights": ("Experience-year weights",

@@ -20,8 +20,12 @@
 | 2 | `01a_adapter_line.yxmd` **or** `01b_adapter_claimant.yxmd` | `stage/int_*.yxdb`, `checks/checks_01a.csv`, `checks/recon_01a.csv` |
 | 3 | `02_experience.yxmd` | `stage/exp_claimants`, `stage/exp_exposure_ty`, `checks/out_completion_indicated.csv` (copy the indicated factors into the Control workbook if you accept them) |
 | 4 | `03_burning_cost.yxmd` | `results/out_bc_summary.csv`, `out_bc_by_year.csv`, `out_large_claims.csv`, `out_annualisation.csv` |
-| 5 | `04_simulate.yxmd` | `results/out_sim_summary.csv`, `out_sim_quantiles.csv`, `out_sim_iterations.csv`, `out_fit.csv` |
-| … | results workbook, attritional / stop loss, per-event as they are built | |
+| 5 | `04_simulate.yxmd` | `results/out_sim_summary.csv`, `out_sim_quantiles.csv`, `out_sim_iterations.csv`, `out_fit.csv`; `stage/sim_gross`, `stage/sim_iterations` |
+| 6 | `05_stop_loss.yxmd` | `results/out_attritional_by_year.csv`, `out_gross_summary.csv`, `out_gross_iterations.csv`, `out_sl_iterations.csv`, `out_struct_summary.csv`, `out_struct_quantiles.csv`, `out_exposed_lives.csv` |
+| … | results workbook, per-event as they are built | |
+
+Stage 05 needs the `ATTRITIONAL` completion factors (Completion sheet) for any treaty year that is not complete,
+and a PP option in the Programme sheet when a stop loss is `NET_OF_XOL`.
 
 A STOP check raises an Error in the Results window and cancels the run (workflow setting *Cancel running workflow on
 error*). FLAG checks are written to the checks CSV only. Read `checks_NN.csv` after every step.

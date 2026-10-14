@@ -26,7 +26,8 @@ def structural() -> bool:
 
 def main() -> int:
     ok = True
-    for t in ("validate_synthetic.py", "test_stage00.py", "test_stage01.py", "test_stage02.py", "test_stage03.py", "test_stage04.py", "test_designer_twin.py"):
+    for t in ("validate_synthetic.py", "test_stage00.py", "test_stage01.py", "test_stage02.py", "test_stage03.py", "test_stage04.py", "test_stage05.py",
+              "test_designer_twin.py"):
         print(f"== {t}")
         r = subprocess.run([sys.executable, str(ROOT / "tests" / t)], capture_output=True, text=True)
         tail = [x for x in r.stdout.splitlines() if x.strip()][-3:]

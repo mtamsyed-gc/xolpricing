@@ -114,7 +114,8 @@ def oracle():
         ru = (np.zeros(iters) if pd.isna(cost) or pd.isna(L.limit) else
               cost * (rec if pd.isna(n_r) else np.minimum(rec, n_r * L.limit)) / L.limit)
         out[int(L.option_id)] = dict(rec=rec, above=(xl - xlb) * f, ru=ru)
-    return dict(alpha=alpha, lam=lam, n_claims=n_claims, u1=u1, out=out, claims_sum=claim.sum())
+    return dict(alpha=alpha, lam=lam, n_claims=n_claims, u1=u1, out=out, claims_sum=claim.sum(), claim=claim,
+                it_idx=it_idx, iters=iters, u=u, lives=lives)
 
 
 def main() -> int:

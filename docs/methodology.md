@@ -1,7 +1,7 @@
-# Methodology — per-person XoL (stages 02–04)
+# Methodology — per-person XoL and aggregate stop loss (stages 02–05)
 
-Version 0.2 · 2026-10-14. Every formula below is implemented in `tools/alteryx/build_stage02.py`–`build_stage04.py`
-and independently re-implemented in `tests/test_stage02.py`–`test_stage04.py`.
+Version 0.3 · 2026-10-14. Every formula below is implemented in `tools/alteryx/build_stage02.py`–`build_stage05.py`
+and independently re-implemented in `tests/test_stage02.py`–`test_stage05.py`.
 Notation: TY = treaty year, Q = quote year, AP = attachment point, L = layer limit.
 
 ## 1. Treaty year and accumulation (stage 02)
@@ -104,7 +104,36 @@ the stochastic stage (scope §7).
 Independence of severity and cap is an approximation (higher-limit plans may also have higher severities); the
 lognormal / GPD candidates and negative binomial frequency need the Python tool (D6) and are not in this version.
 
-## 9. Not yet in this version
+## 9. Aggregate stop loss and cedant-impact inputs (stage 05, native Alteryx)
 
-Scenario overrides (sensitivity runs), AP-band completion factors, the expiring-rate comparison, the attritional
-model (needed for the net-claims-budget exhibit and stop loss: phase 3) and per-event cover (phase 4).
+| Item | Rule |
+|---|---|
+| Large / attritional split | `t_sl = max(sl_attritional_threshold, u)`. Large = accumulation units with adjusted amount > t_sl; they come from the stage-04 simulation (sum of simulated claims > t_sl per iteration). Attritional = everything else (G02 flags a threshold below u) |
+| Attritional history | `attritional(ty) = total claims(ty) − raw amount of large units(ty)`. Total: the accumulation units (line data) or the monthly aggregate (claimant data, × QS retention; TY from cohort month (RA) or incurred month (LO); G05 flags a PAID trigger). G01 stops if large units exceed the total |
+| Adjustment | × FGU trend to Q (the trend components, **not** `large_claim_trend_pct`) × attritional completion `IBNR · UNEARNED · UNWRITTEN` from the Completion sheet, side `ATTRITIONAL` (aggregate development of total claims; missing factor = 1, G11 flags an incomplete year with none) |
+| Cost per life | `a(ty) = adjusted attritional / full-year exposure` (stage 02) |
+| Mean | `μ = Σ w_ty · a(ty) × lives_Q × incidence_adj` (weights of §6) |
+| Volatility | `CoV = max(sample CoV of a(ty), sl_cov_floor)` (G03 reports when the floor or a short history applies). Year-to-year variation of the trended, completed cost per life: it carries parameter and systemic variation, which dominates a portfolio's attritional claims |
+| Distribution | `sl_attritional_dist`: LOGNORMAL (default; σ² = ln(1 + CoV²), m = ln μ − σ²/2) or NORMAL (truncated at 0) |
+| Draws | Standard normal by Box–Muller, `z = √(−2 ln U₄) · cos(2π U₅)`, from two further MINSTD streams started at offsets 2²⁸ and 3·2²⁷ (below stream 1 at 2²⁹, so no overlap) |
+| Gross claims | `G = attritional + large above t_sl`, per iteration. Attritional and large are independent |
+| Net claims budget | `net_claims_budget`, else the mean simulated gross (so the average-year surplus without RI is 0) |
+| SL attachment / limit | `sl_measure`: PCT_BUDGET × budget, PCT_EPI × EPI, AMOUNT as entered (blank limit = unlimited) |
+| SL base claims | `sl_claims_basis`: GROSS = G; NET_OF_XOL = G − recoveries of the per-person option named in the Programme sheet (first active PP step; G04 stops if none) |
+| SL recovery | `min(max(base − AP, 0), L) × (1 − co-participation)`; one layer per option (G10 flags a layer 2) |
+| Structures | Without RI; each PP option (net = G − PP recoveries); each SL option (net = base − SL recovery; with its PP option when NET_OF_XOL) |
+| Quantiles | Per structure, q = 0.001 … 0.999 (nearest rank, `rank = ⌈q·n⌉` computed as ⌈q_milli·n/1000⌉): net claims, the reinstatement usage of the iteration at that rank (by layer), and the cover's own recovery |
+| Exhibit C2 | Surplus at return period N = budget − premium − (net claims quantile at 1 − 1/N); average year = budget − premium − mean net. Exact for structures without reinstatement premium; with reinstatements, the reinstatement premium is taken from the iteration at the net-claims quantile (G08) |
+| Exposed lives | PP: share of the latest treaty year's member days whose benefit limit > AP (unknown limit counts as exposed), × lives_Q. EV and SL: all lives. Claimant data has no member limits: share 1 (G07) |
+| Outputs | `out_attritional_by_year.csv`, `out_gross_summary.csv`, `out_gross_iterations.csv`, `out_sl_iterations.csv`, `out_struct_summary.csv`, `out_struct_quantiles.csv`, `out_exposed_lives.csv` |
+
+Limitations: the large and attritional parts are independent; the attritional CoV rests on 2–5 annual points
+(hence the floor); claims between u and t_sl that the per-person simulation sees also sit in the attritional history,
+so with NET_OF_XOL and an AP below t_sl the PP recoveries on those claims are drawn independently of the attritional
+amount (set t_sl at or below the lowest AP to avoid it). A stop loss needs the stage-04 simulation, so a PP layer or a
+`fit_cutoff` must be present.
+
+## 10. Not yet in this version
+
+Scenario overrides (sensitivity runs), AP-band completion factors, the expiring-rate comparison, per-event cover
+(phase 4) and the Results workbook exhibits.

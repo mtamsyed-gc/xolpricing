@@ -468,6 +468,16 @@ def build_claimant(v):
                                  "has_paid_date", "has_member_exposure", "has_line_detail", "exposure_by_cohort",
                                  "date_precision"], keep_unknown=False, label="int_run_meta")
     wf.output_yxdb(meta, C.stage(v, "int_run_meta"), label="int_run_meta")
+    # no member detail: write an empty, typed int_members so later stages never read a stale line-mode file
+    em = wf.text_input(["member_id"], [["-"]], label="int_members schema row")
+    em = wf.formula(em, [("policy_id", X.STR, '""'), ("scheme_id", X.STR, '""'), ("policy_start", X.DATE, "Null()"),
+                         ("policy_end", X.DATE, "Null()"), ("cover_start", X.DATE, "Null()"),
+                         ("cover_end", X.DATE, "Null()"), ("plan", X.STR, '""'), ("annual_limit", X.DBL, "Null()"),
+                         ("segment", X.STR, '""'), ("site", X.STR, '""'), ("currency", X.STR, '""'),
+                         ("written_premium", X.DBL, "Null()"), ("written_premium_q", X.DBL, "Null()"),
+                         ("cohort_month", X.DATE, "Null()"), ("cov_days", X.INT, "Null()")], label="typed fields")
+    em, _ = wf.filter(em, "1=0", label="no rows")
+    wf.output_yxdb(em, C.stage(v, "int_members"), label="int_members (empty: claimant mode)")
     recon(wf, [(raw, "claimants", "rows_in", None), (ic, "int_claims", "rows_out", None),
                (ic, "int_claims", "amount_paid_q", "amount_paid_q"), (ic, "int_claims", "amount_os_q", "amount_os_q"),
                (ie, "int_exposure", "earned_ly", "earned_ly"), (ie, "int_exposure", "written_premium", "written_premium"),

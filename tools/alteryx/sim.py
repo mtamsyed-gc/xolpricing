@@ -530,6 +530,8 @@ def make_func(name, args):
                 raise SimError("Sqrt of a negative number")
             return math.sqrt(x)
         return sq
+    if n == "cos":              # XOL: Designer Cos(x), radians
+        return lambda c: None if a(0, c) is None else math.cos(a(0, c))
     if n == "floor":
         return lambda c: None if a(0, c) is None else int(math.floor(a(0, c)))
     if n == "abs":

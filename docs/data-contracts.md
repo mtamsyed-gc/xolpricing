@@ -203,7 +203,7 @@ Every input block is an **Excel Table** (or a named range) with a fixed name, wh
 | `tbl_fx` | Currency | currency, priced_rate_to_quote_ccy, rate_date |
 | `tbl_limits` | Plan | plan, annual_limit, sub_limit_notes |
 | `tbl_trend` | Year | year, client_pct, market_pct, inflation_pct, residual_pct, weight_client, weight_market, weight_inflation, one_off_adj, large_claim_trend_pct (O), premium_trend_pct |
-| `tbl_completion` | Year × component × side × ap_band | year, component (`IBNR` / `UNEARNED` / `UNWRITTEN`), side (`PRE_AP` / `POST_AP_AMOUNT` / `POST_AP_COUNT`), ap_band_from (default 0), selected_factor, indicated_factor (written back by Alteryx, read-only), justification |
+| `tbl_completion` | Year × component × side × ap_band | year, component (`IBNR` / `UNEARNED` / `UNWRITTEN`), side (`PRE_AP` / `POST_AP_AMOUNT` / `POST_AP_COUNT` / `ATTRITIONAL` — total claims below the stop-loss large threshold, stop loss only), ap_band_from (default 0), selected_factor, indicated_factor (written back by Alteryx, read-only), justification |
 | `tbl_weights` | Year | year, months_complete, use_default (1/0), custom_weight, justification |
 | `tbl_layers` | Cover × option × layer | cover (`PP` / `EV` / `SL`), option_id (1–4), layer (1/2), label (O), limit_basis (`AMOUNT` / `TO_BENEFIT_LIMIT`), ap, limit, aal, aad, co_participation_pct, reinstatements_n (blank = unlimited), reinstatement_cost_pct, reinst_pro_rata_time (1/0), sl_claims_basis (`GROSS` / `NET_OF_XOL`), sl_measure (`PCT_BUDGET` / `PCT_EPI` / `AMOUNT`), sl_ap, sl_limit, active |
 | `tbl_programme` | Order | step, cover (`QS` / `PP` / `EV` / `SL`), active |
@@ -226,7 +226,7 @@ Every input block is an **Excel Table** (or a named range) with a fixed name, wh
 | Credibility | full_cred_n, complement_source (STOCHASTIC/BENCHMARK/EXPIRING), benchmark_rate | 64 |
 | Incidence | incidence_adj | 1.00 |
 | QS | qs_cedant_retention_pct | 100% |
-| Stochastic | iterations, seed, fit_cutoff (blank = AP), fit_candidates, fit_years, freq_model (POISSON/NEGBIN), sl_attritional_threshold, sl_cov_floor | 10000, 12345 |
+| Stochastic | iterations, seed, fit_cutoff (blank = AP), fit_candidates, fit_years, freq_model (POISSON/NEGBIN), sl_attritional_threshold, sl_cov_floor, sl_attritional_dist (LOGNORMAL/NORMAL) | 10000, 12345, 100000, 0.05, LOGNORMAL |
 | Cedant impact | net_claims_budget (blank = best-estimate gross claims), reference_lives, return_periods (comma list), currency_display (QUOTE/USD) | 20000; "5,50,250" |
 
 ## 5. Results workbook (`excel/templates/XoL_Results.xlsx`)
@@ -249,6 +249,12 @@ Alteryx overwrites the `out_*` data sheets in full each run. Presentation sheets
 | `out_asif_by_year` | Scenario × cover × option × year | As-if recoveries vs as-if premium, cumulative |
 | `out_ev_scenarios` | Scenario | Deterministic per-event losses by option |
 | `out_exposed_lives` | Cover × option | Exposed lives for the quote year (per-person: lives with annual limit > AP), reference lives |
+| `out_attritional_by_year` | Treaty year | Total claims, large units above t_sl, attritional raw / adjusted, trend and completion factors, cost per life, weight (stage 05) |
+| `out_gross_summary` | Run | t_sl, attritional mean and CoV (history and used), distribution parameters, mean attritional / large / gross, SD, net claims budget and its source, EPI, lives |
+| `out_gross_iterations` | Iteration | Attritional, large above t_sl, gross |
+| `out_sl_iterations` | SL option × iteration | Gross, PP recoveries used (NET_OF_XOL), base, SL recovery, net claims |
+| `out_struct_summary` | Structure (without RI, PP option, SL option) | Mean / SD of the cover's recovery and of net claims, P(no recovery), mean reinstatement usage by layer, SL attachment and limit (amount, % budget, % EPI), budget |
+| `out_struct_quantiles` | Structure × q (0.001 … 0.999) | Net claims, reinstatement usage at that iteration (layer 1 / 2), the cover's recovery quantile — Excel derives Exhibit C2 and "recoveries exceed premium 1 in N" |
 
 Presentation sheets: **Reinsurance Structures** (Exhibit C1) and **Cedant Impact** (Exhibit C2), laid out as in scope §8. They are formula-driven from `out_sim_summary`, `out_sim_quantiles`, `out_exposed_lives` and the loadings, so a loading change updates both without a re-run.
 

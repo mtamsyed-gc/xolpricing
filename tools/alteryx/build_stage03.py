@@ -41,14 +41,16 @@ def iif_max0(x):
     return f"IIF({x} > 0, {x}, 0)"
 
 
-def trend_indices(wf, v):
-    """Cumulative claims and premium trend indices by year, and the factors to the quote year."""
+def trend_indices(wf, v, fgu=False):
+    """Cumulative claims and premium trend indices by year, and the factors to the quote year.
+    fgu=True ignores large_claim_trend_pct (attritional claims, stage 05)."""
     tr = wf.input_yxdb(C.stage(v, "ctl_trend"), label="ctl_trend (stage 00)")
     z = lambda f: f"IIF(IsNull([{f}]), 0, [{f}])"  # noqa: E731
     tr = wf.formula(tr, [
         ("t_comp", X.DBL, f"{z('weight_client')} * {z('client_pct')} + {z('weight_market')} * {z('market_pct')} + "
                           f"{z('weight_inflation')} * {z('inflation_pct')} + {z('residual_pct')}"),
-        ("t_claims", X.DBL, "IIF(IsNull([large_claim_trend_pct]), [t_comp], [large_claim_trend_pct])"),
+        ("t_claims", X.DBL, "[t_comp]" if fgu else
+         "IIF(IsNull([large_claim_trend_pct]), [t_comp], [large_claim_trend_pct])"),
         ("t_prem", X.DBL, z("premium_trend_pct")), ("t_adj", X.DBL, z("one_off_adj"))], label="annual trend")
     tr = wf.sort(tr, [("year", "Ascending")], label="by year")
     tr = wf.multirow(tr, "idx_c", X.DBL, "IIF([Row-1:idx_c] = 0, 1, [Row-1:idx_c] * (1 + [t_claims]) * (1 + [t_adj]))",
