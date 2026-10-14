@@ -275,8 +275,8 @@ class Parser:
                 return other(c)
             return f
         if k == "id" and v.lower() in ("true", "false") and self.peek(1) != ("op", "("):
-            self.i += 1          # XOL: Designer boolean constants True / False
-            return (lambda c: True) if v.lower() == "true" else (lambda c: False)
+            # XOL: Designer 26.1 (laptop, 2026-10-14): "Parse Error ... Unknown variable "True"". Use 1=1 / 1=0.
+            raise SimError(f"{v} is not a Designer constant (use 1=1 / 1=0) in {self.src[:200]!r}")
         if k == "id":
             self.i += 1
             if self.peek() != ("op", "("):

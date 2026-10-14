@@ -327,9 +327,9 @@ def build_line(v):
     wf.container("01a.6 Run meta, recon, checks")
     meta = wf.formula(valk, [
         ("source_mode", X.STR, '"L"'), ("valuation_date", X.DATE, "[valuation]"),
-        ("listing_threshold", X.DBL, "0"), ("has_reported_date", X.BOOL, "True"), ("has_paid_date", X.BOOL, "True"),
-        ("has_member_exposure", X.BOOL, "True"), ("has_line_detail", X.BOOL, "True"),
-        ("exposure_by_cohort", X.BOOL, "True"), ("date_precision", X.STR, '"DAY"')], label="capability flags")
+        ("listing_threshold", X.DBL, "0"), ("has_reported_date", X.BOOL, "1=1"), ("has_paid_date", X.BOOL, "1=1"),
+        ("has_member_exposure", X.BOOL, "1=1"), ("has_line_detail", X.BOOL, "1=1"),
+        ("exposure_by_cohort", X.BOOL, "1=1"), ("date_precision", X.STR, '"DAY"')], label="capability flags")
     meta = wf.select(meta, keep=["source_mode", "valuation_date", "listing_threshold", "has_reported_date",
                                  "has_paid_date", "has_member_exposure", "has_line_detail", "exposure_by_cohort",
                                  "date_precision"], keep_unknown=False, label="int_run_meta")
@@ -461,9 +461,9 @@ def build_claimant(v):
     meta = wf.formula(valk, [
         ("source_mode", X.STR, '"C"'), ("valuation_date", X.DATE, "[valuation]"),
         ("listing_threshold", X.DBL, "IIF(IsNull([listing_thr]), 0, [listing_thr])"),
-        ("has_reported_date", X.BOOL, "False"), ("has_paid_date", X.BOOL, "False"),
-        ("has_member_exposure", X.BOOL, "False"), ("has_line_detail", X.BOOL, "False"),
-        ("exposure_by_cohort", X.BOOL, "False"), ("date_precision", X.STR, '"DAY"')], label="capability flags")
+        ("has_reported_date", X.BOOL, "1=0"), ("has_paid_date", X.BOOL, "1=0"),
+        ("has_member_exposure", X.BOOL, "1=0"), ("has_line_detail", X.BOOL, "1=0"),
+        ("exposure_by_cohort", X.BOOL, "1=0"), ("date_precision", X.STR, '"DAY"')], label="capability flags")
     meta = wf.select(meta, keep=["source_mode", "valuation_date", "listing_threshold", "has_reported_date",
                                  "has_paid_date", "has_member_exposure", "has_line_detail", "exposure_by_cohort",
                                  "date_precision"], keep_unknown=False, label="int_run_meta")

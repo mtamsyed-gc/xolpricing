@@ -55,11 +55,11 @@ def build(v):
                          [[p[0], p[3], p[4] or "-", 1 if p[5] else 0] for p in S.PARAMS], label="parameter spec")
     j = wf.join(spec, rows, ["s_pid"], ["pid"], label="spec x sheet")
     m = j["J"]
-    re_expr = " ".join(f'IIF([s_kind] = "{k}", REGEX_Match([val], "{r}"),' for k, r in KIND_RE.items()) + " False" + ")" * len(KIND_RE)
+    re_expr = " ".join(f'IIF([s_kind] = "{k}", REGEX_Match([val], "{r}"),' for k, r in KIND_RE.items()) + " 1=0" + ")" * len(KIND_RE)
     m = wf.formula(m, [
         ("blank", X.BOOL, 'IsEmpty([val])'),
-        ("kind_ok", X.BOOL, f'IIF(IsEmpty([val]), True, {re_expr})'),
-        ("allowed_ok", X.BOOL, 'IIF(IsEmpty([val]) OR [s_allowed] = "-", True, '
+        ("kind_ok", X.BOOL, f'IIF(IsEmpty([val]), 1=1, {re_expr})'),
+        ("allowed_ok", X.BOOL, 'IIF(IsEmpty([val]) OR [s_allowed] = "-", 1=1, '
                                'FindString("," + [s_allowed] + ",", "," + [val] + ",") >= 0)'),
     ], label="check value")
     p01, _ = wf.filter(m, "[blank] AND [s_required] = 1", label="P01 required blank")
