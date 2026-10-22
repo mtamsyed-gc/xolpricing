@@ -1,5 +1,8 @@
 # Running the tool (Designer 2025.2 format; tested on 2026.2)
 
+Users: start with the illustrated manual, `docs/manual/USER_MANUAL.md` (or `USER_MANUAL.html`). This page is the
+developer's run guide.
+
 ## One-off setup
 1. Clone or download the repo. Keep the folder structure: workflows find their files by relative path.
 2. Open `excel/templates/XoL_Control.xlsx`, save a copy as **`data/input/XoL_Control.xlsx`** and fill it in

@@ -1,0 +1,13 @@
+﻿stage,table,measure,value
+S01c,fact_claims,rows_in,130
+S01c,int_members,written_premium_q,45425
+S01c,int_exposure,earned_ly,31.273972602739732
+S01c,int_exposure,earned_premium,41726.20000000001
+S01c,fact_claims,rows_rejected_excluded,0
+S01c,fact_claims,rows_after_valuation_excluded,0
+S01c,fact_claims,rows_unmatched_excluded,0
+S01c,int_claims,rows_out,128
+S01c,int_claims,amount_paid_q,199423.47999999998
+S01c,int_claims,amount_os_q,9796.23
+S01c,dim_life,rows_in,42
+S01c,int_members,rows_out,42

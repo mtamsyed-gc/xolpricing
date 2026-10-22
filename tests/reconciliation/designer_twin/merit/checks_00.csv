@@ -1,0 +1,6 @@
+﻿stage,code,severity,item,message
+S00,OK,INFO,-,stage 00 checks ran
+S00,T05,FLAG,2021,completion rows for a year outside years_included (ignored)
+S00,T05,FLAG,2022,completion rows for a year outside years_included (ignored)
+S00,T05,FLAG,2023,completion rows for a year outside years_included (ignored)
+S00,T05,FLAG,2024,completion rows for a year outside years_included (ignored)

@@ -8,7 +8,8 @@ caught here.
 | Workflow | Designer run | Stored | Result |
 |---|---|---|---|
 | 00_read_control | 0 errors, 0 warnings | checks_00, out_scenario_applied | identical to the simulator |
-| 01a / 01b / 01c adapters | 0 errors, 0 warnings | checks_01x, recon_01x | identical; recon diffs ≤ 1e-4 |
+| 01a / 01b / 01c adapters | 0 errors, 0 warnings | checks_01x, recon_01x | identical; recon diffs ≤ 1e-4 (01c re-run 2026-10-22 on the Merit-format synthetic files) |
+| Merit route (fixtures/merit_v7 through LIVE 00 → 01c → 02, tools/check_merit.bat) | 0 errors, 0 warnings (2026-10-22) | merit/ | checks, recon and indicated factors identical to the simulator |
 | 02_experience | 0 errors, 0 warnings | checks_02, recon_02, out_completion_indicated | identical (rel 1e-9) |
 | 03_burning_cost | 0 errors, 0 warnings | checks_03, recon_03, out_bc_summary, out_bc_by_year, out_annualisation | identical (rel 1e-9) |
 | 04a_fit_severity (Python tool) | 0 errors, 0 warnings | stage04a/ | candidates, flags, selection (PARETO), log-likelihoods and severity grid = simulator (scipy 1.16 vs local) |

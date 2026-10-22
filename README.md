@@ -13,7 +13,7 @@ loadings, and (C) cedant impact — recoveries vs premium and retained-claims vo
 > per-event XoL (05), stop loss and programme structures (06), Results workbook with pricing, C1, C2, expiring,
 > severity and scenarios (07). `tools\run_pipeline.bat` runs the chain with the Alteryx engine. Every workflow runs
 > clean in Designer 2026.2 and matches the independent oracles exactly.
-> How to run: [`docs/RUNNING.md`](docs/RUNNING.md). Design: [`docs/scope.md`](docs/scope.md),
+> How to run: the illustrated [user manual](docs/manual/USER_MANUAL.md); developers: [`docs/RUNNING.md`](docs/RUNNING.md). Design: [`docs/scope.md`](docs/scope.md),
 > [`docs/data-contracts.md`](docs/data-contracts.md).
 
 ## Synthetic data

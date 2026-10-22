@@ -12,13 +12,20 @@ if exist "%IN%\ete\dim_life.csv" (echo data\input\ete holds files: not overwriti
 if not exist "%IN%\ete" mkdir "%IN%\ete"
 copy /y "%ROOT%\tests\fixtures\merit_v7\XoL_Control_merit_test.xlsx" "%IN%\XoL_Control.xlsx" >nul
 for %%F in (dim_life fact_member_month fact_claims run_manifest_claims) do copy /y "%ROOT%\tests\fixtures\merit_v7\%%F.csv" "%IN%\ete\%%F.csv" >nul
-echo y | call "%~dp0run_pipeline.bat" live 01c 00 02
+echo === Merit synthetic outputs through the LIVE workflows, stages 00 to 02
+call "%~dp0run_pipeline.bat" live 01c 00 02 quiet
+set "RC1=%errorlevel%"
 del "%IN%\XoL_Control.xlsx"
 for %%F in (dim_life fact_member_month fact_claims run_manifest_claims) do del "%IN%\ete\%%F.csv"
-echo Test inputs removed from data\input. Log: %ROOT%\data\output\live\engine_run.log
-rem the synthetic ETE files (data\synthetic\ete, Merit format) through the SYNTH workflows 00 -> 01c
-echo y | call "%~dp0run_pipeline.bat" synth 01c 00 01c
-echo Synthetic ETE log: %ROOT%\data\output\synth\engine_run.log
+echo Test inputs removed from data\input.
+echo.
+echo === Synthetic ETE files through the SYNTH workflows, stages 00 to 01c
+call "%~dp0run_pipeline.bat" synth 01c 00 01c quiet
+set "RC2=%errorlevel%"
+echo.
+if "%RC1%"=="0" if "%RC2%"=="0" echo CHECK PASSED: both runs ended without errors.
+if not "%RC1%"=="0" echo Merit route FAILED: see %ROOT%\data\output\live\engine_run.log
+if not "%RC2%"=="0" echo Synthetic ETE run FAILED: see %ROOT%\data\output\synth\engine_run.log
 :end
 echo.
 pause

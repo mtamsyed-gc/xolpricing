@@ -1,0 +1,5 @@
+﻿stage,code,severity,item,message
+S01c,OK,INFO,-,stage 01c checks ran
+S01c,A17,FLAG,FICTIONAL PAYER A|TPA FOUR|A103|S9M2 UWY 2025,"life-period without cover dates (e.g. void ab initio): kept for its claims, no exposure"
+S01c,A16,FLAG,Payer FICTIONAL PAYER A,one of 2 payers pooled in this run: set ete_payer_filter to price one payer
+S01c,A16,FLAG,Payer FICTIONAL PAYER B,one of 2 payers pooled in this run: set ete_payer_filter to price one payer

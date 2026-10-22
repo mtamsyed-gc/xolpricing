@@ -6,6 +6,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools/alteryx"))
+sys.path.insert(0, str(ROOT / "tests"))
 import xol_common as C  # noqa: E402
 import build_stage00  # noqa: E402
 import build_stage01  # noqa: E402
@@ -38,6 +39,7 @@ def main() -> int:
     for f in ("checks_01c", "recon_01c"):
         ok &= compare(f)
     sim.run(build_stage04a.build(C.SYNTH))       # the simulator's own 04a run, compared with Designer's
+    ok &= merit()
     ok &= stage04a()
     ok &= stage04()
     ok &= twin("stage05", "twin_stage05.py", "stage 05 (per-event)")
@@ -83,6 +85,28 @@ def stage06() -> bool:
     good = r.returncode == 0
     print(f"{'PASS' if good else 'FAIL'}  stage 06, 10,000 iterations (Designer 2026.2 vs oracle)")
     return good
+
+
+def merit() -> bool:
+    """The Merit route on the engine (tests/fixtures/merit_v7 through LIVE 00 -> 01c -> 02, tools/check_merit.bat):
+    checks, recon and indicated factors equal the simulator's run of tests/test_merit.py."""
+    import test_merit
+    d = TWIN / "merit"
+    out = test_merit.run("tmerit")
+    good = True
+    for f in ("checks_00", "checks_01c", "checks_02"):
+        good &= pd.read_csv(d / f"{f}.csv", encoding="utf-8-sig").sort_values(["code", "item"]).reset_index(drop=True) \
+            .equals(pd.read_csv(out / f"checks/{f}.csv").sort_values(["code", "item"]).reset_index(drop=True))
+    for f in ("recon_01c", "recon_02"):
+        a = pd.read_csv(d / f"{f}.csv", encoding="utf-8-sig")
+        m = a.merge(pd.read_csv(out / f"checks/{f}.csv"), on=["stage", "table", "measure"], how="outer",
+                    suffixes=("_d", "_s"))
+        good &= bool(m.notna().all().all() and np.allclose(m.value_d, m.value_s, rtol=1e-9, atol=1e-6))
+    a = pd.read_csv(d / "out_completion_indicated.csv", encoding="utf-8-sig")
+    b = pd.read_csv(out / "checks/out_completion_indicated.csv")
+    good &= len(a) == len(b) and bool(np.allclose(a.indicated_factor, b.indicated_factor, rtol=1e-9))
+    print(f"{'PASS' if good else 'FAIL'}  Merit route 00 -> 01c -> 02 (Alteryx engine vs simulator)")
+    return bool(good)
 
 
 def stage04a() -> bool:
