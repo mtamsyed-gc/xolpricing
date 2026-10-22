@@ -2,6 +2,16 @@
 
 Methodology and data-contract changes, newest first.
 
+## 2026-10-22 — 0.6: Merit outputs as an input
+- Owner: take Merit v7's final outputs as they are (no change to Merit) and make every further adjustment in the XoL tool. Adapter 01c now reads Merit's `dim_life.csv`, `fact_member_month.csv`, `fact_claims.csv` and `run_manifest_claims.csv` as written:
+  - members are **life-periods (LifeKey × UWY)**: a life renewing across UWYs no longer stops the run (A14 now checks LifeKey × UWY); member-months and claims are joined on LifeKey × UWY; policy_id = PolKey | UWY;
+  - valuation date from Merit's run manifest (`valuation_date`); claims treated after it are **excluded with an A04 FLAG** (Merit's claims extract runs past the valuation date; owner: valuation = Merit's valuation date);
+  - `ete_payer_filter` (new Control parameter) with the TPA filter; A16 flags several payers pooled in a run;
+  - a life-period without cover dates (Merit "Void ab initio") is kept for its claims with zero cover days (A17 FLAG).
+- `tools\import_merit.bat` copies Merit's four files into `data\input\ete`; `tools\check_merit.bat` runs the route on Merit's synthetic outputs through the engine; `run_pipeline.bat` takes a last-stage argument.
+- `tests/test_merit.py` (contract test): fixture `tests/fixtures/merit_v7` = Merit v7.0.2's synthetic outputs with company names replaced in values and keys (`tools/synth/merit_fixture.py`); 00 → 01c → 02 against a pandas computation (life-periods, claims, paid / OS, earned exposure, payer filter, late claim, void life-period); and, with an ete-dashboard clone alongside, the fixture must equal a fresh build from Merit's current outputs.
+- Synthetic ETE files carry `run_manifest_claims.csv` (Merit format) instead of `run_meta.csv`.
+
 ## 2026-10-14 — 0.5: severity candidates (Python tool), engine runner
 - Python permitted on GC (owner). New stage 04a (`04a_fit_severity.yxmd`): the Python tool runs tools/python/sevfit.py (embedded) on the stage-04 fit data — LOGNORMAL, GAMMA, WEIBULL, PARETO, GPD by left-truncated, right-censored MLE; AIC, BIC, KS against Kaplan–Meier, mean excess at the APs, survival at thresholds; boundary fits flagged and not auto-selected; selection by `fit_selected`, else lowest AIC; inverse-survival grid of the selected distribution. Checks F01–F06.
 - Stage 04 draws severity from that grid when `severity_source = PYTHON` (new default) or from the native Pareto on the same grid (`NATIVE`, exact). S07 stops a PYTHON run without a fresh 04a; stage 03 empties the fit. `out_sim_summary.sev_dist`.

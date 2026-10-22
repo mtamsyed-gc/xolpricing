@@ -3,7 +3,7 @@
     01a_adapter_line.yxmd      members.csv + claims_lines.csv + run_meta.csv  -> int_* (grain LINE)
     01b_adapter_claimant.yxmd  claimants.csv + exposure_monthly.csv + claims_aggregate_monthly.csv + run_meta.csv
                                -> int_* (grain CLAIMANT)
-    01c_adapter_ete.yxmd       ete-dashboard fact_claims + dim_life + fact_member_month + run_meta.csv
+    01c_adapter_ete.yxmd       Merit / ETE final outputs: dim_life + fact_member_month + fact_claims + run_manifest_claims
                                -> int_* (grain LINE, dates of reporting / payment at month precision)
 
 Outputs (staging .yxdb): int_claims, int_members (line only), int_exposure, int_claims_aggregate, int_run_meta;
@@ -49,6 +49,7 @@ CONTRACT_COLS = {
     "claims_aggregate_monthly": ["incurred_month", "segment", "cohort_month", "paid_amount", "os_amount",
                                  "claim_count"],
     "run_meta": ["valuation_date", "listing_threshold", "currency_basis", "data_source_note"],
+    "run_manifest_claims": ["Key", "Value"],                     # Merit (ete-dashboard side_tools/merit) run manifest
     # ETE extension (ete-dashboard payer-level outputs, data-contracts §2.3)
     "dim_life": ["LifeKey", "Payer Name", "TPA", "PolKey", "MemKey", "UWY", "PolicyStart", "PolicyEndAdj", "CovStart",
                  "CovEnd", "Master Contract ID", "Policy Type", "Plan / Category", "Currency", "WrittenPrem_Gross",
@@ -507,29 +508,54 @@ def status_map(raw):
             f'"UNMAPPED"))))')
 
 
+def merit_manifest(wf, v, checks, sn):
+    """Valuation date from Merit's run_manifest_claims.csv (Key / Value rows; key valuation_date), as Merit writes it.
+    A12 stops when the key is missing or not an ISO date."""
+    _, mf = read_contract_csv(wf, v.p(f"{v.ete_dir}/run_manifest_claims.csv"), "run_manifest_claims", ["Key", "Value"],
+                              checks, sn)
+    mf, _ = wf.filter(mf, '[Key] = "valuation_date"', label="valuation_date row")
+    mf = wf.formula(mf, [("kvm", X.INT, "1"), ("val_m", X.DATE, dt("Value"))], label="valuation date")
+    one = wf.select(wf.text_input(["kv"], [["1"]], label="one row"), keep=["kv"], types={"kv": X.INT},
+                    keep_unknown=False, label="key")
+    j = wf.left_join(one, wf.select(mf, keep=["kvm", "val_m"], keep_unknown=False, label="valuation"), ["kv"], ["kvm"],
+                     label="+ valuation (none = Null)")
+    bad, ok = wf.filter(j, "IsNull([val_m])", label="A12 valuation date")
+    checks.append(C.check_formula(wf, bad, sn, "A12", "STOP", '"run_manifest_claims.valuation_date"',
+                                  '"missing, or not an ISO date (yyyy-mm-dd)"'))
+    ok = wf.formula(ok, [("valuation", X.DATE, "[val_m]"), ("listing_thr", X.DBL, "0")], label="valuation, threshold")
+    return wf.select(ok, keep=["kv", "valuation", "listing_thr"], keep_unknown=False, label="valuation, threshold")
+
+
 def build_ete(v):
-    """ETE extension: ete-dashboard payer-level fact_claims, dim_life, fact_member_month (+ run_meta.csv)."""
-    wf = X.WF("01c_adapter_ete", "Stage 01c: ETE extension adapter (ete-dashboard payer-level outputs)")
+    """ETE extension / Merit: the final outputs of Merit (ete-dashboard side_tools/merit, v7) or the ETE engine, read
+    as written - dim_life.csv (one row per life-period: LifeKey x UWY), fact_member_month.csv, fact_claims.csv and
+    run_manifest_claims.csv (valuation_date). Members and claims are keyed on LifeKey x UWY; claims treated after the
+    valuation date are excluded (A04, FLAG); payer and TPA filters from Control."""
+    wf = X.WF("01c_adapter_ete", "Stage 01c: ETE / Merit adapter (final outputs read as written)")
     wf.dag = True
     checks, sn = [], "01c"
-    wf.container("01c.1 Run meta, FX, limits, mode parameters")
-    valk = run_meta(wf, v, v.ete_dir, checks, sn)
+    wf.container("01c.1 Run manifest, FX, limits, mode parameters")
+    valk = merit_manifest(wf, v, checks, sn)
     FX_CACHE[wf] = fx_table(wf, v)
     lim = wf.input_yxdb(C.stage(v, "ctl_limits"), label="ctl_limits (stage 00)")
     lim = wf.select(lim, keep=["plan", "annual_limit"], rename={"plan": "lim_plan", "annual_limit": "plan_limit_q"},
                     keep_unknown=False, label="plan limits")
-    par = C.params_stream(wf, v, ["premium_basis", "segment_field", "ete_tpa_filter"], key="kp", label="mode parameters")
+    par = C.params_stream(wf, v, ["premium_basis", "segment_field", "ete_tpa_filter", "ete_payer_filter"], key="kp",
+                          label="mode parameters")
     par = wf.formula(par, [("tpa_f", X.STR, 'IIF(IsNull([p_ete_tpa_filter]), "", Uppercase(Replace([p_ete_tpa_filter], '
                                             '" ", "")))'),
+                           ("payer_f", X.STR, 'IIF(IsNull([p_ete_payer_filter]), "", '
+                                              'Uppercase(Replace([p_ete_payer_filter], " ", "")))'),
                            ("basis", X.STR, 'IIF(IsNull([p_premium_basis]), "GROSS", [p_premium_basis])'),
                            ("seg_f", X.STR, 'IIF(IsNull([p_segment_field]), "Policy Type", [p_segment_field])')],
                      label="TPA filter, basis, segment field")
-    tpa_ok = 'IIF([tpa_f] = "", 1=1, ' + C.in_csv("[tpa_f]", "[tpa_k]") + ")"
+    tpa_ok = ('IIF([tpa_f] = "", 1=1, ' + C.in_csv("[tpa_f]", 'Replace([tpa_k], " ", "")') + ") AND "
+              'IIF([payer_f] = "", 1=1, ' + C.in_csv("[payer_f]", 'Replace([payer_k], " ", "")') + ")")
 
     # ------------------------------------------------------------------ members
     wf.container("01c.2 dim_life -> members (TPA filter, segment attribute, premium basis)")
     mraw, mfull = read_contract_csv(wf, v.p(f"{v.ete_dir}/dim_life.csv"), "dim_life",
-                                    ["LifeKey", "PolKey", "PolicyStart", "PolicyEndAdj", "CovStart", "CovEnd",
+                                    ["LifeKey", "UWY", "PolKey", "PolicyStart", "PolicyEndAdj", "CovStart", "CovEnd",
                                      "Master Contract ID", "Currency", "WrittenPrem_Gross"], checks, sn)
     mem = wf.record_id(mfull, "src_row", label="source row")
     mem = wf.formula(mem, [("km", X.INT, "1")], label="key")
@@ -539,21 +565,30 @@ def build_ete(v):
         seg = f'IIF([seg_f] = "{col}", IIF(IsEmpty([{col}]), "ALL", Trim([{col}])), {seg})'
     seg = f'IIF([seg_f] = "Policy Type" OR [seg_f] = "segment", IIF(IsEmpty([Policy Type]), "ALL", Trim([Policy Type])), {seg})'
     mem = wf.formula(mem, [
-        ("member_id_t", X.STR, "Uppercase(Trim([LifeKey]))"), ("policy_id_t", X.STR, "Uppercase(Trim([PolKey]))"),
+        ("member_id_t", X.STR, "Uppercase(Trim([LifeKey]))"), ("uwy_k", X.STR, "Trim([UWY])"),
+        ("policy_id_t", X.STR, 'Uppercase(Trim([PolKey])) + "|" + Trim([UWY])'),
         ("scheme_id_t", X.STR, "Uppercase(Trim([Master Contract ID]))"), ("tpa_k", X.STR, "Uppercase(Trim([TPA]))"),
+        ("payer_k", X.STR, "Uppercase(Trim([Payer Name]))"),
         ("policy_start_d", X.DATE, dt("PolicyStart")), ("policy_end_d", X.DATE, dt("PolicyEndAdj")),
         ("cover_start_d", X.DATE, dt("CovStart")), ("cover_end_d", X.DATE, dt("CovEnd")),
         ("plan_t", X.STR, txt("Plan / Category")), ("segment_t", X.STR, seg),
         ("currency_t", X.STR, "Uppercase(Trim([Currency]))"),
         ("wp_g", X.DBL, num("WrittenPrem_Gross")), ("wp_gn", X.DBL, num("WrittenPrem_GrossNet")),
         ("wp_n", X.DBL, num("WrittenPrem_Net"))], label="type dim_life")
+    # a life-period without cover (Merit: blank CovStart / CovEnd, e.g. EndoGroup "Void ab initio") is kept so its
+    # claims still match; it carries no exposure (zero cover days) and is flagged (A17)
+    mem = wf.formula(mem, [("nocov", X.BOOL, "IsNull([cover_start_d]) AND IsNull([cover_end_d]) AND "
+                                             "!IsNull([policy_start_d])")], label="life-period without cover")
+    mem = wf.formula(mem, [("cover_start_d", X.DATE, "IIF([nocov], [policy_start_d], [cover_start_d])"),
+                           ("cover_end_d", X.DATE, "IIF([nocov], [policy_start_d], [cover_end_d])")],
+                     label="no cover: dates set to the policy start (zero cover days below)")
     mem = wf.formula(mem, [("wp", X.DBL, 'IIF([basis] = "NET", [wp_n], IIF([basis] = "GROSSNET", [wp_gn], [wp_g]))'),
                            ("gn_ratio", X.DBL, "IIF(IsNull([wp_g]) OR [wp_g] = 0 OR IsNull([wp_gn]), 1, [wp_gn] / [wp_g])")],
                      label="premium on the chosen basis")
-    _, mem = wf.filter(mem, f"!({tpa_ok})", label="TPA filter (excluded)")
-    mem = wf.select(mem, keep=["member_id_t", "policy_id_t", "scheme_id_t", "policy_start_d", "policy_end_d",
+    _, mem = wf.filter(mem, f"!({tpa_ok})", label="payer / TPA filter (excluded)")
+    mem = wf.select(mem, keep=["member_id_t", "uwy_k", "policy_id_t", "scheme_id_t", "policy_start_d", "policy_end_d",
                                "cover_start_d", "cover_end_d", "plan_t", "segment_t", "currency_t", "wp", "gn_ratio",
-                               "basis", "tpa_k", "src_row"],
+                               "basis", "tpa_k", "payer_k", "nocov", "src_row"],
                     rename={"member_id_t": "member_id", "policy_id_t": "policy_id", "scheme_id_t": "scheme_id",
                             "policy_start_d": "policy_start", "policy_end_d": "policy_end",
                             "cover_start_d": "cover_start", "cover_end_d": "cover_end", "plan_t": "plan",
@@ -566,15 +601,29 @@ def build_ete(v):
     a02, _ = wf.filter(mem_ok, "[cover_start] > [cover_end] OR [policy_start] > [cover_start] OR "
                                "[cover_end] > [policy_end]", label="A02 date order")
     checks.append(C.check_formula(wf, a02, sn, "A02", "FLAG", "[member_id]", '"cover / policy dates out of order"'))
-    _, dupm = wf.unique(mem_ok, ["member_id"], label="LifeKey unique")
-    checks.append(C.check_formula(wf, dupm, sn, "A14", "STOP", "[member_id]", '"LifeKey repeated in dim_life"'))
+    a17, _ = wf.filter(mem_ok, "[nocov]", label="A17 life-period without cover")
+    checks.append(C.check_formula(wf, a17, sn, "A17", "FLAG", '[member_id] + " UWY " + [uwy_k]',
+                                  '"life-period without cover dates (e.g. void ab initio): kept for its claims, no '
+                                  'exposure"'))
+    _, dupm = wf.unique(mem_ok, ["member_id", "uwy_k"], label="LifeKey x UWY unique")
+    checks.append(C.check_formula(wf, dupm, sn, "A14", "STOP", '[member_id] + " UWY " + [uwy_k]',
+                                  '"life-period (LifeKey x UWY) repeated in dim_life"'))
+    pyk = wf.formula(mem_ok, [("kpy", X.INT, "1")], label="key")
+    npay = wf.summarize(pyk, [("kpy", "GroupBy", "kpy2"), ("payer_k", "CountDistinct", "n_payers")],
+                        label="payers in the run")
+    pays = wf.unique(wf.sort(pyk, [("payer_k", "Ascending")], label="by payer"), ["payer_k"], label="each payer")[0]
+    pays = C.append(wf, pays, npay, "kpy", "kpy2", "+ number of payers")
+    a16, _ = wf.filter(pays, "[n_payers] > 1", label="A16 several payers")
+    checks.append(C.check_formula(wf, a16, sn, "A16", "FLAG", '"Payer " + [payer_k]',
+                                  '"one of " + ToString([n_payers]) + " payers pooled in this run: set '
+                                  'ete_payer_filter to price one payer"'))
     memfx = apply_fx(wf, mem_ok, "currency", checks, sn, '"dim_life currency " + [currency]', "members")
     jl = wf.join(memfx, lim, ["plan"], ["lim_plan"], label="plan limit lookup")
     mem2 = wf.union([jl["J"], jl["L"]], label="members (limit lookup left join)", differ="Ignore")
     mem2 = wf.formula(mem2, [
         ("annual_limit", X.DBL, "IIF(IsNull([plan_limit_q]), Null(), [plan_limit_q])"), ("site", X.STR, "Null()"),
         ("cohort_month", X.DATE, MS("[policy_start]")),
-        ("cov_days", X.INT, X.ddiff("[cover_end]", "[cover_start]") + " + 1"),
+        ("cov_days", X.INT, "IIF([nocov], 0, " + X.ddiff("[cover_end]", "[cover_start]") + " + 1)"),
         ("written_premium_q", X.DBL, "[written_premium] * [fx_rate]"), ("k", X.INT, "1")],
         label="limit (plan lookup), cohort, days")
     int_members = wf.select(mem2, keep=["member_id", "policy_id", "scheme_id", "policy_start", "policy_end",
@@ -586,19 +635,23 @@ def build_ete(v):
     # ------------------------------------------------------------------ exposure
     wf.container("01c.3 fact_member_month -> exposure (earned, engine's zero-premium rule kept); written from dim_life")
     _, fm = read_contract_csv(wf, v.p(f"{v.ete_dir}/fact_member_month.csv"), "fact_member_month",
-                              ["LifeKey", "MonthStart", "EarnedDays", "EarnedLY_Gross", "EarnedPrem_Gross"], checks, sn)
-    fm = wf.formula(fm, [("f_life", X.STR, "Uppercase(Trim([LifeKey]))"), ("f_month", X.DATE, dt("MonthStart")),
+                              ["LifeKey", "UWY", "MonthStart", "EarnedDays", "EarnedLY_Gross", "EarnedPrem_Gross"],
+                              checks, sn)
+    fm = wf.formula(fm, [("f_life", X.STR, "Uppercase(Trim([LifeKey]))"), ("f_uwy", X.STR, "Trim([UWY])"),
+                         ("f_month", X.DATE, dt("MonthStart")),
                          ("f_days", X.DBL, num("EarnedDays")), ("ely_g", X.DBL, num("EarnedLY_Gross")),
                          ("ely_n", X.DBL, num("EarnedLY_Net")), ("ep_g", X.DBL, num("EarnedPrem_Gross")),
                          ("ep_n", X.DBL, num("EarnedPrem_Net"))], label="type member months")
-    fm = wf.select(fm, keep=["f_life", "f_month", "f_days", "ely_g", "ely_n", "ep_g", "ep_n"], keep_unknown=False,
+    fm = wf.select(fm, keep=["f_life", "f_uwy", "f_month", "f_days", "ely_g", "ely_n", "ep_g", "ep_n"], keep_unknown=False,
                    label="typed member months")
-    mk = wf.select(mem2, keep=["member_id", "segment", "cohort_month", "fx_rate", "gn_ratio", "basis"],
-                   rename={"member_id": "m_life", "fx_rate": "m_fx"}, keep_unknown=False, label="member keys")
-    fj = wf.join(fm, mk, ["f_life"], ["m_life"], label="member months + members")
-    fmu, _ = wf.unique(fj["L"], ["f_life"], label="member months without a member")
-    checks.append(C.check_formula(wf, fmu, sn, "A15", "FLAG", '"LifeKey " + [f_life]',
-                                  '"member months without a dim_life row (excluded; also outside the TPA filter)"'))
+    mk = wf.select(mem2, keep=["member_id", "uwy_k", "segment", "cohort_month", "fx_rate", "gn_ratio", "basis"],
+                   rename={"member_id": "m_life", "uwy_k": "m_uwy", "fx_rate": "m_fx"}, keep_unknown=False,
+                   label="member keys")
+    fj = wf.join(fm, mk, ["f_life", "f_uwy"], ["m_life", "m_uwy"], label="member months + members (LifeKey x UWY)")
+    fmu, _ = wf.unique(fj["L"], ["f_life", "f_uwy"], label="member months without a member")
+    checks.append(C.check_formula(wf, fmu, sn, "A15", "FLAG", '"LifeKey " + [f_life] + " UWY " + [f_uwy]',
+                                  '"member months without a dim_life row (excluded; also outside the payer / TPA '
+                                  'filter)"'))
     fx_ = wf.formula(fj["J"], [("k", X.INT, "1")], label="key")
     fx_ = wf.join(fx_, valk, ["k"], ["kv"], label="+ valuation")["J"]
     fx_, _ = wf.filter(fx_, "[f_month] <= [valuation]", label="months up to valuation")
@@ -628,13 +681,14 @@ def build_ete(v):
     # ------------------------------------------------------------------ claims
     wf.container("01c.4 fact_claims -> claims (InExperience, status, LifeKey match, FX at the member's currency)")
     craw, cf = read_contract_csv(wf, v.p(f"{v.ete_dir}/fact_claims.csv"), "fact_claims",
-                                 ["ClaimKey", "ClaimID", "LifeKey", "InExperience", "StatusClass", "TreatmentDate",
-                                  "Paid", "OS"], checks, sn)
+                                 ["ClaimKey", "ClaimID", "LifeKey", "UWY", "InExperience", "StatusClass",
+                                  "TreatmentDate", "Paid", "OS"], checks, sn)
     cl = wf.record_id(cf, "src_row", label="source row")
     cl = C.append(wf, wf.formula(cl, [("kc", X.INT, "1")], label="key"), par, "kc", "kp", "+ mode parameters")
     cl = wf.formula(cl, [
         ("c_line", X.STR, "Trim([ClaimKey])"), ("c_claim", X.STR, "Trim([ClaimID])"),
-        ("c_member", X.STR, "Uppercase(Trim([LifeKey]))"), ("tpa_k", X.STR, "Uppercase(Trim([TPA]))"),
+        ("c_member", X.STR, "Uppercase(Trim([LifeKey]))"), ("c_uwy", X.STR, "Trim([UWY])"),
+        ("tpa_k", X.STR, "Uppercase(Trim([TPA]))"), ("payer_k", X.STR, "Uppercase(Trim([Payer Name]))"),
         ("c_inexp", X.STR, "Trim([InExperience])"),
         ("c_treat", X.DATE, dt("TreatmentDate")), ("c_rep", X.DATE, dt("ReportedMonth")),
         ("c_paid", X.DATE, dt("PaidMonth")), ("c_adm", X.DATE, dt("Admission Date")),
@@ -643,7 +697,7 @@ def build_ete(v):
         label="type claims")
     cl = wf.formula(cl, [("c_status", X.STR, status_map("[c_status_raw]"))], label="map status")
     _, cl = wf.filter(cl, f'!({tpa_ok}) OR ([c_inexp] != "1" AND Uppercase([c_inexp]) != "TRUE")',
-                      label="InExperience = 1 and TPA filter (others excluded)")
+                      label="InExperience = 1 and payer / TPA filter (others excluded)")
     a11, cl = wf.filter(cl, '[c_status] = "UNMAPPED"', label="A11 status")
     a11u, _ = wf.unique(a11, ["c_status_raw"], label="unmapped values")
     checks.append(C.check_formula(wf, a11u, sn, "A11", "STOP", '"StatusClass " + [c_status_raw]',
@@ -652,15 +706,22 @@ def build_ete(v):
     checks.append(C.check_formula(wf, bad_c, sn, "A12", "STOP", '"fact_claims row " + ToString([src_row])',
                                   '"blank or non-ISO TreatmentDate, or blank Paid and OS (row excluded)"'))
     clv = wf.join(wf.formula(cl, [("k", X.INT, "1")], label="key"), valk, ["k"], ["kv"], label="claims + valuation")["J"]
-    a04, cl = wf.filter(clv, "[c_treat] > [valuation]", label="A04 after valuation")
-    checks.append(C.check_formula(wf, a04, sn, "A04", "STOP", '"claim " + [c_line]',
-                                  '"treatment date after the valuation date"'))
+    a04, cl = wf.filter(clv, "[c_treat] > [valuation]", label="A04 after valuation (excluded)")
+    a04s = wf.summarize(wf.formula(a04, [("ka", X.INT, "1"), ("one", X.DBL, "1"),
+                                         ("amt", X.DBL, "IIF(IsNull([c_pa]), 0, [c_pa]) + IIF(IsNull([c_os]), 0, [c_os])")],
+                                   label="count"),
+                        [("ka", "GroupBy", "ka"), ("one", "Sum", "n"), ("amt", "Sum", "amt"),
+                         ("c_treat", "Max", "last")], label="claims after valuation")
+    checks.append(C.check_formula(wf, a04s, sn, "A04", "FLAG", '"fact_claims"',
+                                  'ToString([n], 0) + " claim lines treated after the valuation date (latest " + '
+                                  'DateTimeFormat([last], "%Y-%m-%d") + ", paid + OS " + ToString([amt], 0) + '
+                                  '") excluded: the claims extract runs past the valuation date"'))
     rej, cl = wf.filter(cl, '[c_status] = "Rejected"', label="rejected lines (excluded)")
-    memk = wf.select(mem2, keep=["member_id", "policy_id", "scheme_id", "cohort_month", "cover_start", "cover_end",
-                                 "annual_limit", "segment", "site", "currency", "fx_rate"],
-                     rename={"member_id": "m_member", "policy_id": "m_policy", "segment": "m_seg",
+    memk = wf.select(mem2, keep=["member_id", "uwy_k", "policy_id", "scheme_id", "cohort_month", "cover_start",
+                                 "cover_end", "annual_limit", "segment", "site", "currency", "fx_rate"],
+                     rename={"member_id": "m_member", "uwy_k": "m_uwy", "policy_id": "m_policy", "segment": "m_seg",
                              "currency": "m_ccy", "fx_rate": "m_fx"}, keep_unknown=False, label="member keys")
-    jm = wf.join(cl, memk, ["c_member"], ["m_member"], label="LifeKey match")
+    jm = wf.join(cl, memk, ["c_member", "c_uwy"], ["m_member", "m_uwy"], label="LifeKey x UWY match")
     matched, unmatched = jm["J"], jm["L"]
     um = wf.formula(unmatched, [("k", X.INT, "1"), ("n", X.DBL, "0"), ("n_un", X.DBL, "1")], label="unmatched counter")
     mm_ = wf.formula(matched, [("k", X.INT, "1"), ("n", X.DBL, "1"), ("n_un", X.DBL, "0")], label="matched counter")
@@ -672,9 +733,9 @@ def build_ete(v):
     a03, _ = wf.filter(rate, "[match_rate] < 0.95", label="A03 match rate")
     checks.append(C.check_formula(wf, a03, sn, "A03", "STOP", '"fact_claims"',
                                   '"LifeKey match rate " + ToString([match_rate] * 100, 2) + "% < 95%"'))
-    unm1, _ = wf.unique(unmatched, ["c_member"], label="unmatched members")
-    checks.append(C.check_formula(wf, unm1, sn, "A13", "FLAG", '"LifeKey " + [c_member]',
-                                  '"claims with no dim_life row (excluded)"'))
+    unm1, _ = wf.unique(unmatched, ["c_member", "c_uwy"], label="unmatched life-periods")
+    checks.append(C.check_formula(wf, unm1, sn, "A13", "FLAG", '"LifeKey " + [c_member] + " UWY " + [c_uwy]',
+                                  '"claims with no dim_life row for that UWY (excluded)"'))
     ic = wf.formula(matched, [
         ("claim_key", X.STR, "[c_line]"), ("claim_id", X.STR, "[c_claim]"), ("member_id", X.STR, "[c_member]"),
         ("policy_id", X.STR, "[m_policy]"), ("treatment_date", X.DATE, "[c_treat]"),
@@ -707,6 +768,7 @@ def build_ete(v):
                                  "date_precision"], keep_unknown=False, label="int_run_meta")
     wf.output_yxdb(meta, C.stage(v, "int_run_meta"), label="int_run_meta")
     recon(wf, [(craw, "fact_claims", "rows_in", None), (rej, "fact_claims", "rows_rejected_excluded", None),
+               (a04, "fact_claims", "rows_after_valuation_excluded", None),
                (unmatched, "fact_claims", "rows_unmatched_excluded", None), (ic, "int_claims", "rows_out", None),
                (ic, "int_claims", "amount_paid_q", "amount_paid_q"), (ic, "int_claims", "amount_os_q", "amount_os_q"),
                (mraw, "dim_life", "rows_in", None), (int_members, "int_members", "rows_out", None),

@@ -3,6 +3,7 @@ rem XoL pricing tool: run the whole pipeline with the Alteryx engine (no Designe
 rem   run_pipeline.bat                 synthetic data, line adapter (01a)
 rem   run_pipeline.bat live 01b        live data, claimant adapter
 rem   run_pipeline.bat synth 01a 04    start at stage 04 (00-03 already run)
+rem   run_pipeline.bat live 01c 00 02  stop after stage 02 (fourth argument: last stage)
 rem Stops at the first workflow that ends with an error (a STOP check is an error).
 rem Log: data\output\<variant>\engine_run.log
 setlocal
@@ -14,6 +15,7 @@ set "AD=%~2"
 if "%AD%"=="" set "AD=01a"
 set "FROM=%~3"
 if "%FROM%"=="" set "FROM=00"
+set "TO=%~4"
 if /i "%VAR%"=="live" (set "WF=%ROOT%\alteryx\workflows") else (set "WF=%ROOT%\alteryx\workflows\synth")
 if /i "%AD%"=="01a" set "ADW=01a_adapter_line"
 if /i "%AD%"=="01b" set "ADW=01b_adapter_claimant"
@@ -24,16 +26,18 @@ set "OUT=%ROOT%\data\output\%VAR%"
 if not exist "%OUT%" mkdir "%OUT%"
 if not exist "%OUT%\XoL_Results.xlsx" copy "%ROOT%\excel\templates\XoL_Results.xlsx" "%OUT%\XoL_Results.xlsx" >nul
 set "LOG=%OUT%\engine_run.log"
-echo XoL pipeline: variant %VAR%, adapter %ADW%, from stage %FROM% > "%LOG%"
+echo XoL pipeline: variant %VAR%, adapter %ADW%, from stage %FROM% to %TO% > "%LOG%"
 echo Started %date% %time% >> "%LOG%"
 echo XoL pipeline: %VAR%, %ADW%. Log: %LOG%
 set "GO=0"
 for %%W in (00_read_control %ADW% 02_experience 03_burning_cost 04a_fit_severity 04_simulate 05_per_event 06_stop_loss 07_results) do (
     call :run %%W || goto :fail
+    if defined DONE goto :finished
 )
+:finished
 echo ALL DONE %date% %time% >> "%LOG%"
 echo.
-echo All workflows ran. Results workbook: %OUT%\XoL_Results.xlsx
+if defined DONE (echo Stopped after stage %TO% as asked.) else (echo All workflows ran. Results workbook: %OUT%\XoL_Results.xlsx)
 goto :end
 
 :run
@@ -49,6 +53,9 @@ set "RC=%errorlevel%"
 echo ===== %W  end %time%  exit code %RC% >> "%LOG%"
 if %RC% GEQ 2 (echo    FAILED, exit code %RC%: see %LOG% & exit /b 1)
 if %RC%==1 (echo    finished with warnings: see %LOG%) else (echo    ok)
+set "P=%W:~0,2%"
+if not "%W:~2,1%"=="_" set "P=%W:~0,3%"
+if defined TO if /i "%P%"=="%TO%" set "DONE=1"
 exit /b 0
 
 :fail

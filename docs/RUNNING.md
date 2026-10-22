@@ -12,7 +12,7 @@
 |---|---|---|
 | Line (`L`) | `data/input/line/` | `members.csv`, `claims_lines.csv`, `run_meta.csv` |
 | Claimant (`C`) | `data/input/claimant/` | `claimants.csv`, `exposure_monthly.csv`, `claims_aggregate_monthly.csv`, `run_meta.csv` |
-| ETE extension (`E`) | `data/input/ete/` | `dim_life.csv`, `fact_claims.csv`, `fact_member_month.csv` from the ete pipeline, plus `run_meta.csv` |
+| ETE / Merit (`E`) | `data/input/ete/` | Merit's final outputs as written: `dim_life.csv`, `fact_member_month.csv`, `fact_claims.csv`, `run_manifest_claims.csv` (copied by `tools\import_merit.bat`) |
 
 `data/input/` and `data/output/` are git-ignored: client data never goes into the repo.
 
@@ -41,6 +41,23 @@ A STOP check raises an Error in the Results window and cancels the run (workflow
 error*). FLAG and INFO checks are written to the checks CSV and to the `out_warnings` sheet. Read `checks_NN.csv`
 after every step.
 
+## Pricing from Merit outputs
+Merit (ete-dashboard `side_tools/merit`) is used as it is; its final outputs feed the XoL tool and every further
+adjustment is made in the XoL Control workbook.
+1. Run Merit as usual. Its output folder (e.g. `C:\Merit_Client\04_Outputs`) holds `csv\dim_life.csv` etc.
+2. `tools\import_merit.bat "C:\Merit_Client\04_Outputs"` copies the four files the XoL tool reads into
+   `data\input\ete\` (Merit's folder is not changed).
+3. Control workbook: `source_mode = E`; `ete_payer_filter` = the payer to price (Merit can hold several payers; A16
+   flags a pooled run); optionally `ete_tpa_filter`; `premium_basis` GROSS or NET; plan limits in the Limits sheet
+   (Merit has no member limits); completion factors as usual (Merit's IBNR ultimates are not used); per-event
+   scenarios in EvScenarios (Merit has no event fields).
+4. `tools\run_pipeline.bat live 01c`.
+5. Read `checks_01c.csv`: A04 lists claims treated after the valuation date (excluded: Merit's claims extract can run
+   past it), A17 void life-periods that carry claims, A16 pooled payers.
+
+`tools\check_merit.bat` repeats the whole route on Merit's synthetic outputs (`tests\fixtures\merit_v7`) through the
+engine, with its own test Control, and removes its inputs afterwards.
+
 ## Running everything from the command line
 `tools\run_pipeline.bat` runs the workflows in order with `AlteryxEngineCmd.exe` (no Designer window), stops at the
 first error and logs to `data\output\<variant>\engine_run.log`. Double-click it for the synthetic data, or from cmd:
@@ -49,6 +66,7 @@ first error and logs to `data\output\<variant>\engine_run.log`. Double-click it 
 tools\run_pipeline.bat synth 01a        (default)
 tools\run_pipeline.bat live 01b         live data, claimant adapter
 tools\run_pipeline.bat live 01a 04a     start at 04a (00-03 already run)
+tools\run_pipeline.bat live 01c 00 02   stop after 02 (fourth argument: last stage)
 ```
 
 The synthetic chain takes about 25 seconds on the owner's laptop (Designer 2026.2 engine, 2026-10-14). Exit codes:

@@ -27,6 +27,8 @@ PARAMS = [
     ("premium_basis", "Mode", "", "LIST", "GROSS,GROSSNET,NET", True, "Premium basis for rates and EPI"),
     ("segment_field", "Mode", "", "TEXT", "", False, "Segmentation field (ETE: dim_life attribute)"),
     ("ete_tpa_filter", "Mode", "", "TEXT", "", False, "ETE only: comma list of TPAs to include (blank = all)"),
+    ("ete_payer_filter", "Mode", "", "TEXT", "", False,
+     "ETE / Merit only: comma list of payers (Payer Name) to include (blank = all; A16 flags several payers)"),
     ("treaty_basis", "Basis", "", "LIST", "RA,LO", True, "Risks attaching or losses occurring"),
     ("claims_trigger", "Basis", "", "LIST", "INCURRED,PAID", True, "Claims date trigger"),
     ("paid_runoff_months", "Basis", "months", "INT", "", False, "Paid trigger only: months after treaty year end"),

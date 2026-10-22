@@ -1,6 +1,6 @@
 # Data contracts
 
-Version 0.4 · 2026-10-14 · companion to [`scope.md`](scope.md)
+Version 0.5 · 2026-10-22 · companion to [`scope.md`](scope.md)
 
 This document defines:
 - §2: the input templates (standalone mode) and the ETE mapping (extension mode)
@@ -105,48 +105,39 @@ For cedants who supply a large-claimant listing plus aggregates. Disables line-l
 
 **`run_meta.csv`** (both standalone modes): `valuation_date` (R), `listing_threshold` (C mode: amount above which `claimants.csv` is complete; 0 = complete listing), `currency_basis` (R), `data_source_note` (O).
 
-### 2.3 ETE extension mode (`E`)
-Reads the payer-level outputs of the ete-dashboard pipeline (SPEC P7 names; the interim pipeline writes the same tables under `out/`). Mapping current as of ete-dashboard `side_tools/interim_pipeline`, 2026-10-14.
+### 2.3 ETE / Merit extension mode (`E`)
+Reads the **final outputs of Merit** (ete-dashboard `side_tools/merit`, v7: interim pipeline) or of the ETE engine
+**as they are written**: nothing in Merit changes; every further adjustment (trend, completion, limits, layers) happens
+in the XoL tool. Verified against Merit v7.0.2's synthetic outputs (`tests/test_merit.py`, fixture
+`tests/fixtures/merit_v7`).
 
-| Internal | ETE source | Rule |
+**Getting the files in:** `tools\import_merit.bat "<Merit output folder>"` copies `dim_life.csv`,
+`fact_member_month.csv`, `fact_claims.csv` and `run_manifest_claims.csv` from `<folder>\csv\` (v7 layout) or
+`<folder>\` into `data\input\ete\`. Set `source_mode = E`, then `run_pipeline.bat live 01c`.
+
+| XoL internal | Merit source | Rule |
 |---|---|---|
-| **claims_line** | `fact_claims` | Filter `InExperience = 1` and `StatusClass ∉ {Rejected}` |
-| claim_line_id | ClaimKey | |
-| claim_id | ClaimID | |
-| member_id | LifeKey | Payer \| TPA \| Policy \| Member, already normalised |
-| policy_id | PolKey | |
-| scheme_id | dim_life.`Master Contract ID` | Join on LifeKey |
-| treatment_date | TreatmentDate | |
-| reported_date | ReportedMonth | Month precision only; flagged in the run log |
-| paid_date | PaidMonth | Month precision only |
-| amount | PayerShare | Paid + OS at extract |
-| status | StatusClass | Paid / Outstanding / Reversed |
-| currency | dim_life.Currency | |
-| segment | Configurable: any dim_life attribute (default `Policy Type`) | |
-| event_id | x_EventID | When the engine supplies it (SPEC §8) |
-| admission_date, discharge_date | Admission Date, Discharge Date | When supplied (SPEC §8 optional fields) |
-| **members** | `dim_life` | One row per LifeKey (a repeated LifeKey stops the run: A14) |
-| policy_start | PolicyStart | RA cohort |
-| policy_end | PolicyEndAdj | |
-| cover_start / cover_end | CovStart / CovEnd | |
-| plan | `Plan / Category` | |
-| written_premium | WrittenPrem_Gross / _GrossNet / _Net | Basis chosen in Control (matches the gc-mr-powerbi toggle) |
-| **exposure** | `fact_member_month` | Used directly for earned LY and premium by month (no rebuild) |
-| earned_ly | EarnedLY_Gross / _Net | Zero-premium rule already applied by the engine |
-| earned_premium | EarnedPrem_* | |
-| valuation_date | run manifest extract date | |
-| *reference only* | `cf_selected`, `ultimates` | Portfolio CFs are shown next to the IBNR inputs as **reference**, with the large-claim caveat (D3); never applied automatically |
+| **members** | `dim_life.csv` | One row per **life-period: LifeKey × UWY** (a renewing life keeps one row per UWY; A14 stops only on a repeated LifeKey × UWY) |
+| member_id | LifeKey | Payer \| TPA \| policy \| member, normalised by Merit |
+| policy_id | PolKey \| UWY | The policy term |
+| scheme_id | Master Contract ID | Links renewals; per-event grouping |
+| policy_start / policy_end | PolicyStart / PolicyEndAdj | RA cohort |
+| cover_start / cover_end | CovStart / CovEnd | Blank on a life-period without cover (Merit "Void ab initio"): kept so its claims match, zero cover days, no exposure (A17 FLAG) |
+| plan | Plan / Category | Benefit limit looked up in the Control Limits sheet (Merit has no member-level limit) |
+| written_premium | WrittenPrem_Gross / _Net | `premium_basis` GROSS or NET (Merit has no GrossNet) |
+| segment | Any dim_life attribute (`segment_field`, default Policy Type) | |
+| currency | Currency | FX from the Control FX sheet |
+| **exposure** | `fact_member_month.csv` | Joined on LifeKey × UWY; earned life-years and premium for months up to the valuation date (Merit's zero-premium rule kept); written from dim_life |
+| **claims** | `fact_claims.csv` | `InExperience = 1`; StatusClass Paid / Outstanding (Rejected excluded); matched to members on **LifeKey × UWY** (≥ 95% or A03 stops) |
+| claim_line_id / claim_id | ClaimKey / ClaimID | |
+| amount | Paid + OS (payer share) | Merit's IBNR / IBNP ultimates (`UltimateAmount`, `cf_selected`, `ultimates`) are **not** used: the XoL completion factors apply |
+| treatment / reported / paid date | TreatmentDate / ReportedMonth / PaidMonth | Month precision for reported and paid |
+| event fields | — | Merit has none: per-event cover is priced from the EvScenarios sheet (`ev_freq_source = SCENARIOS`) |
+| **valuation date** | `run_manifest_claims.csv`, key `valuation_date` | Claims treated after it (the claims extract can run later) are **excluded and flagged** (A04 FLAG); exposure is earned to it |
+| **filters** | Payer Name, TPA | `ete_payer_filter`, `ete_tpa_filter` (comma lists; blank = all). Several payers left in a run: A16 FLAG per payer |
 
-Mix of TPAs: a payer-level ETE output can contain several TPAs. `TPA` is carried as an attribute, and a per-TPA filter is available in Control.
-
-Files and parameters (stage `01c_adapter_ete.yxmd`, folder `data/input/ete/`, synthetic `data/synthetic/ete/`):
-`dim_life.csv`, `fact_claims.csv`, `fact_member_month.csv` as exported by the ete pipeline, plus `run_meta.csv`
-(valuation_date, listing_threshold, currency_basis, data_source_note), which the ETE pipeline does not write.
-`ete_tpa_filter` (comma list, blank = all), `segment_field` (one of Policy Type, Plan / Category, TPA, Payer Name,
-Master Contract ID, Currency, UWY; default Policy Type) and `premium_basis` (GROSS / GROSSNET / NET) are Params.
-member_id = LifeKey; FX at the member's currency. Claim lines with `InExperience = 0` or `StatusClass = Rejected`
-are excluded and counted in `recon_01c.csv`. Member months of a LifeKey with no `dim_life` row (or outside the TPA
-filter) are excluded and flagged (A15).
+Merit's other outputs (`Merit_Extract`, `Merit_PNLR_Base`, `Merit_TreatyMetrics`, `ultimates`, `cf_selected`, recon and
+exceptions files) are not read. `cf_selected` can be shown next to the completion inputs as a reference (D3).
 
 ## 3. Internal schema (adapter output)
 
@@ -227,7 +218,7 @@ Every input block is an **Excel Table** (or a named range) with a fixed name, wh
 | group | param_id | Example |
 |---|---|---|
 | General | cedant, country, line, quote_ccy, fx_quote_to_usd, treaty_start, quote_year, run_label | — |
-| Mode | source_mode (L/C/E), input_folder, ete_tpa_filter, premium_basis (GROSS/GROSSNET/NET), segment_field | L |
+| Mode | source_mode (L/C/E), input_folder, ete_tpa_filter, ete_payer_filter, premium_basis (GROSS/GROSSNET/NET), segment_field | L |
 | Basis | treaty_basis (RA/LO), claims_trigger (INCURRED/PAID), paid_runoff_months, pp_accumulation (POLICY_YEAR/TREATY_YEAR) | RA |
 | Exposure | epi_quote_year, expected_lives_quote_year (blank = derive), history_years | — |
 | Data | output_threshold_pct_min_ap, policy_limit, years_included | 50% |
@@ -277,7 +268,7 @@ recalculates them without a re-run. Close the workbook in Excel before running s
 | A01 | Required columns present and typed | STOP |
 | A02 | cover_start ≤ cover_end; policy_start ≤ cover_start; cover_end ≤ policy_end | FLAG (rows listed) |
 | A03 | Claim member match rate ≥ 95% (L) | STOP below |
-| A04 | Treatment date ≤ valuation date | STOP |
+| A04 | Treatment date ≤ valuation date (ETE / Merit: later claims excluded, FLAG; Merit's claims extract can run past the valuation date) | STOP (FLAG in E) |
 | A05 | Treatment within the member's cover period | FLAG (out-of-cover amount ≤ 1%) |
 | A06 | Net amount per claim_id ≥ 0 after netting reversals | FLAG |
 | A07 | Currency present in `tbl_fx` | STOP |
@@ -287,8 +278,10 @@ recalculates them without a re-run. Close the workbook in Excel before running s
 | A11 | Claim status value not mapped (Paid / Outstanding / Rejected / Reversed, with common synonyms) | STOP |
 | A12 | Required date or amount blank or not ISO (row excluded) | STOP |
 | A13 | Claims whose member has no member record (excluded; listed by member) | FLAG |
-| A14 | ETE: LifeKey repeated in `dim_life` | STOP |
-| A15 | ETE: member months without a `dim_life` row (excluded; also outside the TPA filter) | FLAG |
+| A14 | ETE / Merit: life-period (LifeKey × UWY) repeated in `dim_life` | STOP |
+| A15 | ETE / Merit: member months without a `dim_life` life-period (excluded; also outside the payer / TPA filter) | FLAG |
+| A16 | ETE / Merit: several payers pooled in one run (one row per payer) | FLAG |
+| A17 | ETE / Merit: life-period without cover dates (void): kept for its claims, no exposure | FLAG |
 
 Matching (line mode): tier 1 on member_id + policy_id; tier 2 on member_id with treatment inside the cover period
 (latest cover wins). Each adapter also writes `recon_01a.csv` / `recon_01b.csv` / `recon_01c.csv`: rows in, rejected, unmatched, out,

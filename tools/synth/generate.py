@@ -6,7 +6,7 @@ Produces a fictional UAE group-medical portfolio in every input format the tool 
     data/synthetic/line/       members.csv, claims_lines.csv, run_meta.csv           (mode L)
     data/synthetic/claimant/   claimants.csv, exposure_monthly.csv,
                                claims_aggregate_monthly.csv, run_meta.csv            (mode C)
-    data/synthetic/ete/        fact_claims.csv, dim_life.csv, fact_member_month.csv  (mode E, 8-scheme sample)
+    data/synthetic/ete/        fact_claims.csv, dim_life.csv, fact_member_month.csv, run_manifest_claims.csv (mode E)
     data/templates/            header-only CSV templates for standalone users
     tests/reconciliation/      synthetic_controls.json (observed totals) and
                                synthetic_truth.json   (ultimate values incl. IBNR, unearned, unwritten)
@@ -448,8 +448,8 @@ def write_ete_sample(out: Path, mem_obs: pd.DataFrame, obs: pd.DataFrame, n_sche
         "OS": np.where(oc.status == "Outstanding", oc.amount, 0.0), "ICD Code": oc.icd_code,
     })
     fmt_dates(fc).to_csv(p / "fact_claims.csv", index=False)
-    (p / "run_meta.csv").write_text("valuation_date,listing_threshold,currency_basis,data_source_note\n"
-                                    f"{VAL.date().isoformat()},0,AED,ETE extract (synthetic)\n")
+    (p / "run_manifest_claims.csv").write_text(          # Merit's run manifest format (Key / Value)
+        "Key,Value\n"f"valuation_date,{VAL.date().isoformat()}\nclaims_extract_date,{VAL.date().isoformat()}\n")
 
 
 def write_templates(out: Path) -> None:
