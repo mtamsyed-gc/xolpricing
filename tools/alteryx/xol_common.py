@@ -36,7 +36,7 @@ LIVE = Variant("LIVE", ROOT / "alteryx/workflows", "..\\..\\", "data/input/XoL_C
                "data/input/line", "data/input/claimant", "data/output/live", "data/input/ete")
 SYNTH = Variant("SYNTH", ROOT / "alteryx/workflows/synth", "..\\..\\..\\", "data/synthetic/XoL_Control_synthetic.xlsx",
                 "data/synthetic/line", "data/synthetic/claimant", "data/output/synth", "data/synthetic/ete")
-VERSION = "0.6"          # tool version carried into the run log
+VERSION = "0.6.1"         # tool version carried into the run log
 VARIANTS = (LIVE, SYNTH)
 
 

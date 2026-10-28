@@ -8,7 +8,7 @@ loadings, and (C) cedant impact — recoveries vs premium and retained-claims vo
 **Excel** holds the inputs (Control workbook) and the loadings, cedant-impact exhibits and charts
 (Results workbook).
 
-> Status (0.6, 2026-10-22): all phases built — Control (00), adapters for line, claimant and ETE / Merit data (01a/b/c; Merit v7 final outputs read as written),
+> Status (0.6.1, 2026-10-28): all phases built — Control (00), adapters for line, claimant and ETE / Merit data (01a/b/c; Merit v7 final outputs read as written),
 > experience (02), per-person burning cost (03), severity candidates with the Python tool (04a) and simulation (04),
 > per-event XoL (05), stop loss and programme structures (06), Results workbook with pricing, C1, C2, expiring,
 > severity and scenarios (07). `tools\run_pipeline.bat` runs the chain with the Alteryx engine. Every workflow runs
