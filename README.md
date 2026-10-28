@@ -14,7 +14,7 @@ loadings, and (C) cedant impact — recoveries vs premium and retained-claims vo
 > severity and scenarios (07). `tools\run_pipeline.bat` runs the chain with the Alteryx engine. Every workflow runs
 > clean in Designer 2026.2 and matches the independent oracles exactly.
 > How to run: the illustrated [user manual](docs/manual/USER_MANUAL.md); developers: [`docs/RUNNING.md`](docs/RUNNING.md). Design: [`docs/scope.md`](docs/scope.md),
-> [`docs/data-contracts.md`](docs/data-contracts.md).
+> [`docs/data-contracts.md`](docs/data-contracts.md). Calculations: [`docs/XOL_MECHANICS.md`](docs/XOL_MECHANICS.md) (walkthrough with a worked example), [`docs/methodology.md`](docs/methodology.md) (formula reference by stage).
 
 ## Synthetic data
 
@@ -40,7 +40,7 @@ data/
   synthetic/      synthetic portfolio in every input mode: line/, claimant/, ete/ (committed)
   input/          real run inputs (git-ignored, never committed)
   output/         run outputs (git-ignored)
-docs/             scope.md, data-contracts.md, RUNNING.md, CHANGELOG.md
+docs/             scope.md, data-contracts.md, methodology.md, XOL_MECHANICS.md, RUNNING.md, CHANGELOG.md, manual/
 tools/alteryx/    workflow builders (build_all.py), xmlkit + strict simulator (vendored from ete-dashboard)
 tools/excel/      Control and Results workbook specs and builders
 tools/python/     sevfit.py: severity fitting, embedded in the 04a Python tool

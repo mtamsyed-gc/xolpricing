@@ -4,6 +4,7 @@ Methodology and data-contract changes, newest first.
 
 ## 2026-10-28 — 0.6.1: Merit v7.6.0 re-verified
 - Merit moved from v7.0.2 to v7.6.0 (contract IP4-10) since the fixture was built. Its changes are additive; the XoL tool reads columns by name, so the new `LifeID`, `ScopeStatus`, `ScopeRule`, `PayerShareCapped`, `PayerShareExcess` and the manifest's `contract_version` pass through unused. Fixture `tests/fixtures/merit_v7` rebuilt from the v7.6.0 synthetic outputs (totals unchanged; one empty member-month row no longer written); 00 → 01c → 02 and the Designer twin reconcile as before.
+- `docs/XOL_MECHANICS.md`: the calculations end to end (claim → unit → adjusted amount → layer loss → burning cost → severity fit → simulation → premium), with a worked example.
 - data-contracts §2.3: what Merit's scope register (EXCLUDE, CARVEOUT, RESHARE, CAP) does to the tables the XoL tool reads, and two open owner decisions (CAP → plan limits; STOP on an unknown `contract_version`).
 
 ## 2026-10-22 — 0.6: Merit outputs as an input
