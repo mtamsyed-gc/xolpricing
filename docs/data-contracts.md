@@ -108,8 +108,10 @@ For cedants who supply a large-claimant listing plus aggregates. Disables line-l
 ### 2.3 ETE / Merit extension mode (`E`)
 Reads the **final outputs of Merit** (ete-dashboard `side_tools/merit`, v7: interim pipeline) or of the ETE engine
 **as they are written**: nothing in Merit changes; every further adjustment (trend, completion, limits, layers) happens
-in the XoL tool. Verified against Merit v7.0.2's synthetic outputs (`tests/test_merit.py`, fixture
-`tests/fixtures/merit_v7`).
+in the XoL tool. Verified against Merit v7.6.0's synthetic outputs, contract IP4-10 (`tests/test_merit.py`, fixture
+`tests/fixtures/merit_v7`; first verified on v7.0.2, re-verified 2026-10-28). Columns are read by name, so Merit's
+additive changes pass through: `LifeID`, `ScopeStatus`, `ScopeRule`, `PayerShareCapped`, `PayerShareExcess` and the
+`contract_version` manifest key are present but not used (see the scope note below the table).
 
 **Getting the files in:** `tools\import_merit.bat "<Merit output folder>"` copies `dim_life.csv`,
 `fact_member_month.csv`, `fact_claims.csv` and `run_manifest_claims.csv` from `<folder>\csv\` (v7 layout) or
@@ -136,8 +138,18 @@ in the XoL tool. Verified against Merit v7.0.2's synthetic outputs (`tests/test_
 | **valuation date** | `run_manifest_claims.csv`, key `valuation_date` | Claims treated after it (the claims extract can run later) are **excluded and flagged** (A04 FLAG); exposure is earned to it |
 | **filters** | Payer Name, TPA | `ete_payer_filter`, `ete_tpa_filter` (comma lists; blank = all). Several payers left in a run: A16 FLAG per payer |
 
-Merit's other outputs (`Merit_Extract`, `Merit_PNLR_Base`, `Merit_TreatyMetrics`, `ultimates`, `cf_selected`, recon and
-exceptions files) are not read. `cf_selected` can be shown next to the completion inputs as a reference (D3).
+Merit's other outputs (`Merit_Extract`, `Merit_PNLR_Base`, `Merit_TreatyMetrics`, `ultimates`, `cf_selected`, recon,
+exceptions, diagnostics and the `*_excluded` twin tables) are not read. `cf_selected` can be shown next to the
+completion inputs as a reference (D3).
+
+**Merit's scope register (v7.6.0) and the XoL tool.** Merit applies its Control's scope rules before it writes the
+tables above, so they carry the consequences: rows an EXCLUDE rule (or the payer's row filter) removes are in the
+`*_excluded` twins, not in what the XoL tool reads; a CARVEOUT rule has already reduced the written and earned premium
+and excluded the benefit's claim lines; a RESHARE rule only changes `ReinsuredPct`, which the XoL tool does not use
+(gross basis). A CAP rule writes `PayerShareCapped` / `PayerShareExcess` per line; the XoL tool reads the actual
+`Paid` / `OS` and applies its own limits from the Control Limits sheet. The main tables carry `ScopeStatus = In scope`
+only. Open decisions (owner): whether a Merit CAP that reflects a real policy limit should feed `plan` limits, and
+whether to STOP on an unknown `contract_version` (known: IP4-10).
 
 ## 3. Internal schema (adapter output)
 

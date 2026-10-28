@@ -1,7 +1,7 @@
 """Merit v7 outputs into the XoL tool, read as written (contract test).
 
 Fixture: tests/fixtures/merit_v7 = Merit's synthetic final outputs (ete-dashboard side_tools/merit/out/alteryx/csv,
-v7.0.2) with company names replaced (tools/synth/merit_fixture.py); every row and column as Merit writes them.
+v7.6.0, contract IP4-10) with company names replaced (tools/synth/merit_fixture.py); every row and column as Merit writes them.
 Runs 00 -> 01c -> 02 in the simulator and checks against an independent pandas computation on the fixture:
   - members: one row per life-period (LifeKey x UWY; a life renewing into 2026 keeps two rows, no A14 stop);
   - claims: InExperience = 1, not rejected, treated on or before the manifest's valuation date, matched on

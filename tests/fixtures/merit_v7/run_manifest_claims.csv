@@ -2,7 +2,7 @@ Key,Value
 valuation_date,2026-07-30
 claims_extract_date,2026-08-31
 claims_workflow,Merit_03_Claims
-claims_workflow_version,IP3-0.14
+claims_workflow_version,IP3-0.20
 large_claim_threshold,100000
 has_claim_dob,0
 has_paid_date,1
@@ -10,3 +10,4 @@ has_reported_date,1
 has_icd,1
 has_provider,1
 has_fob,1
+contract_version,IP4-10
