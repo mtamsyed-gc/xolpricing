@@ -219,7 +219,10 @@ def compare(f) -> bool:
             and np.allclose(d.indicated_factor, s.indicated_factor, rtol=1e-9)
         print(f"{'PASS' if good else 'FAIL'}  {f} (Designer 2026.2 vs simulator)")
         return bool(good)
-    if f.startswith("checks") or f == "out_scenario_applied":
+    if f.startswith("checks"):
+        # 0.7.0 limit-source INFO records (A18 / A19) are new since Designer's stored run (0.6): compared without them
+        good = d.equals(s[~s.code.isin(["A18", "A19"])].reset_index(drop=True))
+    elif f == "out_scenario_applied":
         good = d.equals(s)
     else:
         m = d.merge(s, on=["stage", "table", "measure"], how="outer", suffixes=("_d", "_s"))
