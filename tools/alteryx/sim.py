@@ -1260,12 +1260,27 @@ def run(path, verbose=False, trace=None):
         o, d = c.find("Origin"), c.find("Destination")
         ins[d.get("ToolID")].append((d.get("Connection"), o.get("ToolID"), o.get("Connection"), c.get("name")))
     done, outputs, written = {}, {}, []
+    # XOL (0.7.0, Python route): a tool's output is released once every connection that reads it has been evaluated,
+    # so a full-size run (stage 04 at 10,000 iterations) fits a 16 GB laptop. Results are unchanged.
+    uses = {}
+    for k in ins:
+        for _a, o, _oa, _n in ins[k]:
+            uses[o] = uses.get(o, 0) + 1
+    RELEASED = object()
 
     def get(tid, anchor):
         if tid not in done:
             evaluate(tid)
         r = done[tid]
+        if r is RELEASED:
+            raise SimError(f"tool {tid}: output read after it was released")
         return r[anchor] if isinstance(r, dict) else r
+
+    def release(tid):
+        for _a, o, _oa, _n in ins[tid]:
+            uses[o] -= 1
+            if uses[o] == 0 and o in done:
+                done[o] = RELEASED
 
     def evaluate(tid):
         kind, cfg, node = nodes[tid]
@@ -1332,6 +1347,7 @@ def run(path, verbose=False, trace=None):
         except SimError as e:
             raise SimError(f"tool {tid} {kind} '{label}': {e}") from None
         done[tid] = res
+        release(tid)
         if verbose:
             t = res if isinstance(res, Table) else next(iter(res.values()))
             print(f"  {tid:>4} {kind:<16} {label[:40]:<40} {len(t.rows)}")

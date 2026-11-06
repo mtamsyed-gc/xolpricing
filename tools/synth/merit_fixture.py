@@ -65,9 +65,11 @@ def build(src: Path, out: Path) -> dict:
     return counts
 
 
-def test_control(src: Path, out: Path, payer: str = "") -> Path:
+def test_control(src: Path, out: Path, payer: str = "", extra: dict | None = None, limits: dict | None = None) -> Path:
     """A Control workbook for the fixture: the synthetic Control with source_mode E, treaty years 2025-2026, quote year
-    2027 (trend row added = 2026's) and the payer filter. Used by tests/test_merit.py and tools/check_merit.bat."""
+    2027 (trend row added = 2026's) and the payer filter. Used by tests/test_merit.py and tools/check_merit.bat.
+    extra: further Params values (e.g. default_benefit_limit); limits: {plan: annual limit} rows replacing the Limits
+    sheet's rows (0.7.0 limit tests)."""
     import shutil
     from openpyxl import load_workbook
     sys.path.insert(0, str(ROOT / "tools/excel"))
@@ -77,9 +79,18 @@ def test_control(src: Path, out: Path, payer: str = "") -> Path:
     ws = wb["Params"]
     vals = {"source_mode": "E", "quote_year": "2027", "years_included": "2025,2026", "treaty_start": "2026-01-01",
             "ete_payer_filter": payer or None, "ete_tpa_filter": None, "segment_field": "Policy Type"}
+    vals.update(extra or {})
     for r in range(5, ws.max_row + 1):
         if ws.cell(r, 1).value in vals:
             ws.cell(r, 3).value = vals[ws.cell(r, 1).value]
+    if limits is not None:
+        lm = wb["Limits"]
+        hdr = next(r for r in range(1, lm.max_row + 1) if lm.cell(r, 1).value == "plan")
+        for r in range(hdr + 1, lm.max_row + 1):
+            for c in range(1, lm.max_column + 1):
+                lm.cell(r, c).value = None
+        for i, (plan, amount) in enumerate(sorted(limits.items())):
+            lm.cell(hdr + 1 + i, 1).value, lm.cell(hdr + 1 + i, 2).value = plan, amount
     tr = wb["Trend"]
     last = tr.max_row
     for c in range(1, tr.max_column + 1):

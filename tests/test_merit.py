@@ -1,7 +1,8 @@
 """Merit v7 outputs into the XoL tool, read as written (contract test).
 
 Fixture: tests/fixtures/merit_v7 = Merit's synthetic final outputs (ete-dashboard side_tools/merit/out/alteryx/csv,
-v7.6.0, contract IP4-10) with company names replaced (tools/synth/merit_fixture.py); every row and column as Merit writes them.
+v8.0.9 to v8.0.11, contract IP4-13; rebuilt 2026-11-06) with company names replaced (tools/synth/merit_fixture.py); every row and column
+as Merit writes them. The Designer twin uses a frozen copy, tests/fixtures/merit_v7_twin.
 Runs 00 -> 01c -> 02 in the simulator and checks against an independent pandas computation on the fixture:
   - members: one row per life-period (LifeKey x UWY; a life renewing into 2026 keeps two rows, no A14 stop);
   - claims: InExperience = 1, not rejected, treated on or before the manifest's valuation date, matched on
@@ -49,10 +50,10 @@ def close(name, got, exp, tol=1e-9):
         print(f"  MISMATCH {name}: got {got} exp {exp}")
 
 
-def run(name, payer="", ete=None):
+def run(name, payer="", ete=None, extra=None, limits=None):
     out = ROOT / f"data/output/{name}"
     out.mkdir(parents=True, exist_ok=True)
-    ctl = merit_fixture.test_control(ROOT / C.SYNTH.control, out / f"XoL_Control_{name}.xlsx", payer)
+    ctl = merit_fixture.test_control(ROOT / C.SYNTH.control, out / f"XoL_Control_{name}.xlsx", payer, extra, limits)
     v = C.Variant(name.upper(), out / "wf", "..\\..\\..\\..\\", str(ctl.relative_to(ROOT)).replace("\\", "/"),
                   "data/synthetic/line", "data/synthetic/claimant", f"data/output/{name}",
                   str((ete or FIX).relative_to(ROOT)).replace("\\", "/"))
@@ -118,6 +119,53 @@ def fixture_current():
     ok(f"fixture = fresh build from Merit's outputs in ../ete-dashboard ({rev[:60]})", same)
 
 
+def limits():
+    """0.7.0 (owner 2026-11-06): a life's benefit limit is the data's own (Merit: a binding claimant CAP, whose capped
+    payer share adds up to the cap), else its plan's on the Limits sheet, else the Control's default_benefit_limit;
+    A18 / A19 count the lives on the data and on the default."""
+    d = ROOT / "data/output/tmerit_lim/ete"
+    d.mkdir(parents=True, exist_ok=True)
+    for f in merit_fixture.FILES:
+        shutil.copy(FIX / f"{f}.csv", d / f"{f}.csv")
+    fc = pd.read_csv(d / "fact_claims.csv", dtype=str, keep_default_na=False)
+    dl = pd.read_csv(d / "dim_life.csv", dtype=str, keep_default_na=False)
+    ps = pd.to_numeric(fc.PayerShare, errors="coerce").fillna(0)
+    life = fc.loc[ps > 0, ["LifeKey", "UWY"]].iloc[0]                       # a life-period with claims: its cap binds
+    on = (fc.LifeKey == life.LifeKey) & (fc.UWY == life.UWY)
+    fc["PayerShareCapped"] = ps.where(~on, ps * 0.5).map(lambda x: f"{x:.2f}")
+    fc["PayerShareExcess"] = (ps - ps.where(~on, ps * 0.5)).map(lambda x: f"{x:.2f}")
+    fc.to_csv(d / "fact_claims.csv", index=False, lineterminator="\n")
+    cap = pd.to_numeric(fc.loc[on, "PayerShareCapped"]).sum()
+    plan = "Plan T"                                                          # three other life-periods on their own plan
+    on_t = dl.index[dl.LifeKey != life.LifeKey][:3]
+    dl.loc[on_t, "Plan / Category"] = plan
+    dl.to_csv(d / "dim_life.csv", index=False, lineterminator="\n")
+    out = run("tmerit_lim", ete=d, extra={"default_benefit_limit": 250000}, limits={plan: 1000000})
+    mem = load(out, "int_members")
+    mem = mem.assign(fx=mem.written_premium_q / mem.written_premium.where(mem.written_premium != 0))
+    key = (mem.member_id == life.LifeKey.strip().upper()) & (mem.policy_id.str.endswith("|" + life.UWY.strip()))
+    fx = mem.loc[key, "fx"].dropna()
+    close("limit: a binding Merit CAP is the life-period's limit (capped payer share, in the quote currency)",
+          mem.loc[key, "annual_limit"].tolist(), [cap * (fx.iloc[0] if len(fx) else 1.0)])
+    on_plan = (mem.plan == plan) & ~key
+    ok(f"limit: plan '{plan}' takes its Limits row ({on_plan.sum()} life-periods)",
+       on_plan.any() and (mem.loc[on_plan, "annual_limit"] == 1000000).all())
+    rest = ~key & ~on_plan
+    ok(f"limit: every other life-period takes the default_benefit_limit ({rest.sum()})",
+       (mem.loc[rest, "annual_limit"] == 250000).all())
+    chk = pd.read_csv(out / "checks/checks_01c.csv")
+    a18, a19 = chk[chk.code == "A18"], chk[chk.code == "A19"]
+    ok("limit: A18 INFO counts 1 life-period on Merit's CAP",
+       len(a18) == 1 and (a18.severity == "INFO").all() and a18.message.iloc[0].startswith("1 life-periods"))
+    ok(f"limit: A19 INFO counts the {rest.sum()} life-periods on the default",
+       len(a19) == 1 and a19.message.iloc[0].startswith(f"{rest.sum()} life-periods"))
+    cl = load(out, "int_claims")
+    ok("limit: the life-period's claims carry its limit",
+       (cl.loc[cl.member_id == life.LifeKey.strip().upper(), "annual_limit"].round(2) == round(cap, 2)).any())
+    plain = pd.read_csv(ROOT / "data/output/tmerit/checks/checks_01c.csv")
+    ok("limit: no A18 / A19 when no cap binds and no default is set", not plain.code.isin(["A18", "A19"]).any())
+
+
 def main() -> int:
     fixture_current()
     e = oracle()
@@ -141,6 +189,7 @@ def main() -> int:
     chk2 = check(run("tmerit2", ete=late), e2, "claim after the valuation date")
     ok(f"late claim: excluded and flagged ({chk2[chk2.code == 'A04'].message.iloc[0][:60]}...)",
        len(e2["after"]) == 1 and (chk2.code == "A04").sum() == 1)
+    limits()
     ex = load(ROOT / "data/output/tmerit", "exp_exposure_ty")
     ok(f"stage 02 on Merit data: treaty years {sorted(ex.ty.unique())}", set(ex.ty) >= {2025, 2026})
     for n, good in results:

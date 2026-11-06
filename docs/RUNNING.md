@@ -51,19 +51,21 @@ adjustment is made in the XoL Control workbook.
 2. `tools\import_merit.bat "C:\Merit_Client\04_Outputs"` copies the four files the XoL tool reads into
    `data\input\ete\` (Merit's folder is not changed).
 3. Control workbook: `source_mode = E`; `ete_payer_filter` = the payer to price (Merit can hold several payers; A16
-   flags a pooled run); optionally `ete_tpa_filter`; `premium_basis` GROSS or NET; plan limits in the Limits sheet
-   (Merit has no member limits); completion factors as usual (Merit's IBNR ultimates are not used); per-event
+   flags a pooled run); optionally `ete_tpa_filter`; `premium_basis` GROSS or NET; benefit limits: a life-period
+   whose Merit CAP binds takes the cap, else its plan's limit on the Limits sheet, else `default_benefit_limit`
+   (Params; blank = no limit); completion factors as usual (Merit's IBNR ultimates are not used); per-event
    scenarios in EvScenarios (Merit has no event fields).
 4. `tools\run_pipeline.bat live 01c`.
 5. Read `checks_01c.csv`: A04 lists claims treated after the valuation date (excluded: Merit's claims extract can run
-   past it), A17 void life-periods that carry claims, A16 pooled payers.
+   past it), A17 void life-periods that carry claims, A16 pooled payers, A18 / A19 how many life-periods take their
+   limit from a Merit CAP / from the default.
 
 `tools\check_merit.bat` repeats the whole route on Merit's synthetic outputs (`tests\fixtures\merit_v7`) through the
 engine, with its own test Control, and removes its inputs afterwards.
 
 ## Running everything from the command line
 `tools\run_pipeline.bat` runs the workflows in order with `AlteryxEngineCmd.exe` (no Designer window), stops at the
-first error and logs to `data\output\<variant>\engine_run.log`. Double-click it for the synthetic data, or from cmd:
+first error and logs to `data\output\<variant>\engine_run.log`. Without Alteryx, see the Python route below. Double-click it for the synthetic data, or from cmd:
 
 ```
 tools\run_pipeline.bat synth 01a        (default)
@@ -74,6 +76,34 @@ tools\run_pipeline.bat live 01c 00 02   stop after 02 (fourth argument: last sta
 
 The synthetic chain takes about 25 seconds on the owner's laptop (Designer 2026.2 engine, 2026-10-14). Exit codes:
 0 ok, 1 warnings, 2 errors (a STOP check is an error).
+
+## Running without Alteryx (Python route, 0.7.0)
+`tools\run_pipeline_python.bat` (or `py tools\run_python.py`) runs the same committed workflows in Python, with the
+same arguments, input files and output files as `run_pipeline.bat`:
+
+```
+tools\run_pipeline_python.bat synth 01a        (default)
+tools\run_pipeline_python.bat live 01c         live data, Merit adapter
+tools\run_pipeline_python.bat live 01c 00 04   stages 00 to 04 only
+```
+
+It executes each `.yxmd` in `tools/alteryx/sim.py`, the strict executor that the test suite checks against Designer's
+own runs (`tests/test_designer_twin.py`; the Python route's synthetic outputs of stages 00 to 06 equal Designer's
+stored run, and both routes' Results workbooks pass the same exhibit checks), stops at the first workflow that ends with an error
+(a STOP check is an error) and logs to `data\output\<variant>\python_run.log`. Exit codes: 0 ok, 2 stopped or bad
+arguments.
+
+- **Setup:** Python 3.12 or later with `requirements-native.txt`, installed once in a normal PowerShell window:
+  `py -m pip install -r requirements-native.txt` (scipy is needed for stage 04a only).
+- **One route per run:** the stage files (`stage/*.yxdb`) one route writes cannot be read by the other. A run that
+  starts after stage 00 needs stage 00 of the same variant to have run on the same route (`stage/ENGINE.txt`);
+  otherwise it stops and asks to start from 00.
+- **Time and memory:** the synthetic chain at 10,000 iterations takes about 5½ minutes (stage 04 about 3 minutes,
+  stage 07 1½) and peaks at about 13 GB of memory (the executor holds rows as Python objects; measured 2026-11-06 in
+  the build container). That fits the owner's laptop (63.5 GB). On a 16 GB laptop close other programs, or set
+  `iterations` to 2,000–5,000 for a working run and keep 10,000 for the final run on a larger machine or in Alteryx.
+- Stage 04a's fitted parameters can differ from Designer's in the fifth or sixth significant figure (scipy version);
+  the selection and the severity grid are the same.
 
 ## The Results workbook
 Open `data/output/<variant>/XoL_Results.xlsx` after stage 07. Excel recalculates on opening. **Inputs** sets the

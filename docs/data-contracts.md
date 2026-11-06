@@ -36,7 +36,7 @@ Full claim-line data plus member-level exposure. Enables every stage.
 | policy_end | date | R | Inclusive |
 | cover_start | date | R | Member cover start (≥ policy_start for joiners) |
 | cover_end | date | R | Member cover end, inclusive (≤ policy_end for leavers) |
-| plan | text | O | Plan / category; drives the benefit limit lookup if `annual_limit` is blank |
+| plan | text | O | Plan / category; drives the benefit limit lookup if `annual_limit` is blank (then `default_benefit_limit`) |
 | annual_limit | number | O | Per-member annual benefit limit, in currency |
 | segment | text | O | Free segmentation field (line, country, product); a mix-risk check runs on it |
 | site | text | O | Location / worksite; per-event concentration and clustering |
@@ -108,10 +108,10 @@ For cedants who supply a large-claimant listing plus aggregates. Disables line-l
 ### 2.3 ETE / Merit extension mode (`E`)
 Reads the **final outputs of Merit** (ete-dashboard `side_tools/merit`, v7: interim pipeline) or of the ETE engine
 **as they are written**: nothing in Merit changes; every further adjustment (trend, completion, limits, layers) happens
-in the XoL tool. Verified against Merit v7.6.0's synthetic outputs, contract IP4-10 (`tests/test_merit.py`, fixture
-`tests/fixtures/merit_v7`; first verified on v7.0.2, re-verified 2026-10-28). Columns are read by name, so Merit's
-additive changes pass through: `LifeID`, `ScopeStatus`, `ScopeRule`, `PayerShareCapped`, `PayerShareExcess` and the
-`contract_version` manifest key are present but not used (see the scope note below the table).
+in the XoL tool. Verified against Merit v8.0.11's synthetic outputs, contract IP4-13 (`tests/test_merit.py`, fixture
+`tests/fixtures/merit_v7`, rebuilt 2026-11-06; first verified on v7.0.2). Columns are read by name, so Merit's
+additive changes pass through: `LifeID`, `ScopeStatus`, `ScopeRule` and the `contract_version` manifest key are present
+but not used. `PayerShareCapped` / `PayerShareExcess` feed the benefit limit (0.7.0; see the scope note below the table).
 
 **Getting the files in:** `tools\import_merit.bat "<Merit output folder>"` copies `dim_life.csv`,
 `fact_member_month.csv`, `fact_claims.csv` and `run_manifest_claims.csv` from `<folder>\csv\` (v7 layout) or
@@ -125,7 +125,8 @@ additive changes pass through: `LifeID`, `ScopeStatus`, `ScopeRule`, `PayerShare
 | scheme_id | Master Contract ID | Links renewals; per-event grouping |
 | policy_start / policy_end | PolicyStart / PolicyEndAdj | RA cohort |
 | cover_start / cover_end | CovStart / CovEnd | Blank on a life-period without cover (Merit "Void ab initio"): kept so its claims match, zero cover days, no exposure (A17 FLAG) |
-| plan | Plan / Category | Benefit limit looked up in the Control Limits sheet (Merit has no member-level limit) |
+| annual_limit | `fact_claims` PayerShareCapped / PayerShareExcess, then Plan / Category | In this order (0.7.0): a binding Merit CAP on the life-period (Σ PayerShareCapped where Σ PayerShareExcess > 0); else the plan's limit on the Control Limits sheet; else `default_benefit_limit`; else none. A18 / A19 INFO count the life-periods on the CAP and on the default |
+| plan | Plan / Category | Key of the Limits sheet lookup |
 | written_premium | WrittenPrem_Gross / _Net | `premium_basis` GROSS or NET (Merit has no GrossNet) |
 | segment | Any dim_life attribute (`segment_field`, default Policy Type) | |
 | currency | Currency | FX from the Control FX sheet |
@@ -146,10 +147,14 @@ completion inputs as a reference (D3).
 tables above, so they carry the consequences: rows an EXCLUDE rule (or the payer's row filter) removes are in the
 `*_excluded` twins, not in what the XoL tool reads; a CARVEOUT rule has already reduced the written and earned premium
 and excluded the benefit's claim lines; a RESHARE rule only changes `ReinsuredPct`, which the XoL tool does not use
-(gross basis). A CAP rule writes `PayerShareCapped` / `PayerShareExcess` per line; the XoL tool reads the actual
-`Paid` / `OS` and applies its own limits from the Control Limits sheet. The main tables carry `ScopeStatus = In scope`
-only. Open decisions (owner): whether a Merit CAP that reflects a real policy limit should feed `plan` limits, and
-whether to STOP on an unknown `contract_version` (known: IP4-10).
+(gross basis). A CAP rule writes `PayerShareCapped` / `PayerShareExcess` per line. Owner decision (2026-11-06): the
+data's own limit feeds the benefit limit where it is available, else a global limit the user sets. Merit does not
+write the cap's amount, but where a cap binds on a life-period (Σ `PayerShareExcess` > 0) the life-period's
+Σ `PayerShareCapped` equals it, so that sum becomes the life-period's `annual_limit` (quote currency at the priced
+rate). A cap that never binds cannot be seen in the outputs; those life-periods take the plan's limit, then
+`default_benefit_limit`. The amounts the XoL tool prices stay the actual `Paid` / `OS`: the limit is applied by its
+own capping (stage 03, methodology §6). The main tables carry `ScopeStatus = In scope` only. Still open (owner):
+whether to STOP on an unknown `contract_version` (known: IP4-10 to IP4-13).
 
 ## 3. Internal schema (adapter output)
 
@@ -168,7 +173,7 @@ Every adapter writes exactly these tables, and everything downstream reads only 
 | amount_paid_q, amount_os_q | number | Quote currency at the priced rate |
 | currency, fx_rate | text / number | Transaction currency and the priced rate applied |
 | status | text | Mapped class |
-| annual_limit | number | From the claim, the member, or the plan lookup |
+| annual_limit | number | From the data (claim, member or Merit CAP), else the plan lookup, else `default_benefit_limit` |
 | segment, site, event_id, cause_code | text | |
 | source_mode | text | L / C / E |
 | source_file, source_row | text / int | Lineage |
@@ -233,7 +238,7 @@ Every input block is an **Excel Table** (or a named range) with a fixed name, wh
 | Mode | source_mode (L/C/E), input_folder, ete_tpa_filter, ete_payer_filter, premium_basis (GROSS/GROSSNET/NET), segment_field | L |
 | Basis | treaty_basis (RA/LO), claims_trigger (INCURRED/PAID), paid_runoff_months, pp_accumulation (POLICY_YEAR/TREATY_YEAR) | RA |
 | Exposure | epi_quote_year, expected_lives_quote_year (blank = derive), history_years | — |
-| Data | output_threshold_pct_min_ap, policy_limit, years_included | 50% |
+| Data | output_threshold_pct_min_ap, policy_limit, default_benefit_limit (0.7.0: benefit limit for a life with none in the data or on the Limits sheet; blank = no limit), years_included | 50% |
 | Outliers | outlier_method (VALUE/IQR), outlier_value, iqr_multiplier | IQR, 1.5 |
 | Credibility | full_cred_n, complement_source (STOCHASTIC/BENCHMARK/EXPIRING), benchmark_rate | 64 |
 | Incidence | incidence_adj | 1.00 |
@@ -294,6 +299,8 @@ recalculates them without a re-run. Close the workbook in Excel before running s
 | A15 | ETE / Merit: member months without a `dim_life` life-period (excluded; also outside the payer / TPA filter) | FLAG |
 | A16 | ETE / Merit: several payers pooled in one run (one row per payer) | FLAG |
 | A17 | ETE / Merit: life-period without cover dates (void): kept for its claims, no exposure | FLAG |
+| A18 | Members / claimants / life-periods whose benefit limit comes from the data (`annual_limit`; Merit: a binding CAP), counted (0.7.0) | INFO |
+| A19 | Members / claimants / life-periods whose benefit limit is the Control's `default_benefit_limit` (no limit in the data or on the Limits sheet), counted (0.7.0) | INFO |
 
 Matching (line mode): tier 1 on member_id + policy_id; tier 2 on member_id with treatment inside the cover period
 (latest cover wins). Each adapter also writes `recon_01a.csv` / `recon_01b.csv` / `recon_01c.csv`: rows in, rejected, unmatched, out,

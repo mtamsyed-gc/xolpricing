@@ -57,7 +57,7 @@ CONTRACT_COLS = {
     "fact_claims": ["ClaimKey", "Payer Name", "TPA", "UWY", "LifeKey", "PolKey", "MemKey", "ClaimID", "MatchStatus",
                     "InCover", "InExperience", "StatusClass", "TreatmentDate", "IncurredMonth", "ReportedMonth",
                     "PaidMonth", "PayerShare", "Paid", "OS", "ICD Code", "x_EventID", "Admission Date",
-                    "Discharge Date"],
+                    "Discharge Date", "PayerShareCapped", "PayerShareExcess"],
     "fact_member_month": ["LifeKey", "UWY", "Payer Name", "TPA", "MonthStart", "EarnedDays", "EarnedLY_Gross",
                           "EarnedLY_Net", "EarnedPrem_Gross", "EarnedPrem_Net"],
 }
@@ -71,6 +71,17 @@ def read_contract_csv(wf, path, file_label, required, checks, stage_no):
     required_columns(wf, raw, required, file_label, checks, stage_no)
     tpl = wf.text_input(CONTRACT_COLS[file_label], [], label=f"{file_label}: contract columns")
     return raw, wf.union([raw, tpl], label=f"{file_label} + contract columns", differ="Ignore")
+
+
+def limit_source_checks(wf, src, checks, stage_no, unit, feed_label):
+    """0.7.0: one INFO record per limit source that occurs - A18 the data's own limit (feed_label), A19 the Control's
+    default_benefit_limit - so a run shows where its benefit limits came from. Nothing is written when neither occurs."""
+    for code, src_val, what in (("A18", "DATA", feed_label), ("A19", "DEFAULT", "the default_benefit_limit (Control)")):
+        hit, _ = wf.filter(src, f'[lim_src] = "{src_val}"', label=f"{code} limit from {src_val.lower()}")
+        hit = wf.formula(hit, [("kls", X.INT, "1")], label=f"{code} key")
+        n = wf.summarize(hit, [("kls", "GroupBy", "kls"), ("kls", "Count", "n_ls")], label=f"{code} count")
+        checks.append(C.check_formula(wf, n, stage_no, code, "INFO", X.lit("benefit limits"),
+                                      f'ToString([n_ls]) + " {unit} take the benefit limit from {what}"'))
 
 
 def required_columns(wf, src, cols, file_label, checks, stage_no):
@@ -215,9 +226,16 @@ def build_line(v):
     memfx = apply_fx(wf, mem_ok, "currency", checks, sn, '"members currency " + [currency]', "members")
     jl = wf.join(memfx, lim, ["plan"], ["lim_plan"], label="plan limit lookup")
     mem2 = wf.union([jl["J"], jl["L"]], label="members (limit lookup left join)", differ="Ignore")
+    mem2 = C.append(wf, wf.formula(mem2, [("kd", X.INT, "1")], label="key"),
+                    C.params_stream(wf, v, ["default_benefit_limit"], key="kd2", label="default limit"), "kd", "kd2",
+                    "+ default benefit limit")
+    mem2 = wf.formula(mem2, [("lim_src", X.STR, 'IIF(!IsNull([limit_in]), "DATA", IIF(!IsNull([plan_limit_q]), "PLAN", '
+                                                'IIF(!IsNull([p_default_benefit_limit]), "DEFAULT", "NONE")))')],
+                      label="limit source")
+    limit_source_checks(wf, mem2, checks, sn, "members", "members.csv annual_limit")
     mem2 = wf.formula(mem2, [
         ("annual_limit", X.DBL, "IIF(!IsNull([limit_in]), [limit_in] * [fx_rate], "
-                                "IIF(IsNull([plan_limit_q]), Null(), [plan_limit_q]))"),
+                                "IIF(!IsNull([plan_limit_q]), [plan_limit_q], [p_default_benefit_limit]))"),
         ("cohort_month", X.DATE, MS("[policy_start]")),
         ("cov_days", X.INT, X.ddiff("[cover_end]", "[cover_start]") + " + 1"),
         ("written_premium_q", X.DBL, "[written_premium] * [fx_rate]"), ("k", X.INT, "1")],
@@ -388,6 +406,12 @@ def build_claimant(v):
     checks.append(C.check_formula(wf, bad, sn, "A12", "STOP", '"claimants row " + ToString([src_row])',
                                   '"blank or non-ISO period date, or blank amount (row excluded)"'))
     cfx = apply_fx(wf, c, "c_ccy", checks, sn, '"claimants currency " + [c_ccy]', "claimants")
+    cfx = C.append(wf, wf.formula(cfx, [("kd", X.INT, "1")], label="key"),
+                   C.params_stream(wf, v, ["default_benefit_limit"], key="kd2", label="default limit"), "kd", "kd2",
+                   "+ default benefit limit")
+    cfx = wf.formula(cfx, [("lim_src", X.STR, 'IIF(!IsNull([lim]), "DATA", IIF(!IsNull([p_default_benefit_limit]), '
+                                              '"DEFAULT", "NONE"))')], label="limit source")
+    limit_source_checks(wf, cfx, checks, sn, "claimants", "claimants.csv annual_limit")
     ic = wf.formula(cfx, [
         ("claim_key", X.STR, '[c_member] + "|" + DateTimeFormat([ps], "%Y-%m-%d")'),
         ("claim_id", X.STR, "[claim_key]"), ("member_id", X.STR, "[c_member]"), ("policy_id", X.STR, "Null()"),
@@ -398,7 +422,8 @@ def build_claimant(v):
         ("amount_paid", X.DBL, "[pa]"), ("amount_os", X.DBL, "[oa]"),
         ("amount_paid_q", X.DBL, "[pa] * [fx_rate]"), ("amount_os_q", X.DBL, "[oa] * [fx_rate]"),
         ("currency", X.STR, "[c_ccy]"), ("status", X.STR, '"CLAIMANT"'),
-        ("annual_limit", X.DBL, "IIF(IsNull([lim]), Null(), [lim] * [fx_rate])"), ("segment", X.STR, "[c_seg]"),
+        ("annual_limit", X.DBL, "IIF(IsNull([lim]), [p_default_benefit_limit], [lim] * [fx_rate])"),
+        ("segment", X.STR, "[c_seg]"),
         ("site", X.STR, "[c_site]"), ("event_id", X.STR, "[c_event]"), ("cause_code", X.STR, "Null()"),
         ("grain", X.STR, '"CLAIMANT"'), ("source_mode", X.STR, '"C"'), ("source_file", X.STR, '"claimants.csv"'),
         ("source_row", X.INT64, "[src_row]")], label="int_claims fields")
@@ -540,7 +565,8 @@ def build_ete(v):
     lim = wf.input_yxdb(C.stage(v, "ctl_limits"), label="ctl_limits (stage 00)")
     lim = wf.select(lim, keep=["plan", "annual_limit"], rename={"plan": "lim_plan", "annual_limit": "plan_limit_q"},
                     keep_unknown=False, label="plan limits")
-    par = C.params_stream(wf, v, ["premium_basis", "segment_field", "ete_tpa_filter", "ete_payer_filter"], key="kp",
+    par = C.params_stream(wf, v, ["premium_basis", "segment_field", "ete_tpa_filter", "ete_payer_filter",
+                                  "default_benefit_limit"], key="kp",
                           label="mode parameters")
     par = wf.formula(par, [("tpa_f", X.STR, 'IIF(IsNull([p_ete_tpa_filter]), "", Uppercase(Replace([p_ete_tpa_filter], '
                                             '" ", "")))'),
@@ -588,7 +614,7 @@ def build_ete(v):
     _, mem = wf.filter(mem, f"!({tpa_ok})", label="payer / TPA filter (excluded)")
     mem = wf.select(mem, keep=["member_id_t", "uwy_k", "policy_id_t", "scheme_id_t", "policy_start_d", "policy_end_d",
                                "cover_start_d", "cover_end_d", "plan_t", "segment_t", "currency_t", "wp", "gn_ratio",
-                               "basis", "tpa_k", "payer_k", "nocov", "src_row"],
+                               "basis", "tpa_k", "payer_k", "nocov", "src_row", "p_default_benefit_limit"],
                     rename={"member_id_t": "member_id", "policy_id_t": "policy_id", "scheme_id_t": "scheme_id",
                             "policy_start_d": "policy_start", "policy_end_d": "policy_end",
                             "cover_start_d": "cover_start", "cover_end_d": "cover_end", "plan_t": "plan",
@@ -618,14 +644,35 @@ def build_ete(v):
                                   '"one of " + ToString([n_payers]) + " payers pooled in this run: set '
                                   'ete_payer_filter to price one payer"'))
     memfx = apply_fx(wf, mem_ok, "currency", checks, sn, '"dim_life currency " + [currency]', "members")
-    jl = wf.join(memfx, lim, ["plan"], ["lim_plan"], label="plan limit lookup")
+    # 0.7.0 (owner 2026-11-06): the data's own limit first. Merit's scope register can CAP a claimant; its outputs do not
+    # carry the cap's amount, but where the cap binds (PayerShareExcess > 0 on the life-period's lines) the life-period's
+    # capped payer share adds up to it exactly. A cap that never binds cannot be seen: plan limit, then the default.
+    capr = wf.input_csv(v.p(f"{v.ete_dir}/fact_claims.csv"), label="fact_claims.csv (claimant CAP)")
+    capt = wf.text_input(["LifeKey", "UWY", "PayerShareCapped", "PayerShareExcess"], [], label="CAP columns")
+    cap = wf.union([capr, capt], label="fact_claims + CAP columns", differ="Ignore")
+    cap = wf.formula(cap, [("cap_member", X.STR, "Uppercase(Trim([LifeKey]))"), ("cap_uwy", X.STR, "Trim([UWY])"),
+                           ("psc", X.DBL, f"IIF(IsNull({num('PayerShareCapped')}), 0, {num('PayerShareCapped')})"),
+                           ("pse", X.DBL, f"IIF(IsNull({num('PayerShareExcess')}), 0, {num('PayerShareExcess')})")],
+                     label="capped and excess payer share")
+    cap = wf.summarize(cap, [("cap_member", "GroupBy", "cap_member"), ("cap_uwy", "GroupBy", "cap_uwy"),
+                             ("psc", "Sum", "cap_capped"), ("pse", "Sum", "cap_excess")], label="per life-period")
+    cap, _ = wf.filter(cap, "[cap_excess] > 0", label="cap binds")
+    cap = wf.select(cap, keep=["cap_member", "cap_uwy", "cap_capped"], keep_unknown=False, label="binding caps")
+    jc = wf.join(memfx, cap, ["member_id", "uwy_k"], ["cap_member", "cap_uwy"], label="claimant CAP lookup")
+    memc = wf.union([jc["J"], jc["L"]], label="members (CAP lookup left join)", differ="Ignore")
+    jl = wf.join(memc, lim, ["plan"], ["lim_plan"], label="plan limit lookup")
     mem2 = wf.union([jl["J"], jl["L"]], label="members (limit lookup left join)", differ="Ignore")
+    mem2 = wf.formula(mem2, [("lim_src", X.STR, 'IIF(!IsNull([cap_capped]), "DATA", IIF(!IsNull([plan_limit_q]), '
+                                                '"PLAN", IIF(!IsNull([p_default_benefit_limit]), "DEFAULT", "NONE")))')],
+                      label="limit source")
+    limit_source_checks(wf, mem2, checks, sn, "life-periods", "Merit's binding claimant CAP")
     mem2 = wf.formula(mem2, [
-        ("annual_limit", X.DBL, "IIF(IsNull([plan_limit_q]), Null(), [plan_limit_q])"), ("site", X.STR, "Null()"),
+        ("annual_limit", X.DBL, "IIF(!IsNull([cap_capped]), [cap_capped] * [fx_rate], IIF(!IsNull([plan_limit_q]), "
+                                "[plan_limit_q], [p_default_benefit_limit]))"), ("site", X.STR, "Null()"),
         ("cohort_month", X.DATE, MS("[policy_start]")),
         ("cov_days", X.INT, "IIF([nocov], 0, " + X.ddiff("[cover_end]", "[cover_start]") + " + 1)"),
         ("written_premium_q", X.DBL, "[written_premium] * [fx_rate]"), ("k", X.INT, "1")],
-        label="limit (plan lookup), cohort, days")
+        label="limit (CAP, plan, default), cohort, days")
     int_members = wf.select(mem2, keep=["member_id", "policy_id", "scheme_id", "policy_start", "policy_end",
                                         "cover_start", "cover_end", "plan", "annual_limit", "segment", "site",
                                         "currency", "written_premium", "written_premium_q", "cohort_month",

@@ -1,6 +1,6 @@
 # Mechanics of the XoL calculations
 
-XoL pricing tool 0.6.1 · 2026-10-28. This document follows one claim from the cedant's file to the reinsurance premium
+XoL pricing tool 0.7.0 · 2026-11-06. This document follows one claim from the cedant's file to the reinsurance premium
 and shows every calculation on the way, in the order the tool performs it. It is the "how" behind `docs/methodology.md`
 (the formula reference, organised by stage) and `docs/data-contracts.md` (the columns). Everything here is what the
 code does: `tools/alteryx/build_stage00.py` … `build_stage07.py` and `tools/excel/build_results.py`, each re-implemented
@@ -84,7 +84,8 @@ tool therefore sums claim lines into **units**:
 
 For each unit: `amount` = Σ paid + Σ outstanding (reversals net within their `claim_id`; rejected lines are
 dropped), `n_lines`, the first treatment date, and the **benefit limit** = the largest annual limit among its lines
-(from `annual_limit`, else the plan's limit in the Control Limits sheet; unknown = no cap).
+(from the data's `annual_limit` — for Merit data, a binding claimant CAP — else the plan's limit in the Control Limits
+sheet, else the Control's `default_benefit_limit`; none of these = no cap).
 
 Units whose TY is outside `years_included` are dropped and reconciled in `recon_02` (rows and amounts in = out +
 excluded).

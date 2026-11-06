@@ -158,7 +158,69 @@ def broken_line():
     return codes
 
 
+def default_limit():
+    """0.7.0: with no Limits rows and a default_benefit_limit, a member (01a) or claimant (01b) without its own
+    annual_limit takes the default; one with its own keeps it; A19 counts the default ones."""
+    import csv
+    import shutil
+    from openpyxl import load_workbook
+    sys.path.insert(0, str(ROOT / "tools/excel"))
+    import xlsx_norm
+    out = ROOT / "data/output/tdef"
+    out.mkdir(parents=True, exist_ok=True)
+    ctl = out / "XoL_Control_tdef.xlsx"
+    shutil.copy(ROOT / C.SYNTH.control, ctl)
+    wb = load_workbook(ctl)
+    ws = wb["Params"]
+    for r in range(5, ws.max_row + 1):
+        if ws.cell(r, 1).value == "default_benefit_limit":
+            ws.cell(r, 3).value = 300000
+    lm = wb["Limits"]
+    hdr = next(r for r in range(1, lm.max_row + 1) if lm.cell(r, 1).value == "plan")
+    for r in range(hdr + 1, lm.max_row + 1):
+        for c in range(1, lm.max_column + 1):
+            lm.cell(r, c).value = None
+    wb.save(ctl)
+    xlsx_norm.normalise(ctl)
+    for mode, f in (("line", "members.csv"), ("claimant", "claimants.csv")):   # 50 rows lose their own limit
+        (out / mode).mkdir(exist_ok=True)
+        for g in (SYN / mode).glob("*.csv"):
+            shutil.copy(g, out / mode / g.name)
+        df = pd.read_csv(SYN / mode / f, dtype=str, keep_default_na=False)
+        df.loc[df.index[:50], "annual_limit"] = ""
+        df.to_csv(out / mode / f, index=False, lineterminator="\n")
+    v = C.Variant("TDEF", out / "wf", "..\\..\\..\\..\\", str(ctl.relative_to(ROOT)).replace("\\", "/"),
+                  "data/output/tdef/line", "data/output/tdef/claimant", "data/output/tdef")
+    sim.run(build_stage00.build(v))
+    sim.run(build_stage01.build_line(v))
+    with open(out / "stage/int_members.yxdb", "rb") as f:
+        fields, rows = pickle.load(f)
+    mem = pd.DataFrame(rows, columns=list(fields))
+    raw = pd.read_csv(out / "line/members.csv", dtype=str, keep_default_na=False)
+    n_blank = int((raw.annual_limit.str.strip() == "").sum())                 # rows: a member can have several
+    dflt = mem[mem.annual_limit == 300000]
+    results.append((f"L default limit: the {n_blank} member rows without their own limit take 300,000",
+                    n_blank == 50 and len(mem) == len(raw) and len(dflt) == n_blank))
+    results.append(("L default limit: member rows with their own limit keep it", mem.annual_limit.notna().all()))
+    chk = list(csv.DictReader(open(out / "checks/checks_01a.csv", encoding="utf-8")))
+    a19 = [r for r in chk if r["code"] == "A19"]
+    results.append(("L default limit: A19 INFO counts them", len(a19) == 1 and a19[0]["severity"] == "INFO" and
+                    a19[0]["message"].startswith(f"{n_blank} members")))
+    sim.run(build_stage01.build_claimant(v))
+    with open(out / "stage/int_claims.yxdb", "rb") as f:
+        fields, rows = pickle.load(f)
+    cl = pd.DataFrame(rows, columns=list(fields))
+    rc = pd.read_csv(out / "claimant/claimants.csv", dtype=str, keep_default_na=False)
+    n_blank = int((rc.annual_limit.str.strip() == "").sum())
+    results.append((f"C default limit: {n_blank} claimants without a limit take 300,000",
+                    n_blank == 50 and int((cl.annual_limit == 300000).sum()) >= n_blank and cl.annual_limit.notna().all()))
+    chk = list(csv.DictReader(open(out / "checks/checks_01b.csv", encoding="utf-8")))
+    a19 = [r for r in chk if r["code"] == "A19"]
+    results.append(("C default limit: A19 INFO", (len(a19) == 1) == (n_blank > 0)))
+
+
 def main() -> int:
+    default_limit()
     sim.run(build_stage00.build(C.SYNTH))
     sim.run(build_stage01.build_line(C.SYNTH))
     results.append(("L no STOP errors", not errors()))

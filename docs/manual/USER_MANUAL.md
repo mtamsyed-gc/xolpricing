@@ -1,6 +1,6 @@
 # XoL Pricing Tool — user manual
 
-Version 0.6 · 22 October 2026 · screenshots taken on the owner's laptop (Windows 11, Alteryx Designer 2026.2,
+Version 0.7 · 6 November 2026 · screenshots (of 0.6, 22 October 2026) taken on the owner's laptop (Windows 11, Alteryx Designer 2026.2,
 Excel 365) during a full run on the synthetic portfolio.
 
 The tool prices excess-of-loss reinsurance on a medical portfolio for the broker: expected claims cost per layer,
@@ -17,6 +17,7 @@ work and simulation run in Alteryx; the assumptions and the exhibits live in Exc
 | The tool folder | `C:\Users\<you>\Documents\xolpricing` (any folder works; keep the structure) | From the release zip or `git clone`. Keep the path short and local (not OneDrive). |
 | Alteryx Designer | installed per user, 2025.2 or later | The engine (`AlteryxEngineCmd.exe`) runs the workflows without opening Designer. |
 | Python in Designer | Designer's own Python environment with numpy, pandas, scipy | Needed by one step (04a, severity fitting). Without it, set `severity_source = NATIVE` and skip 04a. |
+| Python (optional) | Python 3.12 or later, installed per user, with `requirements-native.txt` | Runs the whole chain **without Alteryx** (section 5.1). Install once in a normal PowerShell window: `py -m pip install -r requirements-native.txt`. |
 | Excel | 2016 or later | Control workbook (inputs) and Results workbook (exhibits). No macros. |
 
 The folder:
@@ -42,6 +43,7 @@ The `tools` folder:
 | `run_pipeline.bat` | Runs the workflows in order through the Alteryx engine (section 5) |
 | `import_merit.bat` | Copies Merit's outputs into the tool's input folder (section 3.3) |
 | `check_merit.bat` | Self-test of the Merit route on built-in synthetic data (section 7) |
+| `run_pipeline_python.bat` | Runs the same workflows in Python, without Alteryx (section 5.1) |
 
 ---
 
@@ -135,7 +137,7 @@ What the tool does with Merit's data:
 | One row per life per underwriting year | Kept as such: a renewing member has one row per year |
 | Valuation date in the run manifest | Used as the valuation date. Claims treated after it (Merit's claims extract runs later) are excluded and listed in the checks file |
 | Paid and outstanding amounts | Used. Merit's IBNR-completed ultimates are **not** used: your completion factors apply |
-| No member-level benefit limits | Limits come from the Control Limits sheet, matched on `Plan / Category` |
+| No benefit-limit field; a claimant CAP shows as capped and excess payer share | A life-period whose CAP binds takes the cap as its limit; otherwise the Control Limits sheet, matched on `Plan / Category`; otherwise `default_benefit_limit`. Checks A18 / A19 count the CAP and default cases |
 | No event fields | Per-event cover is priced from the scenarios you enter (EvScenarios sheet) |
 | "Void ab initio" life-periods (blank cover dates) | Kept so their claims count, with no exposure; flagged |
 
@@ -168,6 +170,7 @@ The parameters you will set on every pricing:
 | Basis | treaty_basis, claims_trigger, pp_accumulation | RA or LO; incurred or paid; accumulation by policy year or treaty year |
 | Exposure | epi_quote_year, expected_lives_quote_year | Expected premium and lives for the quote year |
 | Data | years_included | The experience years, 2–5, comma-separated |
+| Data | default_benefit_limit | Benefit limit for a life with none in the data or on the Limits sheet (blank = no limit) |
 | Outliers | outlier_method, outlier_value | VALUE (an amount), IQR or NONE |
 | Credibility | full_cred_n | Claims for full credibility (default 64) |
 | Incidence | incidence_adj | Overall adjustment to expected claims (1 = none); justify |
@@ -208,7 +211,7 @@ residual, with an optional one-off adjustment, a separate large-claim trend and 
 | Sheet | Content |
 |---|---|
 | FX | Priced rate of each currency in the data to the quote currency |
-| Limits | Benefit limit by plan (used when the data has no member-level limit) |
+| Limits | Benefit limit by plan (used when the data has no limit for the life; then `default_benefit_limit` in Params) |
 | Weights | Months complete per year; default weights or custom weights with a justification |
 | Programme | Order of application when `evaluate_mode = PROGRAMME`: PP → EV → SL, with the option used at each step |
 | EventRule | How per-event claims are grouped: supplied event ids, or a clustering rule (window, grouping key, minimum lives) |
@@ -270,6 +273,26 @@ includes any STOP check (section 6); the window says which stage and points to t
 After a run the output folder holds the checks, the results tables, the staging files and the workbook:
 
 ![Output folder](img/11_output_folder.jpg)
+
+### 5.1 Without Alteryx
+
+`tools\run_pipeline_python.bat` runs the same workflows in Python, with the same arguments, the same input files and
+the same outputs (Results workbook included). Alteryx does not need to be installed. The log is
+`data\output\<live|synth>\python_run.log`.
+
+| Command (from a command prompt in `tools`) | Runs |
+|---|---|
+| `run_pipeline_python.bat` | Synthetic data, line adapter, all stages |
+| `run_pipeline_python.bat live 01c` | Your data, Merit / ETE mode |
+| `run_pipeline_python.bat live 01c 00 04` | Stages 00 to 04 only |
+
+- Use one route for a whole run. A run that starts after stage 00 must follow a stage 00 run on the same route;
+  otherwise it stops and asks you to start from 00.
+- The full synthetic chain at 10,000 iterations takes about 5½ minutes and needs about 13 GB of memory. On a 16 GB
+  laptop, close other programs or set `iterations` to 2,000–5,000 while you work, and keep 10,000 for the final run.
+- Results equal the Alteryx route's: stages 00 to 06 were compared with Designer's own run on the synthetic data,
+  and both routes' Results workbooks are checked against the same independent computation. Stage 04a's fitted
+  parameters can differ in the fifth or sixth significant figure; the selected distribution is the same.
 
 ---
 
@@ -394,6 +417,9 @@ Run it after installing the tool on a new computer, and after a Merit release, b
 |---|---|---|
 | "Alteryx engine not found" | Designer not installed per user, or in another folder | Edit the `ENGINE` line at the top of `run_pipeline.bat` |
 | Stage 00 stops with P01–P04 | A required parameter blank, wrong type or not in the list | Fix the Params sheet |
+| Stage 00 stops with P04 on `default_benefit_limit` | A Control workbook made before 0.7 | Add the row to Params (copy it from `excel\templates\XoL_Control.xlsx`; a blank value means no default limit) |
+| Python route: "needs the stage files of a Python run of stage 00" | Stage 00 last ran in Alteryx | Run from stage 00 |
+| Python route stops at stage 04 with a memory error | Too little free memory for the iterations | Close other programs, or lower `iterations` |
 | Stage 01 stops with A03 | Fewer than 95% of claims match a member | Check the member id in both files |
 | Stage 04 stops with S07 | `severity_source = PYTHON` but 04a has not run since the last 03 | Run from 04a, or set NATIVE |
 | Stage 04a fails on `import scipy` | Designer's Python environment lacks scipy | Set `severity_source = NATIVE` (Pareto fitted natively) and run from 04 |
