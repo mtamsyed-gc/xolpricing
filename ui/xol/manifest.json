@@ -6,6 +6,7 @@
   "kit": "ui/kit",
   "results_name": "XoL_Results.xlsx",
   "control_template": "excel/templates/XoL_Control.xlsx",
+  "control_spec": "tools/excel/control_spec.py",
   "allowed_roots": ["data", "excel/templates"],
   "adapters": {"01a": "Line data (members, claim lines)", "01b": "Claimant listing", "01c": "Merit / ETE outputs"},
   "variants": {

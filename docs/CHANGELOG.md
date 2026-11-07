@@ -23,6 +23,15 @@ a saved workbook; the theme and behaviour are shared so the other tools can adop
 - Tests: `tests/test_ui.py` (served files, state, a run of 00-03 through the API, table endpoint, change
   detection, planted STOP, refusals). Not in scope yet: the Alteryx engine route from the page, editing Params in
   the browser, charts.
+- **Input help (same day).** Every user input now says what to enter, its options and an example, and whether it is
+  required. Control workbook (`build_control.py`, both templates rebuilt): required input cells yellow, optional
+  blue, labels grey; row 3 (not read by the tool) marks every column required / optional; every header and every
+  Params value cell carries a comment (required or optional | type or options | example | description); new
+  **Guide** sheet listing every sheet and column; README legend. Content lives in `control_spec.PARAM_EXAMPLES` and
+  `COLUMN_HELP` (one source for the workbook, the page and the manual). Page: `/api/params` reads the Params sheet of
+  the chosen book and shows a readiness table (required ● / optional ○, blank required values in red, values outside
+  the allowed list amber, rows missing from a pre-0.7 workbook named); `/api/spec` feeds an Input guide card
+  mirroring the Guide sheet; the page's own controls (book, adapter) carry help text. Tests in `test_ui.py`.
 - Laptop check of the page (2026-11-07, `Documents\20261107`, Chrome): started from `start_ui.cmd`, run 00 → 07 from
   the page in 6 min 50 s (stage 04 298 s), live log and stage chips, Open in Excel on the Control workbook, stage
   card with its flag and tables, dated copy of the Results workbook, Open Results in Excel. Two fixes from it: a

@@ -8,6 +8,8 @@ The page (ui/<tool>/index.html + ui/kit) talks to this process on 127.0.0.1 only
   GET  /api/state?variant=&adapter=   tool, variant, adapter, workbook mtimes, input files, per-stage status, last run
   GET  /api/table?variant=&name=      a checks/ or results/ CSV as JSON rows (first MAX_ROWS rows)
   GET  /api/log?variant=              tail of the current / last run log
+  GET  /api/spec                      input reference: every Control sheet and column (required, type, options, example)
+  GET  /api/params?variant=           the Params sheet of the variant's Control workbook, with required / blank flags
   POST /api/run    {variant, adapter, first, last}  start tools/run_python.py in the background (one run at a time)
   POST /api/stop                      terminate the running pipeline
   POST /api/open   {variant, what|path}  open a workbook / CSV in its Windows application (os.startfile)
@@ -151,6 +153,79 @@ class Tool:
             p = self.table_path(v, name)
             info["tables"].append({"name": name, "exists": p is not None, "mtime": fmt_t(mtime(p)) if p else None})
         return info
+
+    # ---- input reference (from the tool's spec module named in the manifest, e.g. tools/excel/control_spec.py)
+    def _spec_module(self):
+        if getattr(self, "_spec", None) is None:
+            import importlib.util
+            path = ROOT / self.m["control_spec"]
+            sp = importlib.util.spec_from_file_location("control_spec_ui", path)
+            mod = importlib.util.module_from_spec(sp)
+            sp.loader.exec_module(mod)
+            self._spec = mod
+        return self._spec
+
+    def spec(self) -> dict:
+        S = self._spec_module()
+        kinds = {"TEXT": "text", "NUMBER": "number", "INT": "whole number", "DATE": "date yyyy-mm-dd", "LIST": "choice",
+                 "CSV": "comma list"}
+        sheets = []
+        params = [{"name": pid, "group": g, "required": bool(req), "kind": kinds.get(k, k), "unit": "" if u == "date" else u,
+                   "options": a.split(",") if a else [], "example": S.PARAM_EXAMPLES.get(pid, ""),
+                   "description": d, "default": S.DEFAULTS.get(pid, "")} for pid, g, u, k, a, req, d in S.PARAMS]
+        sheets.append({"sheet": "Params", "title": S.TABLES["Params"][0], "note": S.TABLES["Params"][1], "inputs": params})
+        label_cols = ("description", "allowed_values", "group", "unit", "param_id", "indicated_factor")
+        for sh in S.SHEETS:
+            if sh == "Params":
+                continue
+            title, note, cols = S.TABLES[sh]
+            ins = []
+            for name, k, a, req in cols:
+                d, ex = S.COLUMN_HELP.get(sh, {}).get(name, ("", ""))
+                ins.append({"name": name, "required": bool(req) and name not in label_cols, "label": name in label_cols,
+                            "kind": kinds.get(k, k), "options": a.split(",") if (k in ("LIST", "INT") and "," in a) else [],
+                            "example": ex, "description": d})
+            sheets.append({"sheet": sh, "title": title, "note": note, "inputs": ins})
+        return {"sheets": sheets, "header_row": S.HEADER_ROW}
+
+    def params(self, v: str) -> dict:
+        """The Params sheet of the variant's Control workbook as the tool will read it, with readiness flags."""
+        S = self._spec_module()
+        ctl = self.control(v)
+        if not ctl.exists():
+            return {"exists": False, "rows": [], "missing_required": [], "invalid": []}
+        from openpyxl import load_workbook
+        wb = load_workbook(ctl, read_only=True, data_only=True)
+        if "Params" not in wb.sheetnames:
+            wb.close()
+            return {"exists": True, "error": "no Params sheet", "rows": [], "missing_required": [], "invalid": []}
+        it = wb["Params"].iter_rows(values_only=True)
+        for _ in range(S.HEADER_ROW - 1):
+            next(it, None)
+        head = [str(h).strip() if h is not None else "" for h in next(it, [])]
+        values = {}
+        for r in it:
+            d = dict(zip(head, r))
+            if d.get("param_id"):
+                values[str(d["param_id"]).strip()] = (d.get("value"), d.get("justification"))
+        wb.close()
+        rows, missing, invalid = [], [], []
+        for pid, g, u, k, a, req, desc in S.PARAMS:
+            val, just = values.get(pid, (None, None))
+            txt = "" if val is None else str(val).strip()
+            blank = txt == ""
+            bad = bool(a and not blank and txt.upper() not in a.split(",") and k == "LIST")
+            if req and blank:
+                missing.append(pid)
+            if bad:
+                invalid.append(pid)
+            rows.append({"name": pid, "group": g, "value": txt, "justification": "" if just is None else str(just),
+                         "required": bool(req), "blank": blank, "invalid": bad, "in_sheet": pid in values,
+                         "options": a.split(",") if a else [], "unit": u, "example": S.PARAM_EXAMPLES.get(pid, ""),
+                         "description": desc, "default": S.DEFAULTS.get(pid, "")})
+        not_in_sheet = [pid for pid, *_ in S.PARAMS if pid not in values]
+        return {"exists": True, "rows": rows, "missing_required": missing, "invalid": invalid,
+                "not_in_sheet": not_in_sheet, "mtime": fmt_t(mtime(ctl))}
 
     def input_files(self, v: str) -> list[dict]:
         out = []
@@ -323,6 +398,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.table(q.get("variant", "synth"), q.get("name", ""))
             if u.path == "/api/log":
                 return self.log(q.get("variant", "synth"))
+            if u.path == "/api/spec":
+                return self.send_json(self.tool.spec())
+            if u.path == "/api/params":
+                return self.send_json(self.tool.params(q.get("variant", "synth")))
             return self.send_json({"error": "not found"}, 404)
         except ValueError as e:
             return self.send_json({"error": str(e)}, 400)

@@ -50,9 +50,11 @@
     const ctl = st.control, files = st.inputs.filter((f) => f.mode === adapter);
     const missing = files.filter((f) => !f.exists);
     inputsCard.setBody(el("div", {},
-      el("div", { class: "gc-row", style: "margin-bottom:10px" },
-        el("label", { class: "fld" }, "Book", selVariant),
-        el("label", { class: "fld" }, "Data source (adapter)", selAdapter)),
+      el("div", { class: "gc-row", style: "margin-bottom:4px" },
+        el("label", { class: "fld", title: "Synthetic book: the fictional test portfolio shipped with the tool. Live pricing: your own data under data/input/." }, "Book", selVariant),
+        el("label", { class: "fld", title: "Must match source_mode in the Control workbook: 01a = L (line data), 01b = C (claimant listing), 01c = E (Merit / ETE outputs)." }, "Data source (adapter)", selAdapter),
+        el("span", { class: "muted", style: "font-size:12px;align-self:flex-end" }, "Book: synthetic = the test portfolio shipped with the tool, live = your data in data/input/. Adapter: must match the Control workbook's source_mode (01a = L, 01b = C, 01c = E).")),
+      el("div", { style: "margin-bottom:10px" }, el("span", { class: "muted", style: "font-size:12px" }, "Required inputs are ", el("span", { class: "swatch req" }), " yellow and optional ones ", el("span", { class: "swatch opt" }), " blue, in the workbook and in the tables below.")),
       ctl.changed_since_run ? el("div", { class: "banner flag", style: "margin-bottom:10px" },
         el("b", {}, "Control workbook changed"), ` saved ${fmtWhen(ctl.mtime)}, after the last run started. Re-run from stage 00 to use it.`,
         el("span", { class: "spacer" }),
@@ -66,7 +68,7 @@
           el("div", { class: "gc-row", style: "margin:6px 0" },
             openBtn("Open in Excel", { what: "control" }, "primary"),
             el("span", { class: "muted" }, ctl.exists ? "saved " + fmtWhen(ctl.mtime) : "missing")),
-          el("p", { class: "note" }, "Edit the yellow cells, save, close. The page notices the save and offers the re-run.")),
+          el("p", { class: "note" }, "Edit the yellow (required) and blue (optional) cells, save, close. The page notices the save and offers the re-run. Hover a header or a Params value in Excel for what to enter; the Guide sheet lists everything.")),
         el("div", {},
           el("div", { class: "gc-row" }, el("b", {}, "Data files"), el("span", { class: "muted" }, st.adapters[adapter]),
             missing.length ? pill("stop", missing.length + " missing") : pill("ok", "all present")),
@@ -74,8 +76,70 @@
             el("span", { class: f.exists ? "ok" : "miss" }, f.exists ? "✓" : "✗"),
             el("span", { class: "path" }, f.path),
             el("span", { class: "when" }, f.exists ? fmtWhen(f.mtime) : "not found"),
-            f.exists ? openBtn("Open", { what: "input", path: f.path }, "sm") : null)))))));
+            f.exists ? openBtn("Open", { what: "input", path: f.path }, "sm") : null))))),
+      el("div", { id: "params-box", style: "margin-top:10px" })));
   }
+
+  // ---------------------------------------------------------------- Params readiness (read from the Control workbook)
+  let paramsKey = null, paramsOpen = false;
+  async function renderParams(st) {
+    const box = $("#params-box"); if (!box) return;
+    const key = variant + "|" + st.control.mtime;
+    if (paramsKey !== key) {
+      try { st.params = await api(`/api/params?variant=${variant}`); paramsKey = key; cachedParams = st.params; } catch (e) { box.replaceChildren(el("span", { class: "muted" }, e.message)); return; }
+    }
+    const pr = cachedParams; if (!pr || !pr.exists) { box.replaceChildren(); return; }
+    const nMiss = pr.missing_required.length, nBad = pr.invalid.length, nOld = (pr.not_in_sheet || []).length;
+    const head = el("div", { class: "tbl-head", style: "cursor:pointer", onclick: () => { paramsOpen = !paramsOpen; renderParams(st); } },
+      el("b", {}, (paramsOpen ? "▾ " : "▸ ") + "Params in this workbook"),
+      nMiss ? pill("stop", nMiss + " required blank") : nBad ? pill("flag", nBad + " not an allowed value") : nOld ? pill("flag", nOld + " missing row" + (nOld > 1 ? "s" : "")) : pill("ok", "all required filled"),
+      el("span", { class: "n" }, `${pr.rows.length} parameters · read ${fmtWhen(pr.mtime)}`));
+    const parts = [head];
+    if (nMiss) parts.push(el("div", { class: "banner stop", style: "margin-top:6px" }, el("b", {}, "Required and blank: "), pr.missing_required.join(", "), " — stage 00 will stop (P-checks). Fill them in Excel and save."));
+    if (nBad) parts.push(el("div", { class: "banner flag", style: "margin-top:6px" }, el("b", {}, "Not an allowed value: "), pr.invalid.map((n) => { const r = pr.rows.find((x) => x.name === n); return `${n} = "${r.value}" (allowed: ${r.options.join(", ")})`; }).join("; ")));
+    if (nOld) parts.push(el("div", { class: "banner flag", style: "margin-top:6px" }, el("b", {}, "Rows missing from the Params sheet: "), (pr.not_in_sheet || []).join(", "), " — this workbook predates the current template; add the rows from excel/templates/XoL_Control.xlsx."));
+    if (paramsOpen) {
+      const rows = pr.rows.map((r) => el("tr", { class: r.required && r.blank ? "sev-STOP" : r.invalid ? "sev-FLAG" : "" },
+        el("td", {}, r.required ? el("span", { class: "req-mark", title: "required" }, "●") : el("span", { class: "opt-mark", title: "optional" }, "○"), " ", el("code", {}, r.name)),
+        el("td", {}, r.group),
+        el("td", { class: "mono" }, r.blank ? el("span", { class: "muted" }, r.required ? "BLANK" : (r.default !== "" ? "blank → " + r.default : "blank")) : r.value),
+        el("td", {}, r.options.length ? el("span", { class: "opts" }, r.options.map((o) => el("span", { class: "opt" + (o === String(r.value).toUpperCase() ? " on" : "") }, o))) : r.example ? el("span", { class: "muted" }, "e.g. " + r.example) : (r.unit ? el("span", { class: "muted" }, r.unit) : "")),
+        el("td", { class: "desc" }, r.description + (r.unit && r.options.length ? ` (${r.unit})` : ""))));
+      parts.push(el("div", { class: "tbl-wrap", style: "max-height:420px" }, el("table", { class: "gc params" },
+        el("thead", {}, el("tr", {}, ["parameter", "group", "value", "options / example", "what to enter"].map((h) => el("th", {}, h)))),
+        el("tbody", {}, ...rows))));
+    }
+    box.replaceChildren(...parts);
+  }
+  let cachedParams = null;
+
+  // ---------------------------------------------------------------- input guide (every sheet and column of the Control workbook)
+  const guideCard = card({ id: "guide", num: "", title: "Input guide", sub: "every sheet and column of the Control workbook: what to enter, options, examples", status: "none" });
+  guideCard.setStatus("info", "reference");
+  let guideLoaded = false;
+  guideCard.head.addEventListener("click", async () => {
+    if (guideLoaded) return; guideLoaded = true;
+    try {
+      const sp = await api("/api/spec");
+      const body = el("div", {});
+      body.append(el("p", { class: "note" }, "Mirror of the Guide sheet in the workbook. ", el("span", { class: "req-mark" }, "●"), " required · ", el("span", { class: "opt-mark" }, "○"), " optional · grey = label or written by the tool. Options are the only accepted values (drop-down in Excel). Examples show the format, not a recommendation."));
+      for (const sh of sp.sheets) {
+        const rows = sh.inputs.map((r) => el("tr", { class: r.label ? "lbl" : "" },
+          el("td", {}, r.label ? el("span", { class: "muted", title: "label" }, "–") : r.required ? el("span", { class: "req-mark", title: "required" }, "●") : el("span", { class: "opt-mark", title: "optional" }, "○"), " ", el("code", {}, r.name)),
+          el("td", {}, r.kind + (r.unit ? " · " + r.unit : "")),
+          el("td", {}, r.options.length ? el("span", { class: "opts" }, r.options.map((o) => el("span", { class: "opt" }, o))) : ""),
+          el("td", { class: "mono" }, r.example || (r.default !== undefined && r.default !== "" ? "default " + r.default : "")),
+          el("td", { class: "desc" }, (r.group ? `[${r.group}] ` : "") + r.description)));
+        body.append(el("div", { class: "tbl-head" }, el("b", {}, sh.sheet), el("span", { class: "n" }, sh.title)),
+          el("p", { class: "note", style: "margin:2px 0 4px" }, sh.note),
+          el("div", { class: "tbl-wrap", style: "max-height:none" }, el("table", { class: "gc params" },
+            el("thead", {}, el("tr", {}, ["input", "type", "options", "example / default", "what to enter"].map((h) => el("th", {}, h)))),
+            el("tbody", {}, ...rows))));
+      }
+      guideCard.setBody(body);
+    } catch (e) { guideCard.setBody(el("span", { class: "muted" }, e.message)); }
+  });
+  inputsCard.after(guideCard);
 
   // ---------------------------------------------------------------- run
   let logPoll = null;
@@ -220,7 +284,7 @@
       selAdapter.replaceChildren(...Object.entries(st.adapters).map(([k, v]) => el("option", { value: k }, k + " · " + v)));
     }
     selVariant.value = variant; selAdapter.value = adapter;
-    renderInputs(st); renderRun(st); ensureStageCards(st);
+    renderInputs(st); await renderParams(st); renderRun(st); ensureStageCards(st);
     for (const s of st.stages) await renderStage(s, st);
     renderResults(st);
     const key = JSON.stringify([st.run && st.run.started, st.run && st.run.finished, st.control.mtime]);

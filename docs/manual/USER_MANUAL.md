@@ -146,8 +146,13 @@ What the tool does with Merit's data:
 ## 4. The Control workbook
 
 `data\input\XoL_Control.xlsx` holds every assumption. Alteryx reads each sheet by name; the header is always in
-row 4. Yellow cells are inputs; grey cells are written back by Alteryx. Every judgement input has a `justification`
-column that is carried into the run log.
+row 4. **Yellow** cells are required inputs, **blue** cells are optional (blank = the default the description names),
+grey cells are labels or written back by the tool. Row 3 above every column says *required* or *optional*. Hover a
+column header, or a Params value cell, for what to enter, the allowed options and an example; list inputs have a
+drop-down of their options. The **Guide** sheet lists every sheet and column with the same information, and the
+browser page shows it too (Input guide card) along with a readiness check of the Params sheet: a required value
+left blank is named before you run. Every judgement input has a `justification` column that is carried into the
+run log.
 
 ![Control README](img/03_control_readme.jpg)
 

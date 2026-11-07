@@ -131,3 +131,13 @@ table.gc tr.sev-FLAG td { background: var(--flag-soft); }
   font-size: var(--fs-1); box-shadow: 0 4px 16px rgba(0,0,0,.3); opacity: 0; transition: opacity .2s; pointer-events: none; }
 .toast.show { opacity: 1; }
 .muted { color: var(--ink-3); }
+
+/* ---- input help: required / optional marks, option chips, colour swatches */
+.req-mark { color: var(--flag); font-size: 11px; } .opt-mark { color: var(--ink-3); font-size: 11px; }
+.swatch { display: inline-block; width: 11px; height: 11px; border: 1px solid var(--line); vertical-align: -1px; margin: 0 2px; }
+.swatch.req { background: #FFF2CC; } .swatch.opt { background: #DDEBF7; }
+.opts { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.opt { background: var(--line-2); border-radius: 4px; padding: 0 6px; font-family: var(--mono); font-size: var(--fs-0); }
+.opt.on { background: var(--teal-soft); color: var(--teal-2); font-weight: 600; }
+table.gc.params td { white-space: normal; vertical-align: top; } table.gc.params td.desc { color: var(--ink-2); min-width: 260px; }
+table.gc.params tr.lbl td { color: var(--ink-3); background: #fafbfc; }

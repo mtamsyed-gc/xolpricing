@@ -120,6 +120,21 @@ def main() -> int:
         finally:
             chk.write_text(orig, encoding="utf-8")
 
+        st, sp = c.json("/api/spec")
+        ok &= report("spec: Params plus every table sheet, each input with required / options / description",
+                     st == 200 and [x["sheet"] for x in sp["sheets"]][:3] == ["Params", "FX", "Limits"] and
+                     all("required" in i and "options" in i and "description" in i for sh in sp["sheets"] for i in sh["inputs"]) and
+                     next(i for i in sp["sheets"][0]["inputs"] if i["name"] == "source_mode")["options"] == ["L", "C", "E"])
+        st, pr = c.json("/api/params?variant=synth")
+        ok &= report("params: synthetic Control has every required value filled",
+                     st == 200 and pr["exists"] and pr["missing_required"] == [] and pr["invalid"] == [] and len(pr["rows"]) >= 40)
+        tmpl = serve.Tool(ROOT / "ui/xol/manifest.json")
+        tmpl.m["variants"]["synth"]["control"] = "excel/templates/XoL_Control.xlsx"
+        pt = tmpl.params("synth")
+        ok &= report("params: blank template reports the required client fields as blank (cedant, epi_quote_year...)",
+                     "cedant" in pt["missing_required"] and "epi_quote_year" in pt["missing_required"] and
+                     "iterations" not in pt["missing_required"] and pt["invalid"] == [])
+
         st, r = c.json("/api/open", {"variant": "synth", "what": "input", "path": "../etc/hosts"})
         ok &= report("open outside the allowed roots refused", st == 404)
         st, r = c.json("/api/open", {"variant": "synth", "what": "table", "name": "nope"})

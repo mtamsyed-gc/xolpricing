@@ -6,7 +6,7 @@ developer's run guide.
 ## One-off setup
 1. Clone or download the repo. Keep the folder structure: workflows find their files by relative path.
 2. Open `excel/templates/XoL_Control.xlsx`, save a copy as **`data/input/XoL_Control.xlsx`** and fill it in
-   (yellow cells; justify judgement inputs).
+   (yellow = required, blue = optional; hover a header or value for help; the Guide sheet lists every input; justify judgement inputs).
 3. Copy `excel/templates/XoL_Results.xlsx` to **`data/output/live/XoL_Results.xlsx`** (once per pricing; stage 07
    fills its data sheets on every run and keeps the presentation sheets).
 
