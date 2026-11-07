@@ -245,7 +245,7 @@ Every input block is an **Excel Table** (or a named range) with a fixed name, wh
 | QS | qs_cedant_retention_pct | 100% |
 | General | scenario_id (blank / 0 = best estimate; n = apply Scenarios rows with that id) | — |
 | Programme | evaluate_mode (STANDALONE / PROGRAMME) | STANDALONE |
-| Stochastic | iterations, seed, fit_cutoff (blank = lowest PP AP), fit_candidates, fit_selected (blank = lowest AIC), severity_source (PYTHON/NATIVE), fit_years, freq_model (POISSON/NEGBIN), ev_freq_source (EXPERIENCE/SCENARIOS/BOTH), sl_attritional_threshold, sl_cov_floor, sl_attritional_dist (LOGNORMAL/NORMAL) | 10000, 12345, POISSON, BOTH, 100000, 0.05, LOGNORMAL |
+| Stochastic | iterations, seed, fit_cutoff (blank = lowest PP AP), fit_candidates, fit_selected (blank = lowest AIC), below_cutoff (0.9.0: STOP / EMPIRICAL / IGNORE for layers attaching below fit_cutoff), severity_source (PYTHON/NATIVE), fit_years, freq_model (POISSON/NEGBIN), ev_freq_source (EXPERIENCE/SCENARIOS/BOTH), sl_attritional_threshold, sl_cov_floor, sl_attritional_dist (LOGNORMAL/NORMAL) | 10000, 12345, POISSON, BOTH, 100000, 0.05, LOGNORMAL |
 | Cedant impact | net_claims_budget (blank = best-estimate gross claims), reference_lives, return_periods (comma list), currency_display (QUOTE/USD) | 20000; "5,50,250" |
 
 ## 5. Results workbook (`excel/templates/XoL_Results.xlsx`)

@@ -1,6 +1,6 @@
 # XoL Pricing Tool — user manual
 
-Version 0.8 · 7 November 2026 · screenshots (of 0.6, 22 October 2026) taken on the owner's laptop (Windows 11, Alteryx Designer 2026.2,
+Version 0.9 · 7 November 2026 · screenshots (of 0.6, 22 October 2026) taken on the owner's laptop (Windows 11, Alteryx Designer 2026.2,
 Excel 365) during a full run on the synthetic portfolio.
 
 The tool prices excess-of-loss reinsurance on a medical portfolio for the broker: expected claims cost per layer,
@@ -183,6 +183,13 @@ The parameters you will set on every pricing:
 | Stochastic | iterations, seed | 10,000 and a fixed seed; both go into the run log |
 | Stochastic | severity_source, fit_selected | PYTHON uses the distribution selected in 04a; NATIVE the Pareto; `fit_selected` overrides the selection |
 | Cedant impact | net_claims_budget, return_periods, currency_display | Budget for Exhibit C2 (blank = mean simulated gross); return periods; QUOTE or USD |
+
+**The fitting cut-off (0.9).** `fit_cutoff` blank fits the severity distribution from the lowest active attachment,
+which is the safe default. If you raise it, a layer attaching below it has a band of claims the fitted distribution does
+not cover, and `below_cutoff` decides what happens: `STOP` (default: the run stops at stage 04 and names the layers),
+`EMPIRICAL` (the band is simulated from the data's own claims and spliced with the fitted tail; S10 shows its share
+of each layer), `IGNORE` (left out; S09 quotes the band's frequency and deterministic cost so you can justify it).
+The page warns before the run.
 
 ### 4.2 Layers
 
@@ -445,6 +452,7 @@ Run it after installing the tool on a new computer, and after a Merit release, b
 | Python route: "needs the stage files of a Python run of stage 00" | Stage 00 last ran in Alteryx | Run from stage 00 |
 | Python route stops at stage 04 with a memory error | Too little free memory for the iterations | Close other programs, or lower `iterations` |
 | Stage 01 stops with A03 | Fewer than 95% of claims match a member | Check the member id in both files |
+| Stage 04 stops with S08 | `fit_cutoff` is above a layer's attachment and `below_cutoff` = STOP | Lower `fit_cutoff`, or set `below_cutoff` to EMPIRICAL / IGNORE (§4.1) |
 | Stage 04 stops with S07 | `severity_source = PYTHON` but 04a has not run since the last 03 | Run from 04a, or set NATIVE |
 | Stage 04a fails on `import scipy` | Designer's Python environment lacks scipy | Set `severity_source = NATIVE` (Pareto fitted natively) and run from 04 |
 | Stage 07 "cannot access the file" | The Results workbook is open in Excel | Close it and run from 07 |

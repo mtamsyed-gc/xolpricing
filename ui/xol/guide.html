@@ -109,7 +109,14 @@
           <li class="only only-E"><b>Limits</b>: benefit limit per Merit plan where no CAP binds; <code>ete_payer_filter</code> = the payer to price (several payers in one run are flagged A16); <code>premium_basis</code> GROSS or NET; <b>EvScenarios</b> for per-event cover (Merit has no event fields, so set <code>ev_freq_source = SCENARIOS</code>).</li>
           <li class="only only-C"><b>EvScenarios</b> if you price per-event cover: the listing has no event grouping unless it carries <code>event_id</code>.</li>
           <li><b>Expiring</b> (optional): the expiring structure and rate, for the comparison exhibit. <b>Scenarios</b> (optional): sensitivity overrides, see step 8.</li>
-        </ul>`),
+        </ul>
+        <h3>The fitting cut-off and layers attaching below it</h3>
+        <p>The stochastic model fits a severity distribution to claims above <code>fit_cutoff</code> (blank = the lowest attachment of your active per-person options, which is the safe default). If you raise the cut-off to get a cleaner tail fit, any layer whose attachment is below it has a band of claims — between the AP and the cut-off — that the fitted distribution does not cover. <code>below_cutoff</code> says what to do with that band:</p>
+        <table class="gc"><thead><tr><th>below_cutoff</th><th>What happens</th><th>When to use</th></tr></thead><tbody>
+          <tr><td><code>STOP</code> (default)</td><td>Stage 04 stops (S08) and names the layers; the page warns before you run.</td><td>You did not mean to price a layer below the cut-off.</td></tr>
+          <tr><td><code>EMPIRICAL</code></td><td>The band is simulated from the data's own adjusted claims in that band, with their own frequency, spliced with the fitted tail above the cut-off (S10 shows the band's share of each layer).</td><td>You want a high cut-off for the tail fit and still price low layers.</td></tr>
+          <tr><td><code>IGNORE</code></td><td>The band is left out; S09 flags each layer with the band's frequency and deterministic cost.</td><td>The band is priced or retained elsewhere and you want a pure tail view — justify it.</td></tr></tbody></table>
+        <p>The page's Params table shows the exact situation for your workbook (which layers, which cut-off, which mode) before you run.</p>`),
       doneWhen("control", "the page shows ALL REQUIRED FILLED next to Params in this workbook")) },
     { id: "data", title: "Put the data files in place", sub: "data\\input\\…", body: () => el("div", {},
       el("div", { class: "only only-L" },
@@ -154,6 +161,10 @@
         <tr><td>B02</td><td>03</td><td>Credibility below 1 on a layer (fewer than full_cred_n claims)</td><td>The stochastic result carries the balance; read the Pricing sheet's blend</td></tr>
         <tr><td>F06</td><td>04a</td><td>A candidate distribution ended on a boundary</td><td>Not selected automatically; read the Severity sheet before overriding fit_selected</td></tr>
         <tr><td>S07</td><td>04</td><td>severity_source = PYTHON but 04a has not run since 03</td><td>Run from 04a</td></tr>
+        <tr><td>S08</td><td>04</td><td>fit_cutoff is above a layer's attachment and below_cutoff = STOP</td><td>Lower fit_cutoff, or set below_cutoff (step 3)</td></tr>
+        <tr><td>S09</td><td>04</td><td>below_cutoff = IGNORE: the band between AP and cut-off is left out (frequency and cost quoted)</td><td>Justify, or set EMPIRICAL</td></tr>
+        <tr><td>S10</td><td>04</td><td>below_cutoff = EMPIRICAL: band simulated from the data (share of the layer quoted)</td><td>Information; read the share</td></tr>
+        <tr><td>S11</td><td>04</td><td>EMPIRICAL but no claim in the data between AP and cut-off</td><td>Lower fit_cutoff</td></tr>
         <tr><td>V06</td><td>05</td><td>Few events in the layer</td><td>The per-event price leans on EvScenarios; review them</td></tr>
         <tr><td>X01–X04</td><td>00</td><td>A Scenarios row matched no rows or named an unknown column</td><td>Fix the Scenarios sheet</td></tr></tbody></table>`),
       doneWhen("checks", "every STOP is cleared and every flag has been read")) },

@@ -77,10 +77,13 @@ def oracle(tab=None):
     lay = lay[(lay.cover == "PP") & (lay.active == 1)].copy()
     u = float(prm["fit_cutoff"]) if not pd.isna(prm.get("fit_cutoff")) else lay.ap.min()
     s0 = seed % (M - 1) + 1
-    starts = {j: (pow(A, j * (1 << 29), M) * s0) % M for j in (1, 2, 3)}
+    starts = {j: (pow(A, j * (1 << 29), M) * s0) % M for j in (1, 2, 3, 4, 5)}
 
     adj = load("bc_adjusted")
     fu = adj[adj.adj > u].copy()
+    min_ap = lay.ap.min()
+    mode = "STOP" if pd.isna(prm.get("below_cutoff")) or str(prm.get("below_cutoff")) == "" else str(prm["below_cutoff"])
+    bu = adj[(adj.adj > min_ap) & (adj.adj <= u)].sort_values("acc_key")      # 0.9.0 band (min AP, u]
     unc = fu.adj_uncapped < fu.cap
     alpha = unc.sum() / np.log(fu.adj / u).sum()
     caps = fu.sort_values("acc_key").cap.to_numpy()
@@ -92,6 +95,9 @@ def oracle(tab=None):
     freq = (n_u.reindex(w.index, fill_value=0) / ex.reindex(w.index)) * w
     lives = load("bc_summary").lives_quote_year.max()
     lam = freq.sum() * lives * inc
+    n_b = bu.groupby("ty").post_cnt_f_.sum()
+    lam_b = ((n_b.reindex(w.index, fill_value=0) / ex.reindex(w.index)) * w).sum() * lives * inc if u > min_ap else 0.0
+    band_on = mode == "EMPIRICAL" and u > min_ap and len(bu) > 0
 
     n_y, e_y = n_u.reindex(w.index, fill_value=0), ex.reindex(w.index)
     m_pool = n_y.sum() / e_y.sum()
@@ -119,6 +125,25 @@ def oracle(tab=None):
     claim = np.minimum(x, cap)
     below = np.minimum(claim, big_m)
     it_idx = np.repeat(np.arange(iters), n_claims)
+    src_flag = np.zeros(len(claim), dtype=int)
+    # band claims (streams 4 and 5): Poisson(lambda_band) counts, empirical (amount, cap) draws from the band units
+    lam_eff = lam_b if band_on else 0.0
+    k_max_b = math.ceil(lam_eff + 10 * math.sqrt(lam_eff) + 20)
+    pkb = [math.exp(-lam_eff)]
+    for k in range(1, k_max_b + 1):
+        pkb.append(pkb[-1] * lam_eff / k)
+    u4 = minstd(starts[4], iters)
+    n_b_claims = np.searchsorted(np.cumsum(pkb), u4, side="left")
+    tot_b = int(n_b_claims.sum())
+    if tot_b:
+        u5 = minstd(starts[5], tot_b)
+        pick = np.floor(u5 * len(bu)).astype(int)
+        b_claim = bu.adj.to_numpy()[pick]
+        b_cap = bu.cap.to_numpy()[pick]
+        claim = np.concatenate([claim, b_claim]); cap = np.concatenate([cap, b_cap])
+        below = np.concatenate([below, np.minimum(b_claim, big_m)])
+        it_idx = np.concatenate([it_idx, np.repeat(np.arange(iters), n_b_claims)])
+        src_flag = np.concatenate([src_flag, np.ones(tot_b, dtype=int)])
 
     out = {}
     for _, L in lay.iterrows():
@@ -133,6 +158,7 @@ def oracle(tab=None):
             return np.where(over <= 0, 0, np.where(over < lim, over, np.where(lim > 0, lim, 0))) * (1 - cop)
         xl = np.bincount(it_idx, weights=loss(claim), minlength=iters)
         xlb = np.bincount(it_idx, weights=loss(below), minlength=iters)
+        xlband = np.bincount(it_idx, weights=loss(claim) * (src_flag == 1), minlength=iters)
         aad = 0 if pd.isna(L.aad) else L.aad
         n_r = L.reinstatements_n
         agg = L.aal if not pd.isna(L.aal) else (1e15 if pd.isna(n_r) or pd.isna(L.limit) else (1 + n_r) * L.limit)
@@ -141,9 +167,17 @@ def oracle(tab=None):
         cost = L.reinstatement_cost_pct
         ru = (np.zeros(iters) if pd.isna(cost) or pd.isna(L.limit) else
               cost * (rec if pd.isna(n_r) else np.minimum(rec, n_r * L.limit)) / L.limit)
-        out[int(L.option_id)] = dict(rec=rec, above=(xl - xlb) * f, ru=ru)
-    return dict(src=src, x=x, u2=u2, alpha=alpha, lam=lam, phi=phi, nb=nb, n_claims=n_claims, u1=u1, out=out, claims_sum=claim.sum(), claim=claim,
-                it_idx=it_idx, iters=iters, u=u, lives=lives)
+        band_det = 0.0
+        if u > min_ap and len(bu):
+            bl = (np.where(bu.cap.to_numpy() >= 1e15, 1e15, bu.cap.to_numpy() - L.ap) if L.limit_basis == "TO_BENEFIT_LIMIT"
+                  else np.full(len(bu), L.limit if not pd.isna(L.limit) else 1e15))
+            bo = bu.adj.to_numpy() - L.ap
+            band_det = lam_b * float(np.mean(np.where(bo <= 0, 0, np.where(bo < bl, bo, np.where(bl > 0, bl, 0))) * (1 - cop)))
+        out[int(L.option_id)] = dict(rec=rec, above=(xl - xlb) * f, ru=ru, band=xlband * f, band_raw=xlband, band_det=band_det)
+    tail_mask = src_flag == 0
+    return dict(src=src, x=x, u2=u2, alpha=alpha, lam=lam, phi=phi, nb=nb, n_claims=n_claims, u1=u1, out=out,
+                claims_sum=claim[tail_mask].sum(), claim=claim, it_idx=it_idx, iters=iters, u=u, lives=lives,
+                lam_b=lam_b, band_on=band_on, n_band=len(bu), min_ap=min_ap, mode=mode, n_b_claims=n_b_claims)
 
 
 def negbin():
@@ -232,6 +266,62 @@ def gpd():
     OUT, CTL = keep
 
 
+def band():
+    """0.9.0 below_cutoff: with fit_cutoff above two layers' attachments, STOP stops (S08); IGNORE runs with S09 and
+    its result equals the oracle without band claims; EMPIRICAL simulates the band (S10), equals the oracle with band
+    claims on streams 4 and 5, its band share of the mean matches the deterministic band cost within Monte Carlo
+    error, and the layers attaching at or above the cut-off are unchanged between IGNORE and EMPIRICAL."""
+    global OUT, CTL
+    msgs = {}
+    for mode in ("STOP", "IGNORE", "EMPIRICAL"):
+        keep, v = variant(f"t4b{mode[0].lower()}", lambda ws, m=mode: (set_p(ws, "fit_cutoff", "150000"), set_p(ws, "below_cutoff", m)))
+        for b in (build_stage00.build(v), build_stage01.build_line(v), build_stage02.build(v), build_stage03.build(v),
+                  build_stage04a.build(v)):
+            sim.run(b)
+        try:
+            sim.run(build_stage04.build(v))
+            msgs[mode] = [m for m in sim.MESSAGES if m[0] == "Error"]
+        except sim.SimError as ex:
+            msgs[mode] = [("Error", str(ex))]
+        chk = pd.read_csv(OUT / "checks/checks_04.csv")
+        if mode == "STOP":
+            results.append(("STOP: S08 stops, one per layer attaching below the cut-off (2)",
+                            any("S08" in m[1] for m in msgs[mode]) and (chk.code == "S08").sum() == 2 and
+                            (chk[chk.code == "S08"].severity == "STOP").all()))
+        else:
+            e = oracle()
+            summ = pd.read_csv(OUT / "results/out_sim_summary.csv").set_index("option_id")
+            its = pd.read_csv(OUT / "results/out_sim_iterations.csv")
+            results.append((f"{mode}: no STOP", not msgs[mode]))
+            results.append((f"{mode}: band frequency {e['lam_b']:.2f} = lambda above u + band (oracle)", abs(summ.lambda_band.iloc[0] - e["lam_b"]) < 1e-9
+                            and summ.below_cutoff.iloc[0] == mode and summ.band_from.iloc[0] == e["min_ap"] and summ.n_band.iloc[0] == e["n_band"]))
+            for o, d in e["out"].items():
+                g = its[its.option_id == o].sort_values("iter")
+                close(f"{mode} option {o} recovery by iteration", g.recovery, d["rec"])
+                close(f"{mode} option {o} band recovery by iteration", g.recovery_band, d["band"])
+            code = "S09" if mode == "IGNORE" else "S10"
+            results.append((f"{mode}: {code} on the two layers attaching below the cut-off", (chk.code == code).sum() == 2))
+            if mode == "IGNORE":
+                results.append(("IGNORE: no band claims simulated", e["n_b_claims"].sum() == 0 and summ.mean_recovery_band.abs().max() == 0))
+                for o, d in e["out"].items():
+                    m = chk[(chk.code == "S09") & (chk.item == summ.loc[o, "l_label"])]
+                    if len(m):
+                        results.append((f"IGNORE option {o}: S09 quotes the deterministic band cost {d['band_det']:,.0f}",
+                                        f"{d['band_det']:.0f}" in m.message.iloc[0]))
+                ign = summ
+            else:
+                results.append(("EMPIRICAL: band claims simulated", e["band_on"] and e["n_b_claims"].sum() > 0))
+                for o, d in e["out"].items():
+                    if d["band_det"] > 0:        # band loss before the annual AAD / AAL (option 1 carries an AAD in this test)
+                        se = d["band_raw"].std() / math.sqrt(len(d["band_raw"]))
+                        results.append((f"EMPIRICAL option {o}: mean band layer loss {d['band_raw'].mean():,.0f} vs deterministic band cost "
+                                        f"{d['band_det']:,.0f} within 3 SE ({se:,.0f})", abs(d["band_raw"].mean() - d["band_det"]) < 3 * se))
+                    else:
+                        close(f"EMPIRICAL option {o} (AP at or above the cut-off): equals IGNORE", [summ.loc[o, "mean_recovery"]],
+                              [ign.loc[o, "mean_recovery"]])
+        OUT, CTL = keep
+
+
 def stale():
     """Stage 03 empties the fit: 04 after 03 without 04a stops (S07)."""
     global OUT, CTL
@@ -296,6 +386,7 @@ def main() -> int:
     gpd()
     stale()
     negbin()
+    band()
     # statistical sense
     a = summ.alpha.iloc[0]
     results.append((f"alpha {a:.3f} within 1.6 +/- 0.15", abs(a - 1.6) < 0.15))

@@ -6,7 +6,7 @@ td{border-bottom:1px solid #ddd;padding:5px 10px;vertical-align:top}code{backgro
 pre{background:#f3f3f3;padding:10px;overflow:auto}img{max-width:100%;border:1px solid #ccc;margin:8px 0}
 blockquote{border-left:4px solid #ccd;margin:0;padding:4px 14px;color:#444}hr{border:0;border-top:1px solid #ccd;margin:30px 0}</style></head><body>
 <h1>XoL Pricing Tool — user manual</h1>
-<p>Version 0.8 · 7 November 2026 · screenshots (of 0.6, 22 October 2026) taken on the owner's laptop (Windows 11, Alteryx Designer 2026.2,
+<p>Version 0.9 · 7 November 2026 · screenshots (of 0.6, 22 October 2026) taken on the owner's laptop (Windows 11, Alteryx Designer 2026.2,
 Excel 365) during a full run on the synthetic portfolio.</p>
 <p>The tool prices excess-of-loss reinsurance on a medical portfolio for the broker: expected claims cost per layer,
 an indicative reinsurance premium from high-level loadings, and the cedant's position with each structure. It takes
@@ -403,6 +403,12 @@ in the allowed list.</p>
 </tr>
 </tbody>
 </table>
+<p><strong>The fitting cut-off (0.9).</strong> <code>fit_cutoff</code> blank fits the severity distribution from the lowest active attachment,
+which is the safe default. If you raise it, a layer attaching below it has a band of claims the fitted distribution does
+not cover, and <code>below_cutoff</code> decides what happens: <code>STOP</code> (default: the run stops at stage 04 and names the layers),
+<code>EMPIRICAL</code> (the band is simulated from the data's own claims and spliced with the fitted tail; S10 shows its share
+of each layer), <code>IGNORE</code> (left out; S09 quotes the band's frequency and deterministic cost so you can justify it).
+The page warns before the run.</p>
 <h3>4.2 Layers</h3>
 <p>Up to four options per cover. <code>cover</code> is PP (per person), EV (per event) or SL (stop loss). Per-person and
 per-event layers take an attachment point, a limit (or <code>TO_BENEFIT_LIMIT</code>), AAD / AAL, co-participation and
@@ -784,6 +790,11 @@ to 02, removes them again, and then runs the synthetic ETE files through the sam
 <td>Stage 01 stops with A03</td>
 <td>Fewer than 95% of claims match a member</td>
 <td>Check the member id in both files</td>
+</tr>
+<tr>
+<td>Stage 04 stops with S08</td>
+<td><code>fit_cutoff</code> is above a layer's attachment and <code>below_cutoff</code> = STOP</td>
+<td>Lower <code>fit_cutoff</code>, or set <code>below_cutoff</code> to EMPIRICAL / IGNORE (§4.1)</td>
 </tr>
 <tr>
 <td>Stage 04 stops with S07</td>

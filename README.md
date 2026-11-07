@@ -9,7 +9,7 @@ engine, or without Alteryx by the Python route).
 **Excel** holds the inputs (Control workbook) and the loadings, cedant-impact exhibits and charts
 (Results workbook).
 
-> Status (0.8.0, 2026-11-07): browser interface (`tools\xol_ui.bat`: one page that opens the workbooks in Excel, runs the Python route and shows every stage's checks and tables); all phases built — Control (00), adapters for line, claimant and ETE / Merit data (01a/b/c; Merit v8 final outputs read as written; benefit limits from the data, else the plan, else a default),
+> Status (0.9.0, 2026-11-07): layers attaching below the fitting cut-off handled by `below_cutoff` (STOP / EMPIRICAL / IGNORE); browser interface (`tools\xol_ui.bat`: one page that opens the workbooks in Excel, runs the Python route and shows every stage's checks and tables); all phases built — Control (00), adapters for line, claimant and ETE / Merit data (01a/b/c; Merit v8 final outputs read as written; benefit limits from the data, else the plan, else a default),
 > experience (02), per-person burning cost (03), severity candidates with the Python tool (04a) and simulation (04),
 > per-event XoL (05), stop loss and programme structures (06), Results workbook with pricing, C1, C2, expiring,
 > severity and scenarios (07). `tools\run_pipeline.bat` runs the chain with the Alteryx engine;

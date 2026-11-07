@@ -2,6 +2,31 @@
 
 Methodology and data-contract changes, newest first.
 
+## 2026-11-07 — 0.9.0: layers attaching below the fitting cut-off (`below_cutoff`)
+Found by the independent reconciliation (0.8.0): a `fit_cutoff` above a layer's attachment silently dropped the
+claims between the AP and the cut-off from that layer's stochastic cost (−20 % / −31 % on the synthetic book), with
+only the indirect S05 flag. Owner's decision: let the user choose.
+- **New Params `below_cutoff`** (required; default `STOP`; a workbook made before 0.9 needs the row from the
+  template). `STOP`: stage 04 stops (S08) naming each layer attaching below the cut-off. `IGNORE`: the band is left
+  out; S09 FLAG per layer with the band frequency and its deterministic cost (λ_band × mean layer loss over the band
+  units) and the share of the layer it represents. `EMPIRICAL`: the band is simulated — λ_band from the adjusted units
+  in (lowest active AP, u] with the same completion, weights, lives and incidence as λ; counts Poisson(λ_band) by
+  inverse CDF on a fourth MINSTD stream; each band claim an (adjusted amount, cap) pair drawn uniformly from those
+  units on a fifth stream; spliced with the tail claims before the layer step; S10 INFO per layer with the band's
+  share of the mean recovery; S11 FLAG when the band is empty. Band claims stay out of `sim_gross` (below the
+  stop-loss large threshold, covered by the attritional model). Methodology §8.
+- Outputs: `out_sim_summary` gains `below_cutoff`, `band_from`, `lambda_band`, `n_band`, `mean_recovery_band`;
+  `out_sim_iterations` gains `recovery_band`. With the cut-off at the lowest AP (the default) every output is
+  unchanged (base variant identical to 0.8.0 iteration by iteration).
+- Front end: the Params readiness table reads the Layers sheet and shows, before the run, which layers attach below
+  the cut-off and what the chosen mode will do (red for STOP, amber for IGNORE, blue for EMPIRICAL); the Input guide
+  and the guide's step 3 explain the three options with a table; codes S08–S11 in the guide's code table; the
+  workbook's Params comment and Guide sheet carry the same text.
+- Tests: `test_stage04.band()` runs the three modes on a copy of the synthetic book with the cut-off at 150k:
+  S08 stops; IGNORE equals the oracle without band claims and S09 quotes the deterministic band cost; EMPIRICAL
+  equals the oracle with band claims (streams 4, 5) iteration by iteration, its mean band layer loss equals the
+  deterministic band cost within 3 SE, and layers attaching at or above the cut-off are unchanged between modes.
+
 ## 2026-11-07 — 0.8.0: browser interface
 - **Independent reconciliation of stage 04** (`tests/independent/`). A separate agent rebuilt the per-person
   simulation from a neutral specification and parameter packs only (seed, iterations, λ, φ, count distribution, u,

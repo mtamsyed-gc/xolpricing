@@ -10,8 +10,13 @@ Reads bc_adjusted, bc_weights, bc_summary (stage 03), exp_exposure_ty (stage 02)
              ln X = lx0_k + (t - k)(lx1_k - lx0_k). S07 stops when PYTHON is chosen and the table is empty.
     Sim      per iteration N ~ Poisson(lambda) (inverse CDF), X as above, cap sampled from the fitted units'
              caps, claim = min(X, cap); layer loss per active PP layer, AAD / AAL / reinstatements on the annual total
-    RNG      MINSTD (Lehmer, a = 48271, m = 2^31 - 1) seeded from `seed`; three non-overlapping streams by jump-ahead
-             (Poisson draws, severity, cap). Same seed -> identical results in Designer and the simulator.
+    Band     0.9.0: a layer whose AP is below u has a band (AP, u] the fitted distribution does not cover. Params
+             below_cutoff: STOP (S08: the run stops), IGNORE (S09 FLAG: band left out, its deterministic cost shown),
+             EMPIRICAL (S10 INFO: band claims simulated from the data's own adjusted claims in (min AP, u] with their
+             own Poisson frequency lambda_band, drawn uniformly with their caps; spliced with the tail above u).
+    RNG      MINSTD (Lehmer, a = 48271, m = 2^31 - 1) seeded from `seed`; five non-overlapping streams by jump-ahead
+             (Poisson draws, severity, cap, band counts, band draws). Same seed -> identical results in Designer and
+             the simulator.
 Writes results/out_fit.csv, out_sim_summary.csv, out_sim_quantiles.csv, out_sim_iterations.csv, stage sim_summary,
 sim_iterations and sim_gross (per iteration: all large claims, and those above the stop-loss attritional threshold
 t_sl = max(sl_attritional_threshold, u), for stage 05), checks_04.csv, recon_04.csv.
@@ -31,7 +36,7 @@ KSEV, KD = sevfit.K_PER_DECADE, sevfit.K_PER_DECADE * sevfit.DECADES    # severi
 M = 2147483647
 A = 48271
 BIG = "1000000000000000"
-JUMP = {j: pow(A, j * (1 << 29), M) for j in (1, 2, 3)}       # stream start multipliers (build-time constants)
+JUMP = {j: pow(A, j * (1 << 29), M) for j in (1, 2, 3, 4, 5)}       # stream start multipliers (build-time constants)
 QUANTILES = [0.005 * i for i in range(1, 200)] + [0.001, 0.999]
 
 
@@ -115,15 +120,19 @@ def build(v):
     # ------------------------------------------------------------------ inputs
     wf.container("04.1 Inputs: parameters, layers, threshold u")
     par = C.params_stream(wf, v, ["iterations", "seed", "fit_cutoff", "freq_model", "incidence_adj", "years_included",
-                                  "sl_attritional_threshold", "severity_source"], key="kp", label="parameters")
+                                  "sl_attritional_threshold", "severity_source", "below_cutoff"], key="kp", label="parameters")
     lay = pp_layers(wf, v)
     pu = threshold_u(wf, par, lay)
     pu = wf.formula(pu, [("s0", X.DBL, f"[p_seed] - {M - 1} * Floor([p_seed] / {M - 1}) + 1")], label="seed state")
-    pu = wf.formula(pu, [(f"start{j}", X.DBL, jump("[s0]", JUMP[j])) for j in (1, 2, 3)] + [
+    pu = wf.formula(pu, [(f"start{j}", X.DBL, jump("[s0]", JUMP[j])) for j in (1, 2, 3, 4, 5)] + [
         ("t_sl", X.DBL, "IIF(IsNull([p_sl_attritional_threshold]) OR [p_sl_attritional_threshold] < [u_fit], [u_fit], "
                         "[p_sl_attritional_threshold])")], label="stream starts, stop-loss large threshold")
-    ctx = wf.select(pu, keep=["kp", "u_fit", "p_iterations", "p_incidence_adj", "p_freq_model", "start1", "start2",
-                              "start3", "s0", "t_sl", "p_severity_source"], keep_unknown=False, label="simulation context")
+    pu = wf.formula(pu, [("below_mode", X.STR, 'IIF(IsNull([p_below_cutoff]) OR [p_below_cutoff] = "", "STOP", '
+                                                 '[p_below_cutoff])'),
+                         ("band_exists", X.BOOL, "[u_fit] > [min_ap]")], label="below_cutoff mode, band (min AP, u]")
+    ctx = wf.select(pu, keep=["kp", "u_fit", "min_ap", "p_iterations", "p_incidence_adj", "p_freq_model", "start1", "start2",
+                              "start3", "start4", "start5", "s0", "t_sl", "p_severity_source", "below_mode", "band_exists"],
+                    keep_unknown=False, label="simulation context")
 
     # ------------------------------------------------------------------ fit
     wf.container("04.2 Severity fit: Pareto above u with censoring at caps; diagnostics")
@@ -142,6 +151,13 @@ def build(v):
                      label="Pareto alpha (MLE, censored)")
     fitc = wf.select(fit, keep=["kf", "alpha", "alpha_se", "n_fit", "n_uncensored", "n_censored", "max_observed"],
                      keep_unknown=False, label="fit result")
+    # 0.9.0 band: adjusted units between the lowest active AP and u (empirical body for layers attaching below u)
+    bu, _ = wf.filter(adj, "[adj] > [min_ap] AND [adj] <= [u_fit]", label="band units (min AP, u]")
+    bands = wf.record_id(wf.sort(bu, [("acc_key", "Ascending")], label="fixed order"), "b_rank", label="band rank")
+    bands = wf.select(bands, keep=["b_rank", "adj", "cap"], rename={"adj": "b_adj", "cap": "b_cap"}, keep_unknown=False,
+                      label="band table")
+    bcount = wf.summarize(wf.formula(bu, [("kb", X.INT, "1")], label="key"), [("kb", "GroupBy", "kb"), ("acc_key", "Count", "n_band")],
+                          label="band units")
     # caps to sample from: fitted units ranked in a fixed order
     caps = wf.record_id(wf.sort(fu, [("acc_key", "Ascending")], label="fixed order"), "cap_rank", label="cap rank")
     caps = wf.select(caps, keep=["cap_rank", "cap"], rename={"cap_rank": "c_rank", "cap": "s_cap"}, keep_unknown=False,
@@ -177,10 +193,17 @@ def build(v):
                  ["g_ty"], ["ty"], label="weights + exposure")["J"]
     fy = wf.left_join(fy, wf.select(nby, keep=["ty", "n_u"], rename={"ty": "n_ty"}, keep_unknown=False, label="counts"),
                       ["g_ty"], ["n_ty"], label="+ counts")
+    nbyb = wf.formula(bu, [("n_c", X.DBL, "[post_cnt_f_]")], label="completed count per band unit")
+    nbyb = wf.summarize(nbyb, [("ty", "GroupBy", "ty"), ("n_c", "Sum", "n_b")], label="band units by TY")
+    fy = wf.left_join(fy, wf.select(nbyb, keep=["ty", "n_b"], rename={"ty": "b_ty"}, keep_unknown=False, label="band counts"),
+                      ["g_ty"], ["b_ty"], label="+ band counts")
     fy = wf.formula(fy, [("freq_u", X.DBL, "IIF(IsNull([n_u]), 0, [n_u]) / [exposure_ly_full]"),
-                         ("w_freq", X.DBL, "[weight] * [freq_u]"), ("kw", X.INT, "1")], label="frequency above u")
+                         ("w_freq", X.DBL, "[weight] * [freq_u]"),
+                         ("w_freq_b", X.DBL, "[weight] * IIF(IsNull([n_b]), 0, [n_b]) / [exposure_ly_full]"),
+                         ("kw", X.INT, "1")], label="frequency above u, and in the band")
     fy = wf.formula(fy, [("n_y", X.DBL, "IIF(IsNull([n_u]), 0, [n_u])"), ("one", X.DBL, "1")], label="count by year")
-    lam = wf.summarize(fy, [("kw", "GroupBy", "kw"), ("w_freq", "Sum", "freq_u_weighted"), ("n_y", "Sum", "n_all"),
+    lam = wf.summarize(fy, [("kw", "GroupBy", "kw"), ("w_freq", "Sum", "freq_u_weighted"), ("w_freq_b", "Sum", "freq_b_weighted"),
+                            ("n_y", "Sum", "n_all"),
                             ("exposure_ly_full", "Sum", "e_all"), ("one", "Sum", "k_years")],
                        label="weighted frequency, pooled rate")
     # Pearson dispersion of the yearly counts around the pooled rate (negative binomial when > 1)
@@ -195,8 +218,14 @@ def build(v):
                          [("kv", "GroupBy", "kv"), ("lives_quote_year", "Max", "lives_q")], label="lives in quote year")
     lam = C.append(wf, lam, lives, "kw", "kv", "+ lives")
     lam = C.append(wf, lam, ctx, "kw", "kp", "+ context")
+    lam = wf.left_join(lam, bcount, ["kw"], ["kb"], label="+ band units (none = Null)")
     lam = wf.formula(lam, [
         ("lambda", X.DBL, "[freq_u_weighted] * [lives_q] * [p_incidence_adj]"),
+        ("n_band", X.INT64, "IIF(IsNull([n_band]), 0, [n_band])"),
+        ("band_on", X.BOOL, '[below_mode] = "EMPIRICAL" AND [band_exists] AND IIF(IsNull([n_band]), 0, [n_band]) > 0'),
+        ("lambda_band", X.DBL, "IIF([band_exists], [freq_b_weighted] * [lives_q] * [p_incidence_adj], 0)"),
+        ("k_max_b", X.INT64, "Ceil([freq_b_weighted] * [lives_q] * [p_incidence_adj] + "
+                             "10 * Sqrt([freq_b_weighted] * [lives_q] * [p_incidence_adj]) + 20)"),
         ("phi", X.DBL, "IIF([k_years] > 1, [pearson_sum] / ([k_years] - 1), 1)"),
         ("nb", X.BOOL, '[p_freq_model] = "NEGBIN" AND [phi] > 1'),
         ("nb_r", X.DBL, "IIF([nb], [lambda] / ([phi] - 1), Null())"),
@@ -205,9 +234,10 @@ def build(v):
         ("k_max", X.INT64, "Ceil([lambda] + 10 * Sqrt([lambda] * IIF([nb], [phi], 1)) + 20)")],
         label="lambda, dispersion, distribution")
     lam = C.append(wf, lam, fitc, "kw", "kf", "+ fit")
-    lam = wf.select(lam, keep=["kw", "lambda", "k_max", "freq_u_weighted", "lives_q", "u_fit", "alpha", "max_observed",
-                               "n_fit", "p_iterations", "p_freq_model", "start1", "start2", "start3", "t_sl", "phi",
-                               "nb", "nb_r", "nb_q", "freq_dist"],
+    lam = wf.select(lam, keep=["kw", "lambda", "k_max", "freq_u_weighted", "lives_q", "u_fit", "min_ap", "alpha", "max_observed",
+                               "n_fit", "p_iterations", "p_freq_model", "start1", "start2", "start3", "start4", "start5",
+                               "t_sl", "phi", "nb", "nb_r", "nb_q", "freq_dist", "below_mode", "band_exists", "band_on",
+                               "n_band", "lambda_band", "k_max_b"],
                     keep_unknown=False, label="simulation constants")
 
     # ------------------------------------------------------------------ Poisson draws
@@ -281,7 +311,8 @@ def build(v):
     cl = wf.formula(cl, [("claim", X.DBL, "IIF([x] < [s_cap], [x], [s_cap])")], label="claim = min(X, cap)")
     cl = wf.formula(cl, [("claim_belowM", X.DBL, "IIF([claim] < [max_observed], [claim], [max_observed])"),
                          ("kc", X.INT, "1")], label="claim limited to the largest observed")
-    cl = wf.formula(cl, [("claim_sl", X.DBL, "IIF([claim] > [t_sl], [claim], 0)")], label="claim above t_sl")
+    cl = wf.formula(cl, [("claim_sl", X.DBL, "IIF([claim] > [t_sl], [claim], 0)"), ("src", X.INT, "0")],
+                    label="claim above t_sl; tail source")
     gross = wf.summarize(cl, [("iter", "GroupBy", "iter"), ("claim", "Sum", "large_gross"),
                               ("claim_sl", "Sum", "large_gross_sl")], label="large gross by iteration")
     sg = wf.left_join(wf.select(its, keep=["iter"], keep_unknown=False, label="all iterations"),
@@ -293,23 +324,58 @@ def build(v):
                    keep_unknown=False, label="sim_gross fields")
     wf.output_yxdb(wf.sort(sg, [("iter", "Ascending")], label="by iteration"), C.stage(v, "sim_gross"), label="sim_gross")
 
+    # ------------------------------------------------------------------ band claims (below_cutoff = EMPIRICAL)
+    wf.container("04.5b Band claims: Poisson(lambda_band) counts, empirical draws from the band units (streams 4, 5)")
+    lamb = wf.formula(lam, [("lam_eff", X.DBL, "IIF([band_on], [lambda_band], 0)")], label="band lambda (0 unless EMPIRICAL)")
+    ksb = wf.generate_rows(lamb, "k", X.INT64, "0", "[k] <= [k_max_b]", "[k] + 1", label="k = 0 .. k_max_b")
+    ksb = wf.multirow(ksb, "pk", X.DBL, "IIF([k] = 0, Exp(-[lam_eff]), [Row-1:pk] * [lam_eff] / [k])", label="Poisson pmf (band)")
+    ksb = wf.multirow(ksb, "cdf", X.DBL, "[Row-1:cdf] + [pk]", label="CDF (band)")
+    itsb = wf.generate_rows(lamb, "iter", X.INT64, "1", "[iter] <= [p_iterations]", "[iter] + 1", label="iterations (band)")
+    itsb = stream(wf, itsb, "s4", "start4", "band count uniforms")
+    ab = wf.formula(ksb, [("val", X.DBL, "[cdf]"), ("typ", X.INT, "1"), ("iter", X.INT64, "0")], label="CDF records (band)")
+    bb = wf.formula(itsb, [("val", X.DBL, "[u_s4]"), ("typ", X.INT, "0"), ("k", X.INT64, "-1")], label="draw records (band)")
+    mgb = wf.union([wf.select(ab, keep=["val", "typ", "iter", "k"], keep_unknown=False, label="cdf"),
+                    wf.select(bb, keep=["val", "typ", "iter", "k"], keep_unknown=False, label="draws")], label="merge (band)")
+    mgb = wf.sort(mgb, [("val", "Ascending"), ("typ", "Ascending"), ("iter", "Ascending")], label="by value (band)")
+    mgb = wf.multirow(mgb, "n_below", X.INT64, "[Row-1:n_below] + IIF([Row-1:typ] = 1, 1, 0)", label="CDF points below (band)")
+    nnb, _ = wf.filter(mgb, "[typ] = 0", label="draws (band)")
+    nnb = wf.formula(nnb, [("n_claims_b", X.INT64, "[n_below]"), ("kw", X.INT, "1")], label="band N per iteration")
+    nnb = wf.select(nnb, keep=["iter", "n_claims_b", "kw"], keep_unknown=False, label="band claims per iteration")
+    nnb = wf.sort(nnb, [("iter", "Ascending")], label="by iteration (band)")
+    clb = wf.join(nnb, wf.select(lam, keep=["kw", "max_observed", "n_band", "start5"], rename={"kw": "kw2"},
+                                 keep_unknown=False, label="band constants"), ["kw"], ["kw2"], label="+ constants (band)")["J"]
+    clb = wf.generate_rows(clb, "j", X.INT64, "1", "[j] <= [n_claims_b]", "[j] + 1", label="one row per band claim")
+    clb = wf.sort(clb, [("iter", "Ascending"), ("j", "Ascending")], label="band claim order")
+    clb = stream(wf, clb, "s5", "start5", "band draw uniforms")
+    clb = wf.formula(clb, [("b_pick", X.INT64, "Floor([u_s5] * [n_band]) + 1")], label="band unit index")
+    clb = wf.join(clb, bands, ["b_pick"], ["b_rank"], label="+ band unit (amount, cap)")["J"]
+    clb = wf.formula(clb, [("claim", X.DBL, "[b_adj]"), ("s_cap", X.DBL, "[b_cap]")], label="band claim = the unit's adjusted amount")
+    clb = wf.formula(clb, [("claim_belowM", X.DBL, "IIF([claim] < [max_observed], [claim], [max_observed])"),
+                           ("kc", X.INT, "1"), ("src", X.INT, "1")], label="band claim fields")
+    ccols = ["iter", "claim", "s_cap", "claim_belowM", "kc", "src"]
+    cl_all = wf.union([wf.select(cl, keep=ccols, keep_unknown=False, label="tail claims"),
+                       wf.select(clb, keep=ccols, keep_unknown=False, label="band claims")], label="tail + band claims")
+
     # ------------------------------------------------------------------ layers
     wf.container("04.6 Layers: per-claim loss, annual AAD / AAL / reinstatements, iteration totals")
-    cx = C.append(wf, cl, lay, "kc", "kl", "claims x layers")
+    cx = C.append(wf, cl_all, lay, "kc", "kl", "claims x layers")
     cx = wf.formula(cx, [("xl", X.DBL, layer_loss("[claim]", "[s_cap]")),
                          ("xl_below", X.DBL, layer_loss("[claim_belowM]", "[s_cap]"))], label="layer loss")
+    cx = wf.formula(cx, [("xl_band", X.DBL, "IIF([src] = 1, [xl], 0)")], label="layer loss from band claims")
     it = wf.summarize(cx, [("option_id", "GroupBy", "option_id"), ("layer", "GroupBy", "layer"), ("iter", "GroupBy", "iter"),
-                           ("xl", "Sum", "xl"), ("xl_below", "Sum", "xl_below"), ("xl", "Count", "n_claims_layer")],
+                           ("xl", "Sum", "xl"), ("xl_below", "Sum", "xl_below"), ("xl_band", "Sum", "xl_band"),
+                           ("xl", "Count", "n_claims_layer")],
                       label="by iteration")
     grid = C.append(wf, wf.formula(its, [("kg", X.INT, "1")], label="key"), lay, "kg", "kl", "iterations x layers")
-    grid = wf.formula(grid, [("xl", X.DBL, "0"), ("xl_below", X.DBL, "0"), ("n_claims_layer", X.INT64, "0")],
-                      label="zero rows")
-    grid = wf.select(grid, keep=["option_id", "layer", "iter", "xl", "xl_below", "n_claims_layer"], keep_unknown=False,
-                     label="grid")
-    it = wf.summarize(wf.union([wf.select(it, keep=["option_id", "layer", "iter", "xl", "xl_below", "n_claims_layer"],
-                                          keep_unknown=False, label="iteration amounts"), grid], label="+ zero grid"),
+    grid = wf.formula(grid, [("xl", X.DBL, "0"), ("xl_below", X.DBL, "0"), ("xl_band", X.DBL, "0"),
+                             ("n_claims_layer", X.INT64, "0")], label="zero rows")
+    gcols = ["option_id", "layer", "iter", "xl", "xl_below", "xl_band", "n_claims_layer"]
+    grid = wf.select(grid, keep=gcols, keep_unknown=False, label="grid")
+    it = wf.summarize(wf.union([wf.select(it, keep=gcols, keep_unknown=False, label="iteration amounts"), grid],
+                               label="+ zero grid"),
                       [("option_id", "GroupBy", "option_id"), ("layer", "GroupBy", "layer"), ("iter", "GroupBy", "iter"),
-                       ("xl", "Sum", "xl"), ("xl_below", "Sum", "xl_below"), ("n_claims_layer", "Sum", "n_claims_layer")],
+                       ("xl", "Sum", "xl"), ("xl_below", "Sum", "xl_below"), ("xl_band", "Sum", "xl_band"),
+                       ("n_claims_layer", "Sum", "n_claims_layer")],
                       label="all iterations")
     it = wf.join(it, wf.select(lay, keep=["option_id", "layer", "l_label", "lim_basis", "limit", "aal", "aad",
                                           "reinstatements_n", "reinstatement_cost_pct"],
@@ -322,6 +388,7 @@ def build(v):
         ("recovery", X.DBL, f"IIF({after_aad} < [agg_limit], {after_aad}, [agg_limit])"),
         ("aa_f", X.DBL, "IIF([xl] > 0, [recovery] / [xl], 1)"),
         ("recovery_aboveM", X.DBL, "([xl] - [xl_below]) * [aa_f]"),
+        ("recovery_band", X.DBL, "[xl_band] * [aa_f]"),
         ("reinst_usage", X.DBL, "IIF(IsNull([reinstatement_cost_pct]) OR IsNull([limit]) OR [limit] <= 0, 0, "
                                 "[reinstatement_cost_pct] * IIF(IsNull([reinstatements_n]), [recovery], "
                                 "IIF([recovery] < [reinstatements_n] * [limit], [recovery], "
@@ -329,8 +396,8 @@ def build(v):
     it = wf.left_join(it, wf.select(gross, keep=["iter", "large_gross"], rename={"iter": "g_iter"}, keep_unknown=False,
                                    label="gross"), ["iter"], ["g_iter"], label="+ large gross")
     it = wf.formula(it, [("large_gross_", X.DBL, "IIF(IsNull([large_gross]), 0, [large_gross])")], label="no claims = 0")
-    ito = wf.select(it, keep=["iter", "option_id", "layer", "l_label", "recovery", "recovery_aboveM", "reinst_usage",
-                              "n_claims_layer", "large_gross_"], rename={"large_gross_": "large_gross"},
+    ito = wf.select(it, keep=["iter", "option_id", "layer", "l_label", "recovery", "recovery_aboveM", "recovery_band",
+                              "reinst_usage", "n_claims_layer", "large_gross_"], rename={"large_gross_": "large_gross"},
                     keep_unknown=False, label="out_sim_iterations fields")
     ito = wf.sort(ito, [("option_id", "Ascending"), ("layer", "Ascending"), ("iter", "Ascending")], label="order")
     wf.output_csv(ito, results(v, "out_sim_iterations"), label="out_sim_iterations.csv")    # large: CSV only
@@ -360,6 +427,7 @@ def build(v):
     st = wf.summarize(st, [("option_id", "GroupBy", "option_id"), ("layer", "GroupBy", "layer"),
                            ("l_label", "First", "l_label"), ("recovery", "Sum", "sum_r"), ("r2", "Sum", "sum_r2"),
                            ("zero", "Sum", "n_zero"), ("recovery_aboveM", "Sum", "sum_above"),
+                           ("recovery_band", "Sum", "sum_band"),
                            ("reinst_usage", "Sum", "sum_ru"), ("iter", "Count", "n_iter"),
                            ("recovery", "Max", "max_recovery")], label="sums")
     st = wf.formula(st, [("mean_recovery", X.DBL, "[sum_r] / [n_iter]"),
@@ -369,7 +437,8 @@ def build(v):
                          ("p_zero", X.DBL, "[n_zero] / [n_iter]"),
                          ("mean_above_max_observed", X.DBL, "[sum_above] / [n_iter]"),
                          ("mean_below_max_observed", X.DBL, "[mean_recovery] - [mean_above_max_observed]"),
-                         ("mean_reinst_usage", X.DBL, "[sum_ru] / [n_iter]")], label="summary statistics")
+                         ("mean_reinst_usage", X.DBL, "[sum_ru] / [n_iter]"),
+                         ("mean_recovery_band", X.DBL, "[sum_band] / [n_iter]")], label="summary statistics")
     for qv, nm in ((0.5, "p50"), (0.75, "p75"), (0.9, "p90"), (0.95, "p95"), (0.99, "p99"), (0.995, "p995")):
         qq, _ = wf.filter(qo, f"[q] = {qv}", label=f"{nm} rows")
         qq = wf.select(qq, keep=["option_id", "layer", "recovery"], rename={"option_id": f"{nm}_opt", "layer": f"{nm}_lay",
@@ -393,8 +462,10 @@ def build(v):
                               "lives_q", "mean_recovery", "sd_recovery", "cov", "p_zero", "p50", "p75", "p90", "p95",
                               "p99", "p995", "max_recovery", "mean_below_max_observed", "mean_above_max_observed",
                               "mean_reinst_usage", "expected_cost_det", "credibility_z", "det_to_stoch_below",
-                              "expected_loss_blended", "expected_loss_pppy"],
-                    rename={"p_iterations": "iterations"}, keep_unknown=False, label="out_sim_summary fields")
+                              "expected_loss_blended", "expected_loss_pppy", "below_mode", "min_ap", "lambda_band",
+                              "n_band", "mean_recovery_band"],
+                    rename={"p_iterations": "iterations", "below_mode": "below_cutoff", "min_ap": "band_from"},
+                    keep_unknown=False, label="out_sim_summary fields")
     sto = wf.sort(sto, [("option_id", "Ascending"), ("layer", "Ascending")], label="order")
     C.result(wf, sto, v, "out_sim_summary")
     wf.output_yxdb(sto, C.stage(v, "sim_summary"), label="sim_summary")
@@ -414,6 +485,43 @@ def build(v):
     s4, _ = wf.filter(lam, "[n_fit] < 30", label="S04 few claims")
     checks.append(C.check_formula(wf, s4, sn, "S04", "FLAG", '"severity fit"',
                                   'ToString([n_fit], 0) + " claims above u: fit is uncertain (see alpha_se)"'))
+    # 0.9.0 band checks: layers whose AP sits below the fitting cut-off
+    lb = C.append(wf, lay, wf.select(lam, keep=["kw", "u_fit", "below_mode", "lambda_band", "n_band", "band_on"],
+                                     keep_unknown=False, label="band context"), "kl", "kw", "layers + band context")
+    lb, _ = wf.filter(lb, "[ap] < [u_fit]", label="layers attaching below u")
+    # deterministic band cost per layer: lambda_band x mean layer loss over the band units
+    bx = C.append(wf, wf.formula(bu, [("kc", X.INT, "1")], label="key"), lay, "kc", "kl", "band units x layers")
+    bx = wf.formula(bx, [("xl", X.DBL, layer_loss("[adj]", "[cap]")), ("one", X.DBL, "1")], label="layer loss of a band unit")
+    bx = wf.summarize(bx, [("option_id", "GroupBy", "bx_opt"), ("layer", "GroupBy", "bx_lay"), ("xl", "Sum", "xl_sum"),
+                           ("one", "Sum", "n_bx")], label="band loss by layer")
+    lb = wf.left_join(lb, bx, ["option_id", "layer"], ["bx_opt", "bx_lay"], label="+ band loss")
+    lb = wf.formula(lb, [("band_cost_det", X.DBL, "IIF(IsNull([n_bx]) OR [n_bx] = 0, 0, [lambda_band] * [xl_sum] / [n_bx])")],
+                    label="deterministic band cost")
+    lb = wf.join(lb, wf.select(st, keep=["option_id", "layer", "mean_recovery", "mean_recovery_band"],
+                               rename={"option_id": "s_opt", "layer": "s_lay"}, keep_unknown=False, label="stochastic"),
+                 ["option_id", "layer"], ["s_opt", "s_lay"], label="+ stochastic")["J"]
+    s8, _ = wf.filter(lb, '[below_mode] = "STOP"', label="S08 cut-off above AP, STOP")
+    checks.append(C.check_formula(wf, s8, sn, "S08", "STOP", "[l_label]",
+                                  '"fit_cutoff " + ToString([u_fit], 0) + " is above this layer\'s attachment " + ToString([ap], 0) + '
+                                  '": claims between the AP and the cut-off would not be simulated. Lower fit_cutoff, or set '
+                                  'Params below_cutoff to EMPIRICAL (simulate the band from the data) or IGNORE (leave it out)"'))
+    s9, _ = wf.filter(lb, '[below_mode] = "IGNORE"', label="S09 band ignored")
+    checks.append(C.check_formula(wf, s9, sn, "S09", "FLAG", "[l_label]",
+                                  '"below_cutoff = IGNORE: claims between the AP " + ToString([ap], 0) + " and the cut-off " + '
+                                  'ToString([u_fit], 0) + " are not in the stochastic result (band frequency " + '
+                                  'ToString([lambda_band], 1) + " a year, deterministic band cost " + ToString([band_cost_det], 0) + '
+                                  '", " + ToString(100 * [band_cost_det] / ([mean_recovery] + [band_cost_det]), 1) + '
+                                  '"% of this layer): justify, or set EMPIRICAL"'))
+    s10, _ = wf.filter(lb, '[below_mode] = "EMPIRICAL" AND [band_on]', label="S10 band simulated")
+    checks.append(C.check_formula(wf, s10, sn, "S10", "INFO", "[l_label]",
+                                  '"below_cutoff = EMPIRICAL: claims between the AP " + ToString([ap], 0) + " and the cut-off " + '
+                                  'ToString([u_fit], 0) + " simulated from " + ToString([n_band], 0) + " adjusted claims in the data '
+                                  '(band frequency " + ToString([lambda_band], 1) + " a year): " + '
+                                  'ToString(100 * [mean_recovery_band] / [mean_recovery], 1) + "% of this layer\'s mean recovery"'))
+    s11, _ = wf.filter(lb, '[below_mode] = "EMPIRICAL" AND ![band_on]', label="S11 band empty")
+    checks.append(C.check_formula(wf, s11, sn, "S11", "FLAG", "[l_label]",
+                                  '"below_cutoff = EMPIRICAL but the data has no adjusted claim between " + ToString([ap], 0) + '
+                                  '" and the cut-off " + ToString([u_fit], 0) + ": the band contributes nothing; lower fit_cutoff"'))
     s5, _ = wf.filter(st, "!IsNull([det_to_stoch_below]) AND ([det_to_stoch_below] < 0.8 OR [det_to_stoch_below] > 1.25)",
                       label="S05 det vs stoch")
     checks.append(C.check_formula(wf, s5, sn, "S05", "FLAG", "[l_label]",

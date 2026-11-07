@@ -7,7 +7,7 @@ All Params values are stored as text (ISO dates, plain decimals) so Alteryx read
 from __future__ import annotations
 
 HEADER_ROW = 4
-VERSION = "0.1"
+VERSION = "0.2"
 
 # --------------------------------------------------------------------------------------------- Params
 # (param_id, group, unit, kind, allowed, required, description)
@@ -53,6 +53,9 @@ PARAMS = [
     ("seed", "Stochastic", "", "INT", "", True, "Random seed (recorded in the run log)"),
     ("fit_cutoff", "Stochastic", "quote ccy", "NUMBER", "", False, "Severity fitting cut-off (blank = AP)"),
     ("fit_candidates", "Stochastic", "", "CSV", "", True, "Candidate severity distributions"),
+    ("below_cutoff", "Stochastic", "", "LIST", "STOP,EMPIRICAL,IGNORE", True,
+     "When fit_cutoff is above a layer's attachment: STOP the run; EMPIRICAL = simulate the claims between the AP and "
+     "the cut-off from the data's own claims (spliced with the fitted tail); IGNORE = leave them out, with a flag"),
     ("fit_selected", "Stochastic", "", "LIST", "LOGNORMAL,GAMMA,WEIBULL,PARETO,GPD", False,
      "Severity distribution used by the simulation (blank = lowest AIC in stage 04a); justify an override"),
     ("severity_source", "Stochastic", "", "LIST", "PYTHON,NATIVE", True,
@@ -78,7 +81,7 @@ DEFAULTS = {
     "pp_accumulation": "POLICY_YEAR", "output_threshold_pct_min_ap": "0.5", "outlier_method": "IQR",
     "iqr_multiplier": "1.5", "full_cred_n": "64", "complement_source": "STOCHASTIC", "incidence_adj": "1",
     "qs_cedant_retention_pct": "1", "evaluate_mode": "STANDALONE", "iterations": "10000", "seed": "12345",
-    "fit_candidates": "LOGNORMAL,GAMMA,WEIBULL,PARETO,GPD", "freq_model": "POISSON", "severity_source": "PYTHON",
+    "fit_candidates": "LOGNORMAL,GAMMA,WEIBULL,PARETO,GPD", "below_cutoff": "STOP", "freq_model": "POISSON", "severity_source": "PYTHON",
     "sl_attritional_threshold": "100000", "sl_cov_floor": "0.05", "sl_attritional_dist": "LOGNORMAL", "ev_freq_source": "BOTH",
     "return_periods": "5,50,250",
     "currency_display": "QUOTE", "source_mode": "L",
@@ -189,7 +192,8 @@ PARAM_EXAMPLES = {
     "iqr_multiplier": "1.5", "full_cred_n": "64", "benchmark_rate": "120 (quote ccy per person per year)",
     "incidence_adj": "1 (none) or 0.95", "qs_cedant_retention_pct": "1 (no QS) or 0.7",
     "iterations": "10000 (2000-5000 for a working run on a 16 GB laptop)", "seed": "12345", "fit_cutoff": "blank or 100000",
-    "fit_candidates": "LOGNORMAL,GAMMA,WEIBULL,PARETO,GPD", "sl_attritional_threshold": "100000", "sl_cov_floor": "0.05",
+    "fit_candidates": "LOGNORMAL,GAMMA,WEIBULL,PARETO,GPD",
+    "below_cutoff": "STOP (default; EMPIRICAL to price a layer attaching below the cut-off)", "sl_attritional_threshold": "100000", "sl_cov_floor": "0.05",
     "net_claims_budget": "blank or 70000000", "reference_lives": "blank or 10000", "return_periods": "5,50,250",
 }
 
