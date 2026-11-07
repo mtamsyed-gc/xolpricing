@@ -210,7 +210,7 @@ Every adapter writes exactly these tables, and everything downstream reads only 
 ## 4. Control workbook (`excel/templates/XoL_Control.xlsx`)
 
 Every input block is an **Excel Table** (or a named range) with a fixed name, which Alteryx reads by name. Formatting conventions:
-- Yellow cells are inputs; there are no formulas in input tables.
+- Yellow cells are required inputs, blue cells optional (0.8.0); grey cells are labels or written back. Row 3 carries the required / optional marker, headers and Params value cells carry a help comment, and the Guide sheet lists every input (`control_spec.PARAM_EXAMPLES`, `COLUMN_HELP`). There are no formulas in input tables.
 - Each judgement input has a `justification` column, carried into the run log.
 - Caveat text sits in a comment row above the block.
 

@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>XoL Pricing Tool</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/kit/gc_ui.css">
+<script src="/kit/gc_ui.js"></script>
+</head>
+<body>
+<header class="gc-header">
+  <span class="brand">XoL Pricing Tool <small id="ver"></small></span>
+  <span class="meta" id="hmeta"></span>
+  <span class="spacer"></span>
+  <span id="overall"></span>
+</header>
+<main class="gc-main" id="main"></main>
+<script>
+(async function () {
+  const { $, el, api, toast, pill, table, card, poll, fmtWhen } = GC;
+  const manifest = await (await fetch("/page/manifest.json")).json();
+  const stageDefs = Object.fromEntries(manifest.stages.map((s) => [s.code, s]));
+  const prefs = JSON.parse(localStorage.getItem("xol_ui") || "{}");
+  let variant = prefs.variant || "synth", adapter = prefs.adapter || "01a";
+  let state = null, lastRunKey = null;
+  const tableCache = {};   // name -> {mtime, node}
+  const main = $("#main");
+
+  // ---------------------------------------------------------------- 1. inputs card
+  const inputsCard = card({ id: "inputs", num: "", title: "Inputs", sub: "Control workbook and data files", always: true });
+  // ---------------------------------------------------------------- 2. run card
+  const runCard = card({ id: "run", num: "", title: "Run", sub: "Python route (tools/run_python.py)", always: true });
+  // ---------------------------------------------------------------- 3. stage cards (built on first state)
+  const stageCards = {};
+  // ---------------------------------------------------------------- 4. results card
+  const resultsCard = card({ id: "results", num: "", title: "Results workbook", sub: "Pricing, structures, cedant impact", always: true });
+  main.append(inputsCard, runCard, resultsCard);
+
+  const selVariant = el("select", { onchange: (e) => { variant = e.target.value; savePrefs(); refresh(true); } });
+  const selAdapter = el("select", { onchange: (e) => { adapter = e.target.value; savePrefs(); refresh(true); } });
+  const selFirst = el("select"), selLast = el("select");
+  function savePrefs() { localStorage.setItem("xol_ui", JSON.stringify({ variant, adapter })); }
+
+  function openBtn(label, body, cls) {
+    return el("button", { class: "btn " + (cls || ""), onclick: async () => {
+      try { await api("/api/open", Object.assign({ variant }, body)); toast("Opened " + label); } catch (e) { toast(e.message, 4000); } } }, label);
+  }
+
+  function renderInputs(st) {
+    const ctl = st.control, files = st.inputs.filter((f) => f.mode === adapter);
+    const missing = files.filter((f) => !f.exists);
+    inputsCard.setBody(el("div", {},
+      el("div", { class: "gc-row", style: "margin-bottom:4px" },
+        el("label", { class: "fld", title: "Synthetic book: the fictional test portfolio shipped with the tool. Live pricing: your own data under data/input/." }, "Book", selVariant),
+        el("label", { class: "fld", title: "Must match source_mode in the Control workbook: 01a = L (line data), 01b = C (claimant listing), 01c = E (Merit / ETE outputs)." }, "Data source (adapter)", selAdapter),
+        el("span", { class: "muted", style: "font-size:12px;align-self:flex-end" }, "Book: synthetic = the test portfolio shipped with the tool, live = your data in data/input/. Adapter: must match the Control workbook's source_mode (01a = L, 01b = C, 01c = E).")),
+      el("div", { style: "margin-bottom:10px" }, el("span", { class: "muted", style: "font-size:12px" }, "Required inputs are ", el("span", { class: "swatch req" }), " yellow and optional ones ", el("span", { class: "swatch opt" }), " blue, in the workbook and in the tables below.")),
+      ctl.changed_since_run ? el("div", { class: "banner flag", style: "margin-bottom:10px" },
+        el("b", {}, "Control workbook changed"), ` saved ${fmtWhen(ctl.mtime)}, after the last run started. Re-run from stage 00 to use it.`,
+        el("span", { class: "spacer" }),
+        el("button", { class: "btn sm primary", onclick: () => startRun("00", "07") }, "Re-run 00 → 07")) : null,
+      !ctl.exists ? el("div", { class: "banner stop", style: "margin-bottom:10px" }, el("b", {}, "No Control workbook"),
+        ` at ${ctl.path}. Save a filled copy of the template there.`, el("span", { class: "spacer" }),
+        openBtn("Open template", { what: "control_template" }, "sm")) : null,
+      el("div", { class: "gc-grid-2" },
+        el("div", {},
+          el("div", { class: "gc-row" }, el("b", {}, "Control workbook"), el("span", { class: "muted mono" }, ctl.path)),
+          el("div", { class: "gc-row", style: "margin:6px 0" },
+            openBtn("Open in Excel", { what: "control" }, "primary"),
+            el("span", { class: "muted" }, ctl.exists ? "saved " + fmtWhen(ctl.mtime) : "missing")),
+          el("p", { class: "note" }, "Edit the yellow (required) and blue (optional) cells, save, close. The page notices the save and offers the re-run. Hover a header or a Params value in Excel for what to enter; the Guide sheet lists everything.")),
+        el("div", {},
+          el("div", { class: "gc-row" }, el("b", {}, "Data files"), el("span", { class: "muted" }, st.adapters[adapter]),
+            missing.length ? pill("stop", missing.length + " missing") : pill("ok", "all present")),
+          el("ul", { class: "files" }, files.map((f) => el("li", {},
+            el("span", { class: f.exists ? "ok" : "miss" }, f.exists ? "✓" : "✗"),
+            el("span", { class: "path" }, f.path),
+            el("span", { class: "when" }, f.exists ? fmtWhen(f.mtime) : "not found"),
+            f.exists ? openBtn("Open", { what: "input", path: f.path }, "sm") : null))))),
+      el("div", { id: "params-box", style: "margin-top:10px" })));
+  }
+
+  // ---------------------------------------------------------------- Params readiness (read from the Control workbook)
+  let paramsKey = null, paramsOpen = false;
+  async function renderParams(st) {
+    const box = $("#params-box"); if (!box) return;
+    const key = variant + "|" + st.control.mtime;
+    if (paramsKey !== key) {
+      try { st.params = await api(`/api/params?variant=${variant}`); paramsKey = key; cachedParams = st.params; } catch (e) { box.replaceChildren(el("span", { class: "muted" }, e.message)); return; }
+    }
+    const pr = cachedParams; if (!pr || !pr.exists) { box.replaceChildren(); return; }
+    const nMiss = pr.missing_required.length, nBad = pr.invalid.length, nOld = (pr.not_in_sheet || []).length;
+    const head = el("div", { class: "tbl-head", style: "cursor:pointer", onclick: () => { paramsOpen = !paramsOpen; renderParams(st); } },
+      el("b", {}, (paramsOpen ? "▾ " : "▸ ") + "Params in this workbook"),
+      nMiss ? pill("stop", nMiss + " required blank") : nBad ? pill("flag", nBad + " not an allowed value") : nOld ? pill("flag", nOld + " missing row" + (nOld > 1 ? "s" : "")) : pill("ok", "all required filled"),
+      el("span", { class: "n" }, `${pr.rows.length} parameters · read ${fmtWhen(pr.mtime)}`));
+    const parts = [head];
+    if (nMiss) parts.push(el("div", { class: "banner stop", style: "margin-top:6px" }, el("b", {}, "Required and blank: "), pr.missing_required.join(", "), " — stage 00 will stop (P-checks). Fill them in Excel and save."));
+    if (nBad) parts.push(el("div", { class: "banner flag", style: "margin-top:6px" }, el("b", {}, "Not an allowed value: "), pr.invalid.map((n) => { const r = pr.rows.find((x) => x.name === n); return `${n} = "${r.value}" (allowed: ${r.options.join(", ")})`; }).join("; ")));
+    if (nOld) parts.push(el("div", { class: "banner flag", style: "margin-top:6px" }, el("b", {}, "Rows missing from the Params sheet: "), (pr.not_in_sheet || []).join(", "), " — this workbook predates the current template; add the rows from excel/templates/XoL_Control.xlsx."));
+    if (paramsOpen) {
+      const rows = pr.rows.map((r) => el("tr", { class: r.required && r.blank ? "sev-STOP" : r.invalid ? "sev-FLAG" : "" },
+        el("td", {}, r.required ? el("span", { class: "req-mark", title: "required" }, "●") : el("span", { class: "opt-mark", title: "optional" }, "○"), " ", el("code", {}, r.name)),
+        el("td", {}, r.group),
+        el("td", { class: "mono" }, r.blank ? el("span", { class: "muted" }, r.required ? "BLANK" : (r.default !== "" ? "blank → " + r.default : "blank")) : r.value),
+        el("td", {}, r.options.length ? el("span", { class: "opts" }, r.options.map((o) => el("span", { class: "opt" + (o === String(r.value).toUpperCase() ? " on" : "") }, o))) : r.example ? el("span", { class: "muted" }, "e.g. " + r.example) : (r.unit ? el("span", { class: "muted" }, r.unit) : "")),
+        el("td", { class: "desc" }, r.description + (r.unit && r.options.length ? ` (${r.unit})` : ""))));
+      parts.push(el("div", { class: "tbl-wrap", style: "max-height:420px" }, el("table", { class: "gc params" },
+        el("thead", {}, el("tr", {}, ["parameter", "group", "value", "options / example", "what to enter"].map((h) => el("th", {}, h)))),
+        el("tbody", {}, ...rows))));
+    }
+    box.replaceChildren(...parts);
+  }
+  let cachedParams = null;
+
+  // ---------------------------------------------------------------- input guide (every sheet and column of the Control workbook)
+  const guideCard = card({ id: "guide", num: "", title: "Input guide", sub: "every sheet and column of the Control workbook: what to enter, options, examples", status: "none" });
+  guideCard.setStatus("info", "reference");
+  let guideLoaded = false;
+  guideCard.head.addEventListener("click", async () => {
+    if (guideLoaded) return; guideLoaded = true;
+    try {
+      const sp = await api("/api/spec");
+      const body = el("div", {});
+      body.append(el("p", { class: "note" }, "Mirror of the Guide sheet in the workbook. ", el("span", { class: "req-mark" }, "●"), " required · ", el("span", { class: "opt-mark" }, "○"), " optional · grey = label or written by the tool. Options are the only accepted values (drop-down in Excel). Examples show the format, not a recommendation."));
+      for (const sh of sp.sheets) {
+        const rows = sh.inputs.map((r) => el("tr", { class: r.label ? "lbl" : "" },
+          el("td", {}, r.label ? el("span", { class: "muted", title: "label" }, "–") : r.required ? el("span", { class: "req-mark", title: "required" }, "●") : el("span", { class: "opt-mark", title: "optional" }, "○"), " ", el("code", {}, r.name)),
+          el("td", {}, r.kind + (r.unit ? " · " + r.unit : "")),
+          el("td", {}, r.options.length ? el("span", { class: "opts" }, r.options.map((o) => el("span", { class: "opt" }, o))) : ""),
+          el("td", { class: "mono" }, r.example || (r.default !== undefined && r.default !== "" ? "default " + r.default : "")),
+          el("td", { class: "desc" }, (r.group ? `[${r.group}] ` : "") + r.description)));
+        body.append(el("div", { class: "tbl-head" }, el("b", {}, sh.sheet), el("span", { class: "n" }, sh.title)),
+          el("p", { class: "note", style: "margin:2px 0 4px" }, sh.note),
+          el("div", { class: "tbl-wrap", style: "max-height:none" }, el("table", { class: "gc params" },
+            el("thead", {}, el("tr", {}, ["input", "type", "options", "example / default", "what to enter"].map((h) => el("th", {}, h)))),
+            el("tbody", {}, ...rows))));
+      }
+      guideCard.setBody(body);
+    } catch (e) { guideCard.setBody(el("span", { class: "muted" }, e.message)); }
+  });
+  inputsCard.after(guideCard);
+
+  // ---------------------------------------------------------------- run
+  let logPoll = null;
+  const logBox = el("div", { class: "log" }, el("span", { class: "dim" }, "Run log appears here."));
+  function stageOptions(codes, sel, value) {
+    sel.replaceChildren(...codes.map((c) => el("option", { value: c }, c + " · " + (stageDefs[c] ? stageDefs[c].title : c))));
+    sel.value = codes.includes(value) ? value : codes[0];
+  }
+  async function startRun(first, last) {
+    try {
+      await api("/api/run", { variant, adapter, first: first || selFirst.value, last: last || selLast.value });
+      toast("Run started"); refresh(true); logPoll.start();
+    } catch (e) { toast(e.message, 4000); }
+  }
+  async function stopRun() {
+    try { await api("/api/stop", { variant }); toast("Stop requested"); } catch (e) { toast(e.message, 4000); }
+  }
+  async function refreshLog() {
+    const j = await api(`/api/log?variant=${variant}`);
+    {
+      logBox.replaceChildren(...j.lines.map((l) => el("div", { class: /FAILED|STOPPED|Error|Traceback/.test(l) ? "bad" : /\bok\b|ALL DONE|All workflows ran/.test(l) ? "ok" : /^\[|^=====/.test(l) ? "dim" : "" }, l)));
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+    if (!j.running) { logPoll.stop(); refresh(true); }
+  }
+  let runKey = null;
+  function renderRun(st) {
+    const run = st.run, running = run && run.running;
+    const codes = st.stage_codes;
+    const key = JSON.stringify([variant, adapter, run && [run.started, run.finished, run.rc, running], st.stages.map((s) => [s.status, s.stale, s.checks_mtime]), runningStage(st)]);
+    if (runKey === key) return;
+    runKey = key;
+    if (selFirst.options.length !== codes.length || selFirst.options[1].value !== codes[1]) {
+      stageOptions(codes, selFirst, "00"); stageOptions(codes, selLast, "07");
+    }
+    const summary = run ? el("div", { class: "kv", style: "margin-top:8px" },
+      el("dt", {}, "Last run"), el("dd", {}, `${run.started}${run.finished ? " → " + run.finished.slice(11) : " (running)"} · ${run.adapter} · stages ${run.first} → ${run.last}`),
+      el("dt", {}, "Result"), el("dd", {}, running ? pill("running") : run.rc === 0 ? pill("ok", "completed") : run.rc === null ? pill("none", "interrupted") : pill("stop", "stopped, exit " + run.rc))) : el("p", { class: "note" }, "No run yet for this book.");
+    const timeline = el("div", { class: "timeline", style: "margin-top:10px" }, st.stages.map((s) => {
+      const status = runningStage(st) === s.code ? "running" : s.stale ? "stale" : s.status;
+      return el("span", { class: "step " + status, title: s.title, onclick: () => { const c = stageCards[s.code]; if (c) { c.classList.add("open"); c.scrollIntoView({ behavior: "smooth", block: "start" }); } } },
+        el("span", { class: "dot" }), s.code);
+    }));
+    runCard.setBody(el("div", {},
+      el("div", { class: "gc-row" },
+        el("label", { class: "fld" }, "From stage", selFirst), el("label", { class: "fld" }, "To stage", selLast),
+        running ? el("button", { class: "btn danger", onclick: stopRun }, "Stop") :
+          el("button", { class: "btn primary", onclick: () => startRun() }, "▶ Run"),
+        el("span", { class: "muted" }, running ? "running…" : "Starts tools/run_python.py in the background; this page follows the log.")),
+      summary, timeline, logBox));
+    runCard.setStatus(running ? "running" : st.overall === "none" ? "none" : st.overall);
+    if (running && !logPoll.active) logPoll.start();
+  }
+  function runningStage(st) {
+    if (!(st.run && st.run.running)) return null;
+    // the stage after the last checks file written since the run started
+    const codes = st.stage_codes; let last = -1;
+    st.stages.forEach((s, i) => { if (s.status !== "none" && !s.stale) last = i; });
+    const i = Math.max(codes.indexOf(st.run.first), last + 1);
+    return i <= codes.indexOf(st.run.last) ? codes[i] : null;
+  }
+
+  // ---------------------------------------------------------------- stages
+  function ensureStageCards(st) {
+    const wanted = st.stages.map((s) => s.code);
+    Object.keys(stageCards).forEach((c) => { if (!wanted.includes(c)) { stageCards[c].remove(); delete stageCards[c]; } });
+    let anchor = runCard;
+    for (const s of st.stages) {
+      let c = stageCards[s.code];
+      if (!c) {
+        c = stageCards[s.code] = card({ id: "stage-" + s.code, num: s.code, title: s.title, sub: s.name, status: "none" });
+        anchor.after(c);
+      }
+      anchor = c;
+    }
+  }
+  async function renderStage(s, st) {
+    const c = stageCards[s.code], def = stageDefs[s.code] || {};
+    const status = runningStage(st) === s.code ? "running" : s.stale ? "stale" : s.status;
+    // rebuild the card only when something it shows has changed: open tables and scroll positions survive the polling
+    const key = JSON.stringify([variant, status, s.checks_mtime, s.stop, s.flag, s.info, s.tables.map((t) => t.mtime)]);
+    if (c.dataset.key === key) return;
+    c.dataset.key = key;
+    const counts = s.status === "none" ? "" : `${s.stop ? s.stop + " STOP · " : ""}${s.flag ? s.flag + (s.flag > 1 ? " flags · " : " flag · ") : ""}${s.info} info`;
+    c.setStatus(status, status === "ok" ? "OK · " + counts : status === "stale" ? "earlier run" : status === "none" || status === "running" ? undefined : counts);
+    const body = el("div", {});
+    body.append(el("p", { class: "note" }, def.note || ""));
+    if (s.status === "none") {
+      body.append(el("p", { class: "muted" }, "Not run yet."));
+    } else {
+      if (s.stale) body.append(el("div", { class: "banner info" }, "These outputs come from an earlier run; the current run has not reached this stage."));
+      if (s.stop) body.append(el("div", { class: "banner stop" }, el("b", {}, "The run stopped here."), " Fix the STOP items below in the Control workbook or the data, then re-run from stage 00."));
+      body.append(el("div", { class: "tbl-head" }, el("b", {}, "Checks"), el("span", { class: "n" }, s.checks.length ? "" : "no flags · " + fmtWhen(s.checks_mtime)),
+        el("span", { class: "spacer" }), openBtn("Open CSV", { what: "table", name: (def.checks || "").replace(".csv", "") }, "sm")));
+      if (s.checks.length) body.append(table(["code", "severity", "item", "message"], s.checks.map((r) => [r.code, r.severity, r.item, r.message]), { textCols: ["code", "item", "message"] }));
+      for (const t of s.tables) {
+        if (!t.exists) continue;
+        const holder = el("div", {});
+        body.append(el("div", { class: "tbl-head" }, el("b", {}, t.name), el("span", { class: "n", id: "n-" + s.code + "-" + t.name }, fmtWhen(t.mtime)),
+          el("span", { class: "spacer" }), openBtn("Open CSV", { what: "table", name: t.name }, "sm")), holder);
+        loadTable(t, holder);
+      }
+    }
+    c.setBody(body);
+    // a card with a STOP or a flag opens itself the first time that state appears (not on an earlier run's outputs)
+    const alert = (s.status === "stop" || s.status === "flag") && !s.stale ? s.checks_mtime : "";
+    if (alert && c.dataset.alerted !== alert) { c.classList.add("open"); c.dataset.alerted = alert; }
+  }
+  async function loadTable(t, holder) {
+    const key = variant + "/" + t.name, cached = tableCache[key];
+    if (cached && cached.mtime === t.mtime) { holder.replaceChildren(cached.node); return; }
+    holder.replaceChildren(el("span", { class: "muted" }, "loading…"));
+    try {
+      const j = await api(`/api/table?variant=${variant}&name=${t.name}`);
+      const node = el("div", {}, table(j.columns, j.rows), j.truncated ? el("div", { class: "muted", style: "font-size:12px;margin-top:4px" }, `first ${j.rows.length} of ${j.n_rows.toLocaleString()} rows; Open CSV for all`) : null);
+      tableCache[key] = { mtime: t.mtime, node }; holder.replaceChildren(node);
+    } catch (e) { holder.replaceChildren(el("span", { class: "muted" }, e.message)); }
+  }
+
+  // ---------------------------------------------------------------- results
+  function renderResults(st) {
+    const r = st.results, s07 = st.stages.find((x) => x.code === "07");
+    resultsCard.setBody(el("div", {},
+      el("p", { class: "note" }, "Stage 07 fills the data sheets. Inputs (currency, EPI, return periods, loadings) are edited in the workbook and need no re-run. Save a copy to keep a version: the next run rewrites the data sheets."),
+      el("div", { class: "gc-row" },
+        openBtn("Open Results in Excel", { what: "results" }, "primary"),
+        el("button", { class: "btn", onclick: async () => { try { const j = await api("/api/copy", { variant }); toast("Saved " + j.path); refresh(true); } catch (e) { toast(e.message, 4000); } } }, "Save a dated copy"),
+        openBtn("Open output folder", { what: "folder" }),
+        el("span", { class: "muted mono" }, r.path), el("span", { class: "muted" }, r.exists ? "written " + fmtWhen(r.mtime) : "not written yet"))));
+    resultsCard.setStatus(!r.exists ? "none" : s07 && s07.status !== "none" && !s07.stale ? s07.status : "stale", !r.exists ? "no workbook" : s07 && !s07.stale && s07.status !== "none" ? "current" : "earlier run");
+  }
+
+  // ---------------------------------------------------------------- state
+  async function refresh(force) {
+    const st = await api(`/api/state?variant=${variant}&adapter=${adapter}`);
+    state = st;
+    $("#ver").textContent = "v" + st.tool.version;
+    $("#hmeta").replaceChildren(
+      el("span", {}, "Book ", el("b", {}, manifest.variants[variant].label)),
+      el("span", {}, "Adapter ", el("b", {}, adapter)),
+      el("span", {}, "Last run ", el("b", {}, st.run ? st.run.started.slice(0, 16) : "—")),
+      el("span", {}, "Control saved ", el("b", {}, st.control.mtime ? st.control.mtime.slice(0, 16) : "—")));
+    $("#overall").replaceChildren(pill(st.overall, st.overall === "ok" ? "All checks OK" : st.overall === "flag" ? "Flags to review" : st.overall === "stop" ? "Stopped" : st.overall === "running" ? "Running" : "No run"));
+    if (selVariant.options.length === 0) {
+      selVariant.replaceChildren(...st.variants.map((v) => el("option", { value: v }, manifest.variants[v].label)));
+      selAdapter.replaceChildren(...Object.entries(st.adapters).map(([k, v]) => el("option", { value: k }, k + " · " + v)));
+    }
+    selVariant.value = variant; selAdapter.value = adapter;
+    renderInputs(st); await renderParams(st); renderRun(st); ensureStageCards(st);
+    for (const s of st.stages) await renderStage(s, st);
+    renderResults(st);
+    const key = JSON.stringify([st.run && st.run.started, st.run && st.run.finished, st.control.mtime]);
+    if (lastRunKey && key !== lastRunKey && st.run && st.run.finished && !(st.run.running)) toast(st.run.rc === 0 ? "Run completed" : "Run stopped: see the stage cards", 4000);
+    lastRunKey = key;
+  }
+  logPoll = poll(refreshLog, 2000);
+  const statePoll = poll(refresh, 5000);
+  statePoll.start();
+  refreshLog().catch(() => {});
+})();
+</script>
+</body>
+</html>

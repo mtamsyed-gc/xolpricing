@@ -1,6 +1,6 @@
 # XoL Pricing Tool — user manual
 
-Version 0.7 · 6 November 2026 · screenshots (of 0.6, 22 October 2026) taken on the owner's laptop (Windows 11, Alteryx Designer 2026.2,
+Version 0.8 · 7 November 2026 · screenshots (of 0.6, 22 October 2026) taken on the owner's laptop (Windows 11, Alteryx Designer 2026.2,
 Excel 365) during a full run on the synthetic portfolio.
 
 The tool prices excess-of-loss reinsurance on a medical portfolio for the broker: expected claims cost per layer,
@@ -146,8 +146,13 @@ What the tool does with Merit's data:
 ## 4. The Control workbook
 
 `data\input\XoL_Control.xlsx` holds every assumption. Alteryx reads each sheet by name; the header is always in
-row 4. Yellow cells are inputs; grey cells are written back by Alteryx. Every judgement input has a `justification`
-column that is carried into the run log.
+row 4. **Yellow** cells are required inputs, **blue** cells are optional (blank = the default the description names),
+grey cells are labels or written back by the tool. Row 3 above every column says *required* or *optional*. Hover a
+column header, or a Params value cell, for what to enter, the allowed options and an example; list inputs have a
+drop-down of their options. The **Guide** sheet lists every sheet and column with the same information, and the
+browser page shows it too (Input guide card) along with a readiness check of the Params sheet: a required value
+left blank is named before you run. Every judgement input has a `justification` column that is carried into the
+run log.
 
 ![Control README](img/03_control_readme.jpg)
 
@@ -293,6 +298,22 @@ the same outputs (Results workbook included). Alteryx does not need to be instal
 - Results equal the Alteryx route's: stages 00 to 06 were compared with Designer's own run on the synthetic data,
   and both routes' Results workbooks are checked against the same independent computation. Stage 04a's fitted
   parameters can differ in the fifth or sixth significant figure; the selected distribution is the same.
+
+### 5.2 The browser page
+
+Double-click `tools\xol_ui.bat`. A command window opens (leave it open) and the browser shows one page for the whole
+pricing, top to bottom:
+
+| Section | What you do there |
+|---|---|
+| Inputs | Choose the book (synthetic or live) and the data source. **Open in Excel** opens the Control workbook; after you save it, the page shows a banner and a **Re-run** button. The data files the chosen source needs are listed with a tick or a cross. |
+| Run | Choose the first and last stage and press **Run**. The log follows the Python route live; the row of stage chips turns green, amber or red as each stage finishes. **Stop** ends the run. |
+| Stages 00 to 07 | One card per stage. The pill on the right says OK, how many flags, or STOP. Open a card for the check messages, the reconciliation counts and the stage's result tables; **Open CSV** opens any of them in Excel. A card with a STOP opens by itself: fix what it names and re-run from 00. |
+| Results workbook | **Open Results in Excel** after stage 07; **Save a dated copy** keeps a version before the next run overwrites the data sheets. |
+
+Grey "earlier run" pills mean that stage's outputs are older than the current run (for instance after running
+00 to 03 only). Everything the page shows is in `data\output\<live|synth>\` as before; the page is a window on it,
+not a second copy.
 
 ---
 

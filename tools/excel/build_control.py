@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 from openpyxl import Workbook
+from openpyxl.comments import Comment
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
@@ -21,7 +22,25 @@ import control_spec as S  # noqa: E402
 import xlsx_norm  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
-NAVY, INPUT, NOTE = "1F3864", "FFF2CC", "F2F2F2"
+NAVY, INPUT, OPTIONAL, NOTE = "1F3864", "FFF2CC", "DDEBF7", "F2F2F2"   # required input, optional input, label
+REQ_COLOUR, OPT_COLOUR = "C00000", "7F7F7F"
+LABEL_COLS = ("description", "allowed_values", "group", "unit", "param_id", "indicated_factor")
+
+
+def _help_text(sheet: str, name: str, kind: str, allowed: str, req: bool, desc: str, example: str) -> str:
+    """One comment / guide line: required or optional, type, options, example, description."""
+    parts = ["REQUIRED" if req else "optional"]
+    if kind == "LIST" or (allowed and "," in allowed):
+        parts.append("choose one of: " + allowed.replace(",", ", "))
+    elif kind in ("NUMBER", "INT"):
+        parts.append("number" if kind == "NUMBER" else "whole number")
+    elif kind == "DATE":
+        parts.append("date yyyy-mm-dd")
+    elif kind == "CSV":
+        parts.append("comma-separated list")
+    if example:
+        parts.append("e.g. " + example)
+    return " | ".join(parts) + ("\n" + desc if desc else "")
 
 
 def _style_sheet(ws, title: str, note: str, cols: list) -> None:
@@ -32,11 +51,25 @@ def _style_sheet(ws, title: str, note: str, cols: list) -> None:
     ws["A2"].alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=max(len(cols), 6))
     ws.row_dimensions[2].height = 48
-    for j, (name, *_rest) in enumerate(cols, 1):
+    help_ = S.COLUMN_HELP.get(ws.title, {})
+    for j, (name, kind, allowed, req) in enumerate(cols, 1):
         c = ws.cell(row=S.HEADER_ROW, column=j, value=name)
         c.font = Font(bold=True, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=NAVY)
         ws.column_dimensions[get_column_letter(j)].width = max(14, min(42, len(name) + 4))
+        # row 3 (not read by the tool): required / optional marker above every column
+        label = "label" if name in LABEL_COLS else ("required" if req else "optional")
+        m = ws.cell(row=S.HEADER_ROW - 1, column=j, value=label if ws.title != "Params" else
+                    {"value": "yellow = required, blue = optional", "justification": "optional"}.get(name, "label"))
+        m.font = Font(size=8, italic=True, bold=label == "required",
+                      color=REQ_COLOUR if label == "required" else OPT_COLOUR)
+        desc, example = help_.get(name, ("", ""))
+        if ws.title != "Params" or name in ("value", "justification"):
+            if ws.title == "Params":
+                desc, example = ("Type the value here; hover each cell for its own help" if name == "value"
+                                 else "Why you chose this value; carried into the run log"), ""
+            c.comment = Comment(_help_text(ws.title, name, kind, allowed, req, desc, example), "XoL tool")
+            c.comment.width, c.comment.height = 320, 140
     ws.freeze_panes = ws.cell(row=S.HEADER_ROW + 1, column=1)
 
 
@@ -45,10 +78,10 @@ def _write_rows(ws, cols: list, rows: list[dict], n_blank: int = 0) -> None:
         for j, (name, kind, allowed, _req) in enumerate(cols, 1):
             v = r.get(name)
             c = ws.cell(row=S.HEADER_ROW + 1 + i, column=j, value=v)
-            if name in ("description", "allowed_values", "group", "unit", "param_id", "indicated_factor"):
+            if name in LABEL_COLS:
                 c.fill = PatternFill("solid", fgColor=NOTE)
             else:
-                c.fill = PatternFill("solid", fgColor=INPUT)
+                c.fill = PatternFill("solid", fgColor=INPUT if _req else OPTIONAL)
             if kind == "NUMBER" and name.endswith("pct"):
                 c.number_format = "0.00%"
             if kind == "TEXT" or ws.title == "Params":
@@ -70,8 +103,12 @@ def _params_sheet(ws, values: dict) -> None:
                      "unit": unit, "allowed_values": allowed, "description": desc + (" [required]" if req else ""),
                      "justification": values.get(f"just:{pid}")})
     _write_rows(ws, cols, rows)
-    for i, (pid, *_r) in enumerate(S.PARAMS):
-        allowed = S.PARAM_ALLOWED.get(pid)
+    for i, (pid, group, unit, kind, allowed, req, desc) in enumerate(S.PARAMS):
+        v = ws.cell(row=S.HEADER_ROW + 1 + i, column=3)
+        v.fill = PatternFill("solid", fgColor=INPUT if req else OPTIONAL)
+        v.comment = Comment(_help_text("Params", pid, kind, allowed, req, desc, S.PARAM_EXAMPLES.get(pid, "")), "XoL tool")
+        v.comment.width, v.comment.height = 320, 140
+        ws.cell(row=S.HEADER_ROW + 1 + i, column=7).fill = PatternFill("solid", fgColor=OPTIONAL)
         if allowed:
             dv = DataValidation(type="list", formula1=f'"{allowed}"', allow_blank=True)
             ws.add_data_validation(dv)
@@ -87,7 +124,8 @@ def _readme(wb, synthetic: bool) -> None:
         (f"Version {S.VERSION}. {'SYNTHETIC INSTANCE - fictional portfolio for testing.' if synthetic else 'Template.'}", False),
         ("", False),
         ("Alteryx reads every sheet below by name; the header is in row %d. Do not rename sheets or headers." % S.HEADER_ROW, False),
-        ("Yellow cells are inputs. Grey cells are labels or written back by Alteryx.", False),
+        ("YELLOW cells are required inputs; BLUE cells are optional (blank = the default described); GREY cells are labels or written back by the tool.", False),
+        ("Row 3 above each column says required / optional. Hover a header (or a Params value cell) for what to enter, the options and an example. The Guide sheet lists everything.", False),
         ("Every judgement input (trend, completion, weights, incidence) needs a justification - it goes into the run log.", False),
         ("", False),
     ] + [(f"{s}: {S.TABLES[s][0]}", False) for s in S.SHEETS]
@@ -95,6 +133,50 @@ def _readme(wb, synthetic: bool) -> None:
         c = ws.cell(row=i, column=1, value=t)
         c.font = Font(bold=b, size=13 if b else 10, color=NAVY if b else "000000")
     ws.column_dimensions["A"].width = 110
+
+
+def _guide(wb) -> None:
+    """Guide sheet: every input of every sheet with required / optional, type, options, example and description."""
+    ws = wb.create_sheet("Guide", 1)
+    ws["A1"] = "Input guide: every sheet, every column"
+    ws["A1"].font = Font(bold=True, size=13, color=NAVY)
+    ws["A2"] = ("Required inputs are yellow in the sheets, optional ones blue. Options are the only values accepted "
+                "for list inputs (the cells have a drop-down). Examples show the format; they are not recommendations.")
+    ws["A2"].font = Font(italic=True, size=9, color="595959")
+    hdr = ["sheet", "input", "required", "type", "options", "example", "description"]
+    for j, h in enumerate(hdr, 1):
+        c = ws.cell(row=4, column=j, value=h)
+        c.font, c.fill = Font(bold=True, color="FFFFFF"), PatternFill("solid", fgColor=NAVY)
+    r = 5
+    kinds = {"TEXT": "text", "NUMBER": "number", "INT": "whole number", "DATE": "date yyyy-mm-dd", "LIST": "choice", "CSV": "comma list"}
+    for pid, group, unit, kind, allowed, req, desc in S.PARAMS:
+        row = ["Params", pid, "REQUIRED" if req else "optional", kinds.get(kind, kind) + (f" ({unit})" if unit else ""),
+               allowed.replace(",", ", "), S.PARAM_EXAMPLES.get(pid, ""), f"[{group}] {desc}"]
+        for j, v in enumerate(row, 1):
+            c = ws.cell(row=r, column=j, value=v)
+            if j == 3:
+                c.font = Font(bold=req, color=REQ_COLOUR if req else OPT_COLOUR)
+        ws.cell(row=r, column=2).fill = PatternFill("solid", fgColor=INPUT if req else OPTIONAL)
+        r += 1
+    for sheet in S.SHEETS:
+        if sheet == "Params":
+            continue
+        for name, kind, allowed, req in S.TABLES[sheet][2]:
+            desc, example = S.COLUMN_HELP.get(sheet, {}).get(name, ("", ""))
+            label = name in LABEL_COLS
+            row = [sheet, name, "label (written by the tool)" if label else "REQUIRED" if req else "optional",
+                   kinds.get(kind, kind), allowed.replace(",", ", ") if kind in ("LIST", "INT") and "," in allowed else "",
+                   example, desc]
+            for j, v in enumerate(row, 1):
+                c = ws.cell(row=r, column=j, value=v)
+                if j == 3:
+                    c.font = Font(bold=req and not label, color=REQ_COLOUR if req and not label else OPT_COLOUR)
+            ws.cell(row=r, column=2).fill = PatternFill("solid", fgColor=NOTE if label else INPUT if req else OPTIONAL)
+            r += 1
+    for col, w in zip("ABCDEFG", (12, 26, 12, 22, 44, 34, 90)):
+        ws.column_dimensions[col].width = w
+    ws.freeze_panes = "A5"
+    ws.auto_filter.ref = f"A4:G{r - 1}"
 
 
 def build(path: Path, values: dict, tables: dict, synthetic: bool) -> None:
@@ -109,6 +191,7 @@ def build(path: Path, values: dict, tables: dict, synthetic: bool) -> None:
         else:
             _write_rows(ws, cols, tables.get(sheet, []), n_blank=0 if tables.get(sheet) else 5)
     _readme(wb, synthetic)
+    _guide(wb)
     path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(path)
     xlsx_norm.normalise(path)

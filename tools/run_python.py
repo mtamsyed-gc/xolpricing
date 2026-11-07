@@ -1,4 +1,4 @@
-"""Run the XoL pipeline in Python, without Alteryx (0.7.0, owner 2026-11-06).
+"""Run the XoL pipeline in Python, without Alteryx (0.7.0, owner 2026-11-06; browser page: tools/ui/serve.py).
 
     py tools\\run_python.py                       synthetic data, line adapter (01a), stages 00 to 07
     py tools\\run_python.py live 01c              live data, Merit adapter
