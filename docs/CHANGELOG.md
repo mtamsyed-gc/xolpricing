@@ -2,6 +2,37 @@
 
 Methodology and data-contract changes, newest first.
 
+## 2026-11-07 — 0.10.0-dev: stage 04 native (option 2, step 1)
+**Stage 04 (per-person simulation) runs in numpy** (`tools/native/stage04.py`) instead of the row-by-row executor. No
+methodology change: the module transcribes `tools/alteryx/build_stage04.py` tool by tool as `tools/alteryx/sim.py`
+evaluates it, and writes the same 14 files (`out_fit`, `out_sim_summary`, `out_sim_quantiles`, `out_sim_iterations`,
+`checks_04`, `recon_04` and their stage files, `sim_gross`) with the same fields, types, row order and values, and the
+same STOP messages; stages 05–07 and the page are unchanged.
+- **Identical, not just close.** Same IEEE operations in the same order; `Log` / `Log10` / `Exp` / `Pow` through the
+  `math` module (the executor's), not numpy's own; MINSTD states as exact integers (block jump-ahead); Summarize's Sum
+  reproduced as Python's built-in compensated `sum` (vectorised across iterations); the merge-sort inverse CDF as
+  `searchsorted` (draws before equal CDF points); left joins keep the executor's matched-then-unmatched order.
+  `tests/test_native_stage04.py`: every stage file value with its type and every CSV byte equal to the executor on 19
+  variants (line, claimant and ETE adapters; Poisson and NEGBIN; PYTHON severity Pareto, GPD, lognormal, gamma, Weibull,
+  and NATIVE; another seed; AAD, AAL, co-participation, capped and unlimited reinstatements; Z < 1; S02, S03, S04, S05,
+  S06, S07, S08, S09, S10, S11; 50 to 2,000 iterations); max difference 0. At 10,000 iterations (the executor needs
+  more than 6 GB there): Designer 2026.2's stored run on Designer's 04a grid every iteration (max rel diff 1.3e-15, its
+  CSV precision), `tests/twin_stage04.py` 14/14, and the clean-room rebuild of `tests/independent` on all 8 packs (max
+  rel diff 4.9e-15). Executor vs native at 5,000 iterations also identical.
+- **Speed and memory** (sandbox, synthetic book, 4 PP layers, λ = 123): 1,000 iterations 10.6 s → 0.13 s; 2,000:
+  21.3 s → 0.25 s; 5,000: 55 s and 4.2 GB → 0.5 s and 0.3 GB; 10,000: executor killed at 6.3 GB after ~70 s (owner's
+  laptop: 5–8 min, ~9 GB) → 1.2 s and 0.4 GB.
+- **Runner.** `tools/run_python.py` runs stage 04 natively by default and logs the engine; `XOL_STAGE04=executor`
+  selects the executor. Data the module does not reproduce (no unit above u, no Pareto fit, no active PP layer, blank or
+  repeated keys, a non-integer seed, the two S09 / S10 divisions by zero) raises `Unsupported` and the runner then runs
+  the executor, so results never depend on the engine. The user pack carries the module (`tests/test_packs.py` now runs
+  the unpacked pack 00 → 04).
+- **Executor behaviour found while transcribing** (kept as is, not changed): with no adjusted unit above u the fit
+  Summarize yields no row, so stage 04 writes empty tables and S01 never fires (fallback case); a stale severity table
+  (S07) also empties `out_sim_summary` and with it S05 and S08–S11; the executor's Generate Rows guard stops runs above
+  10,000 iterations (the native module has no such limit); S09 and S10 divide by the layer's mean recovery (an executor
+  error when it is 0); `below_cutoff` values other than STOP / IGNORE / EMPIRICAL raise no check and simulate no band.
+
 ## 2026-11-07 — 0.9.0: Python only (Alteryx dropped from the XoL tool); `below_cutoff`
 **Alteryx dropped (owner, 2026-11-07; this tool only — Merit and the ETE pipeline keep Alteryx).** The Python route
 reproduces Designer exactly (laptop checks 2026-11-06/07; Designer baseline in the tests), so the tool no longer

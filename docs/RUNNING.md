@@ -37,9 +37,13 @@ tools\run_pipeline.bat live 01c 00 02   stop after 02 (fourth argument: last sta
   Stops at the first stage that ends with an error (a STOP check is an error); log `data\output\<variant>\python_run.log`;
   exit code 0 ok, 2 stopped or bad arguments. A run that starts after stage 00 needs this tool's own stage files
   (`stage/ENGINE.txt`); stage folders left by an old Alteryx run are refused (start from 00).
-- **Time and memory**: on the owner's laptop the full chain at 10,000 iterations takes about 7–11 minutes, stage 04
-  about 5–8 of them, peak Python memory about 9 GB (2026-11-06/07). On a 16 GB laptop close other programs, or set
-  `iterations` to 2,000–5,000 for working runs. (0.10 rewrites stage 04 natively; see the CHANGELOG.)
+- **Time and memory**: 0.10.0 runs stage 04 (simulation) in numpy (`tools/native/stage04.py`): 10,000 iterations take
+  about a second and under 0.5 GB, where the executor took 5–8 minutes and about 9 GB on the owner's laptop
+  (2026-11-06/07). The results are identical to the executor's (`tests/test_native_stage04.py`). The log names the
+  engine (`stage 04 engine: native`); to run stage 04 in the executor instead, set `XOL_STAGE04=executor` before the
+  run (`set XOL_STAGE04=executor` in the command window). The executor also runs it, automatically and logged, for
+  data the native module does not cover (e.g. no claim above the fitting cut-off). The other stages still run in the
+  executor.
 
 ## Input files
 | Mode (`source_mode`) | Folder | Files (templates in `data/templates/`) |

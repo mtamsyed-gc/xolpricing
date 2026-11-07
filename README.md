@@ -52,6 +52,7 @@ tools/excel/      Control and Results workbook specs and builders
 tools/python/     sevfit.py: severity fitting, embedded in the 04a Python tool
 tools/run_pipeline.bat   runs every workflow with AlteryxEngineCmd.exe
 tools/run_python.py      runs the same workflows in Python (run_pipeline_python.bat), no Alteryx
+tools/native/     stage04.py: stage 04 in numpy, identical to the executor (0.10.0; XOL_STAGE04=executor to compare)
 tools/synth/      synthetic data generator (seeded, reproducible)
 tests/
   run_all.py              every test + structural check of the generated workflows
@@ -59,6 +60,7 @@ tests/
   test_stage00.py … test_stage07.py   simulator runs vs independent oracles, incl. broken-input cases
   test_designer_twin.py   the simulator and oracles reproduce Designer's stored outputs
   test_python_route.py    the Python route's runner, its guard and its outputs against Designer's
+  test_native_stage04.py  native stage 04 = the executor on every variant; Designer 10k, oracle, clean-room rebuild
   twin_stage04/05/06.py   compare a Designer run with the numpy oracles
   reconciliation/         synthetic_controls.json (observed totals), synthetic_truth.json (ultimates)
 ```

@@ -6,7 +6,9 @@
     py tools\\run_python.py synth 01a 04          start at stage 04 (00-03 already run)
 
 Runs the stage definitions in alteryx/workflows (live) or alteryx/workflows/synth (synth) with tools/alteryx/sim.py,
-the Python executor. The definitions were first written for Alteryx Designer and the executor reproduces Designer's own
+the Python executor; stage 04 (simulation) runs in tools/native/stage04.py, a numpy implementation that writes the same
+files with the same values, much faster (0.10.0). Set XOL_STAGE04=executor to run stage 04 in the executor instead; the
+executor also runs it when the data is outside what the native module reproduces (logged). The definitions were first written for Alteryx Designer and the executor reproduces Designer's own
 runs exactly (tests/test_designer_twin.py keeps that comparison); the tool does not use Alteryx from 0.9.0.
 Stops at the first workflow that ends with an error (a STOP check is an error). Log: data/output/<variant>/python_run.log.
 
@@ -17,6 +19,7 @@ Needs Python 3.12+ with the packages in requirements-native.txt (numpy, pandas, 
 """
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 import time
@@ -32,6 +35,7 @@ STAGES = ["00", "AD", "02", "03", "04a", "04", "05", "06", "07"]
 NAMES = {"00": "00_read_control", "02": "02_experience", "03": "03_burning_cost", "04a": "04a_fit_severity",
          "04": "04_simulate", "05": "05_per_event", "06": "06_stop_loss", "07": "07_results"}
 MARKER = "ENGINE.txt"
+STAGE04_ENV = "XOL_STAGE04"      # "executor": stage 04 in the executor; anything else (default): the native module
 
 
 class RunError(Exception):
@@ -62,6 +66,24 @@ def check_packages(steps) -> None:
     if missing:
         raise RunError(f"Python packages missing: {', '.join(missing)}. Install requirements-native.txt "
                        f"(py -m pip install -r requirements-native.txt) and run again.")
+
+
+def run_stage(sim, code: str, wf: Path, out: Path) -> tuple[list, list, str]:
+    """Run one stage; returns (messages, warnings, engine note). Messages are (kind, text) as the Message tool gives
+    them, warnings (tool label, text). Stage 04 runs natively unless XOL_STAGE04=executor or the data is outside the
+    native path (stage04.Unsupported), in which case the executor runs it."""
+    note = ""
+    if code == "04" and os.environ.get(STAGE04_ENV, "").strip().lower() != "executor":
+        sys.path.insert(0, str(ROOT / "tools" / "native"))
+        import stage04
+        try:
+            return stage04.run(out), [], "stage 04 engine: native (tools/native/stage04.py)"
+        except stage04.Unsupported as e:
+            note = f"stage 04 engine: executor (native path not applicable: {e})"
+    elif code == "04":
+        note = f"stage 04 engine: executor ({STAGE04_ENV}=executor)"
+    sim.run(wf)
+    return list(sim.MESSAGES), list(sim.WARNINGS), note
 
 
 def main(argv: list[str]) -> int:
@@ -105,15 +127,15 @@ def main(argv: list[str]) -> int:
         print(f"[{datetime.now():%H:%M:%S}] {name} ...", flush=True)
         lines += ["", f"===== {name}  start {datetime.now():%H:%M:%S}"]
         try:
-            sim.run(wf_dir / f"{name}.yxmd")
+            msgs, warnings, note = run_stage(sim, code, wf_dir / f"{name}.yxmd", out)
         except Exception as e:  # noqa: BLE001 - every failure stops the chain with its message in the log
             lines += [f"FAILED: {type(e).__name__}: {e}", traceback.format_exc()]
             print(f"   FAILED: {type(e).__name__}: {e}")
             rc = 2
             break
-        errors = [m for m in sim.MESSAGES if m[0] == "Error"]
-        warns = [m for m in sim.MESSAGES if m[0] == "Warning"] + [("Warning", f"{a}: {b}") for a, b in sim.WARNINGS]
-        lines += [f"{k}: {m}" for k, m in sim.MESSAGES] + [f"Warning: {a}: {b}" for a, b in sim.WARNINGS]
+        errors = [m for m in msgs if m[0] == "Error"]
+        warns = [m for m in msgs if m[0] == "Warning"] + [("Warning", f"{a}: {b}") for a, b in warnings]
+        lines += ([note] if note else []) + [f"{k}: {m}" for k, m in msgs] + [f"Warning: {a}: {b}" for a, b in warnings]
         lines.append(f"===== {name}  end {datetime.now():%H:%M:%S}  {time.time() - t:.0f} s, "
                      f"{len(errors)} error(s), {len(warns)} warning(s)")
         if code == "00":
@@ -122,7 +144,8 @@ def main(argv: list[str]) -> int:
             print(f"   STOPPED: {errors[0][1]}" + (f" (+{len(errors) - 1} more)" if len(errors) > 1 else ""))
             rc = 2
             break
-        print(f"   ok ({time.time() - t:.0f} s)" + (f", {len(warns)} warning(s): see the log" if warns else ""))
+        print(f"   ok ({time.time() - t:.0f} s)" + (f", {len(warns)} warning(s): see the log" if warns else "")
+              + (f"; {note}" if note else ""))
     lines.append(("ALL DONE " if rc == 0 else "STOPPED ") + f"{datetime.now():%Y-%m-%d %H:%M:%S}")
     log.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print()
