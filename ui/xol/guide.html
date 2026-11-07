@@ -116,7 +116,9 @@
           <tr><td><code>STOP</code> (default)</td><td>Stage 04 stops (S08) and names the layers; the page warns before you run.</td><td>You did not mean to price a layer below the cut-off.</td></tr>
           <tr><td><code>EMPIRICAL</code></td><td>The band is simulated from the data's own adjusted claims in that band, with their own frequency, spliced with the fitted tail above the cut-off (S10 shows the band's share of each layer).</td><td>You want a high cut-off for the tail fit and still price low layers.</td></tr>
           <tr><td><code>IGNORE</code></td><td>The band is left out; S09 flags each layer with the band's frequency and deterministic cost.</td><td>The band is priced or retained elsewhere and you want a pure tail view — justify it.</td></tr></tbody></table>
-        <p>The page's Params table shows the exact situation for your workbook (which layers, which cut-off, which mode) before you run.</p>`),
+        <p>The page's Params table shows the exact situation for your workbook (which layers, which cut-off, which mode) before you run: red for STOP, amber for IGNORE, blue for EMPIRICAL.</p>
+        <figure><img src="img/g13_cutoff_banner.png" alt="Cut-off banner" loading="lazy"><figcaption>The banner under Params in this workbook, here for EMPIRICAL with a 150,000 cut-off and two layers attaching below it.</figcaption></figure>
+        <figure><img src="img/g14_s10_checks.png" alt="S10 checks on the stage 04 card" loading="lazy"><figcaption>After the run, the stage 04 card lists one S10 row per affected layer with the band's frequency and its share of the layer's loss.</figcaption></figure>`),
       doneWhen("control", "the page shows ALL REQUIRED FILLED next to Params in this workbook")) },
     { id: "data", title: "Put the data files in place", sub: "data\\input\\…", body: () => el("div", {},
       el("div", { class: "only only-L" },
