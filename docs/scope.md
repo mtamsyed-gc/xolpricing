@@ -46,6 +46,10 @@ Structures can be stacked:
 
 ## 3. Platform split
 
+> **0.9.0 (2026-11-07):** Alteryx is no longer used. Everything this section assigns to Alteryx runs in Python (the same
+> stage definitions, executed by `tools/alteryx/sim.py`, reproducing Designer exactly); Excel keeps its role. The
+> table below is the original design, kept for the record.
+
 | Layer | Tool | Rule |
 |---|---|---|
 | Data ingestion, cleaning, FX as-if, limits, accumulation, event grouping, trend, completion, layering, burning cost, weights, outliers, credibility | **Alteryx** | *All* data manipulation and preparation is done in Alteryx — no Power Query, no Excel formulas acting on claim rows |

@@ -4,19 +4,23 @@ Broker-side excess-of-loss pricing tool for medical (health) portfolios. For eac
 structure (per-person XoL, per-event XoL, aggregate stop loss; RA or LO) it produces (A) expected layer claims cost, (B) an indicative RI premium on high-level
 loadings, and (C) cedant impact — recoveries vs premium and retained-claims volatility.
 
-**Alteryx** workflows do all data preparation, burning cost, distribution fitting and simulation (run by the Alteryx
-engine, or without Alteryx by the Python route).
-**Excel** holds the inputs (Control workbook) and the loadings, cedant-impact exhibits and charts
-(Results workbook).
+**Python** does all data preparation, burning cost, distribution fitting and simulation, driven from a page in the
+browser (`tools\xol_ui.bat`). **Excel** holds the inputs (Control workbook) and the loadings, cedant-impact exhibits
+and charts (Results workbook). Alteryx is not used from 0.9.0: the stage definitions in `alteryx/workflows/` (historical
+folder name) were first written for Designer and are run by the Python executor, which reproduces Designer's own runs
+exactly (`tests/test_designer_twin.py`).
 
-> Status (0.9.0, 2026-11-07): layers attaching below the fitting cut-off handled by `below_cutoff` (STOP / EMPIRICAL / IGNORE); browser interface (`tools\xol_ui.bat`: one page that opens the workbooks in Excel, runs the Python route and shows every stage's checks and tables); all phases built — Control (00), adapters for line, claimant and ETE / Merit data (01a/b/c; Merit v8 final outputs read as written; benefit limits from the data, else the plan, else a default),
-> experience (02), per-person burning cost (03), severity candidates with the Python tool (04a) and simulation (04),
-> per-event XoL (05), stop loss and programme structures (06), Results workbook with pricing, C1, C2, expiring,
-> severity and scenarios (07). `tools\run_pipeline.bat` runs the chain with the Alteryx engine;
-> `tools\run_pipeline_python.bat` runs the same workflows in Python, without Alteryx (`docs/RUNNING.md`). Every workflow runs
-> clean in Designer 2026.2 and matches the independent oracles exactly.
-> How to run: the illustrated [user manual](docs/manual/USER_MANUAL.md); developers: [`docs/RUNNING.md`](docs/RUNNING.md). Design: [`docs/scope.md`](docs/scope.md),
-> [`docs/data-contracts.md`](docs/data-contracts.md). Calculations: [`docs/XOL_MECHANICS.md`](docs/XOL_MECHANICS.md) (walkthrough with a worked example), [`docs/methodology.md`](docs/methodology.md) (formula reference by stage).
+> Status (0.9.0, 2026-11-07): Python only; layers attaching below the fitting cut-off handled by `below_cutoff`
+> (STOP / EMPIRICAL / IGNORE); browser page with the interactive guide (**How to use**); input help on every Control
+> input; user pack without synthetic data, admin pack with everything (`tools/release/make_packs.py`). All phases
+> built: Control (00), adapters for line, claimant and ETE / Merit data (01a/b/c), experience (02), per-person
+> burning cost (03), severity candidates (04a) and simulation (04), per-event XoL (05), stop loss and programme
+> structures (06), Results workbook with pricing, C1, C2, expiring, severity and scenarios (07). Stage 04 reconciled
+> iteration by iteration with an independent clean-room rebuild (`tests/independent/`).
+> How to run: the page's **How to use** guide or the illustrated [user manual](docs/manual/USER_MANUAL.md); developers:
+> [`docs/RUNNING.md`](docs/RUNNING.md). Design: [`docs/scope.md`](docs/scope.md), [`docs/data-contracts.md`](docs/data-contracts.md).
+> Calculations: [`docs/XOL_MECHANICS.md`](docs/XOL_MECHANICS.md) (walkthrough with a worked example),
+> [`docs/methodology.md`](docs/methodology.md) (formula reference by stage).
 
 ## Synthetic data
 

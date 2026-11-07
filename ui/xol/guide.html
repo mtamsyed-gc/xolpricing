@@ -77,9 +77,9 @@
         <li>Unzip the pack anywhere you keep work files (for example <code>C:\\XoL\\</code>). Keep the folder structure: the workflows find their files by relative path. Do not put client data inside OneDrive-synced folders unless your policy allows it.</li>
         <li>Python 3.12 or later: on a GC laptop it is installed; check with <kbd>py --version</kbd> in a command prompt.</li>
         <li>Once, in a normal PowerShell or command window in the tool folder: <kbd>py -m pip install -r requirements-native.txt</kbd> (numpy, pandas, openpyxl, scipy from GC Artifactory; takes a minute).</li>
-        <li>Alteryx is <b>not</b> needed: the page runs the workflows in Python. If you have Alteryx Designer, <code>tools\\run_pipeline.bat</code> runs the same workflows through its engine.</li>
+        <li>Nothing else is installed: every stage runs in Python on your laptop (Alteryx is not used from version 0.9). Excel opens the Control and Results workbooks; this page does the rest.</li>
       </ol>`),
-      fig("g01_tools_folder.png", "The tools folder: xol_ui.bat starts the page; run_pipeline_python.bat is the command-line route."),
+      fig("g01_tools_folder.png", "The tools folder: xol_ui.bat starts the page; run_pipeline.bat is the same run from a command prompt; import_merit.bat copies Merit's outputs in."),
       doneWhen("install", "py --version shows 3.12 or later and pip install finished without errors")) },
     { id: "start", title: "Start the page", sub: "tools\\xol_ui.bat", body: () => el("div", {},
       html(`<p>Double-click <code>tools\\xol_ui.bat</code>. A small command window opens and stays open (it is the server; closing it closes the page), and your browser opens <code>http://127.0.0.1:8765/</code>. Nothing leaves the laptop: the page only talks to that window.</p>
@@ -192,10 +192,10 @@
         <tr><td>Stage 00 stops with P04 on default_benefit_limit</td><td>A Control workbook made before 0.7</td><td>Add the row from the template (blank = no default limit)</td></tr>
         <tr><td>Stage 04 stops with a memory error</td><td>Too little free memory</td><td>Close other programs or lower <code>iterations</code></td></tr>
         <tr><td>Stage 07 "cannot access the file"</td><td>The Results workbook is open in Excel</td><td>Close it, run from 07</td></tr>
-        <tr><td>"needs the stage files of a Python run of stage 00"</td><td>Stage 00 last ran through Alteryx</td><td>Run from 00</td></tr>
+        <tr><td>"needs the stage files of a run of stage 00 by this tool"</td><td>The stage folder holds files of an old Alteryx run</td><td>Run from 00</td></tr>
         <tr><td>Exhibits show blanks</td><td>The run stopped before 07</td><td>Read the stage cards; the header pill says where</td></tr>
         <tr><td>Open in Excel does nothing</td><td>The file does not exist yet, or Excel is busy with a dialog</td><td>Check the path shown next to the button; close the Excel dialog</td></tr></tbody></table>
-        <p>Developer references: <code>docs\\RUNNING.md</code>, <code>docs\\XOL_MECHANICS.md</code> (the calculations with a worked example), <code>docs\\methodology.md</code>, <code>docs\\data-contracts.md</code>. The illustrated manual <code>docs\\manual\\USER_MANUAL.html</code> covers the Alteryx route and every Results sheet.</p>`)) },
+        <p>Developer references: <code>docs\\RUNNING.md</code>, <code>docs\\XOL_MECHANICS.md</code> (the calculations with a worked example), <code>docs\\methodology.md</code>, <code>docs\\data-contracts.md</code>. The illustrated manual <code>docs\\manual\\USER_MANUAL.html</code> covers every Control and Results sheet in detail.</p>`)) },
   ];
 
   function doneWhen(id, text) {

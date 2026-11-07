@@ -123,7 +123,7 @@ def _readme(wb, synthetic: bool) -> None:
         ("XoL Pricing Tool - Control workbook", True),
         (f"Version {S.VERSION}. {'SYNTHETIC INSTANCE - fictional portfolio for testing.' if synthetic else 'Template.'}", False),
         ("", False),
-        ("Alteryx reads every sheet below by name; the header is in row %d. Do not rename sheets or headers." % S.HEADER_ROW, False),
+        ("The tool reads every sheet below by name; the header is in row %d. Do not rename sheets or headers." % S.HEADER_ROW, False),
         ("YELLOW cells are required inputs; BLUE cells are optional (blank = the default described); GREY cells are labels or written back by the tool.", False),
         ("Row 3 above each column says required / optional. Hover a header (or a Params value cell) for what to enter, the options and an example. The Guide sheet lists everything.", False),
         ("Every judgement input (trend, completion, weights, incidence) needs a justification - it goes into the run log.", False),

@@ -1,8 +1,8 @@
 # Methodology — per-person XoL, per-event XoL, aggregate stop loss and pricing (stages 00–07)
 
-Version 0.5 · 2026-10-14. Every formula below is implemented in `tools/alteryx/build_stage00.py`–`build_stage07.py`
+Version 0.9 · 2026-11-07. Every formula below is implemented in `tools/alteryx/build_stage00.py`–`build_stage07.py`
 and `tools/excel/build_results.py`, and independently re-implemented in `tests/test_stage00.py`–`test_stage07.py`.
-Designer 2026.2 reproduces the simulator and the oracles exactly (`tests/test_designer_twin.py`).
+The tool runs these definitions in Python (`tools/alteryx/sim.py`; Alteryx is not used from 0.9.0); Designer 2026.2's run of 2026-10-14 is kept as a regression baseline that the executor reproduces exactly (`tests/test_designer_twin.py`).
 Notation: TY = treaty year, Q = quote year, AP = attachment point, L = layer limit.
 
 ## 1. Treaty year and accumulation (stage 02)
@@ -85,7 +85,7 @@ the stochastic stage (scope §7).
 `out_bc_by_year.csv`, `out_bc_summary.csv`, `out_large_claims.csv`, `out_annualisation.csv` (reported → + IBNR →
 + unearned → + unwritten, for layer amount and count), `checks/out_completion_indicated.csv`.
 
-## 8. Stochastic model (stage 04, native Alteryx)
+## 8. Stochastic model (stage 04)
 
 | Item | Rule |
 |---|---|
@@ -103,12 +103,12 @@ the stochastic stage (scope §7).
 | Band below the cut-off (0.9.0) | A layer whose AP is below u has a band (AP, u] the fitted distribution does not cover. Params `below_cutoff`: `STOP` (default; S08 stops and names the layers), `IGNORE` (band left out; S09 FLAG per layer quoting the band frequency and its deterministic cost `λ_band · mean layer loss over the band units`), `EMPIRICAL` (band simulated: `λ_band` computed as λ over the adjusted units in (min active AP, u] with the same completion, weights, lives and incidence; per iteration N_band ~ Poisson(λ_band) by inverse CDF on stream 4; each band claim is an (adjusted amount, cap) pair drawn uniformly from those units in `acc_key` order on stream 5; spliced with the tail claims before the layer step; S10 INFO per layer with the band's share of the mean recovery; S11 FLAG when the band holds no unit). Band claims do not enter `sim_gross` (they lie below the stop-loss large threshold, which the attritional model covers). Outputs: `below_cutoff`, `band_from`, `lambda_band`, `n_band`, `mean_recovery_band` in `out_sim_summary`; `recovery_band` per iteration |
 | Unused capacity | Each claim is also limited to M = largest observed adjusted claim; `recovery_aboveM` is the part of the layer the experience cannot see |
 | Blend | `E[L] = Z · E_det + (1 − Z) · E_stoch(below M) + E_stoch(above M)` (Z, E_det from stage 03) |
-| RNG | MINSTD (Lehmer, a = 48271, m = 2³¹ − 1), state `s0 = 1 + seed mod (m − 1)`; five non-overlapping streams started at `s0 · a^(j·2²⁹) mod m` (j = 1 Poisson draws, 2 severity, 3 cap, 4 band counts, 5 band draws), computed with 16-bit splitting so every product stays below 2⁵³. The same seed gives identical results in Designer and the simulator |
+| RNG | MINSTD (Lehmer, a = 48271, m = 2³¹ − 1; chosen so Designer and Python gave identical draws, kept for reproducibility), state `s0 = 1 + seed mod (m − 1)`; five non-overlapping streams started at `s0 · a^(j·2²⁹) mod m` (j = 1 Poisson draws, 2 severity, 3 cap, 4 band counts, 5 band draws), computed with 16-bit splitting so every product stays below 2⁵³. The same seed gives identical results in Designer and the simulator |
 | Outputs | `out_sim_summary.csv` (λ, α, mean, SD, CoV, P(0), P50–P99.5, above-M, reinstatement usage, blend), `out_sim_quantiles.csv` (q = 0.001, 0.005 … 0.995, 0.999, nearest rank), `out_sim_iterations.csv` (per iteration and layer: recovery, above-M, reinstatement usage, large-claim gross), `out_fit.csv` |
 
 Independence of severity and cap is an approximation (higher-limit plans may also have higher severities).
 
-### 8.1 Severity candidates (stage 04a, Python tool)
+### 8.1 Severity candidates (stage 04a)
 
 | Item | Rule |
 |---|---|
@@ -122,10 +122,10 @@ Independence of severity and cap is an approximation (higher-limit plans may als
 | Staleness | Stage 03 empties the fit; stage 04 stops (S07) when `severity_source = PYTHON` and no grid of the current burning cost exists |
 | Outputs | `out_fit_candidates.csv`, `out_fit_mean_excess.csv`, `out_fit_survival.csv`, `out_sev_table.csv`; Results workbook sheet Severity |
 
-Environment: Designer's base Python environment (Designer 2026.2: Python 3.13, numpy 2.1, pandas 2.3, scipy 1.16).
+Environment: Python 3.12+ with the pinned `requirements-native.txt` (scipy 1.18). Designer's run of 2026-10-14 (scipy 1.16) gave the same selection and grid; fitted parameters agree to 1e-5 relative.
 On the synthetic book (Pareto by construction) Pareto is selected; lognormal, gamma and Weibull end as boundary fits.
 
-## 9. Aggregate stop loss, programme and cedant-impact inputs (stage 06, native Alteryx)
+## 9. Aggregate stop loss, programme and cedant-impact inputs (stage 06)
 
 | Item | Rule |
 |---|---|
@@ -154,7 +154,7 @@ so with NET_OF_XOL and an AP below t_sl the PP recoveries on those claims are dr
 amount (set t_sl at or below the lowest AP to avoid it). A stop loss needs the stage-04 simulation, so a PP layer or a
 `fit_cutoff` must be present.
 
-## 10. Per-event XoL (stage 05, native Alteryx)
+## 10. Per-event XoL (stage 05)
 
 | Item | Rule |
 |---|---|

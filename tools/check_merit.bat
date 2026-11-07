@@ -1,8 +1,8 @@
 @echo off
 rem One-off check of the Merit route on this computer, with the synthetic Merit outputs in tests\fixtures\merit_v7:
-rem copies them and their test Control into data\input, runs 00 -> 01c -> 02 (LIVE workflows, Alteryx engine),
-rem then removes the copied inputs again (log: data\output\live\engine_run.log); then runs 00 -> 01c on the synthetic
-rem ETE files with the SYNTH workflows (log: data\output\synth\engine_run.log). Rerun 01a afterwards for line mode.
+rem copies them and their test Control into data\input, runs 00 -> 01c -> 02 (live stage definitions), then removes
+rem the copied inputs again (log: data\output\live\python_run.log); then runs 00 -> 01c on the synthetic ETE files
+rem (log: data\output\synth\python_run.log). Rerun 01a afterwards for line mode. Admin pack only (needs tests\).
 rem Refuses to run when data\input already holds a Control workbook or ETE files (yours).
 setlocal
 for %%I in ("%~dp0..") do set "ROOT=%%~fI"
@@ -24,8 +24,8 @@ call "%~dp0run_pipeline.bat" synth 01c 00 01c quiet
 set "RC2=%errorlevel%"
 echo.
 if "%RC1%"=="0" if "%RC2%"=="0" echo CHECK PASSED: both runs ended without errors.
-if not "%RC1%"=="0" echo Merit route FAILED: see %ROOT%\data\output\live\engine_run.log
-if not "%RC2%"=="0" echo Synthetic ETE run FAILED: see %ROOT%\data\output\synth\engine_run.log
+if not "%RC1%"=="0" echo Merit route FAILED: see %ROOT%\data\output\live\python_run.log
+if not "%RC2%"=="0" echo Synthetic ETE run FAILED: see %ROOT%\data\output\synth\python_run.log
 :end
 echo.
 pause

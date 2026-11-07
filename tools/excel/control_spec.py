@@ -2,7 +2,7 @@
 
 Used by tools/excel/build_control.py (writes the workbook) and by the stage-00 workflow builder (validation rules).
 Every table sits on its own sheet: title in row 1, instructions in row 2, header in row HEADER_ROW, data below.
-All Params values are stored as text (ISO dates, plain decimals) so Alteryx reads one consistent type.
+All Params values are stored as text (ISO dates, plain decimals) so the tool reads one consistent type.
 """
 from __future__ import annotations
 
@@ -59,7 +59,7 @@ PARAMS = [
     ("fit_selected", "Stochastic", "", "LIST", "LOGNORMAL,GAMMA,WEIBULL,PARETO,GPD", False,
      "Severity distribution used by the simulation (blank = lowest AIC in stage 04a); justify an override"),
     ("severity_source", "Stochastic", "", "LIST", "PYTHON,NATIVE", True,
-     "PYTHON: distribution selected in 04a_fit_severity (Python tool); NATIVE: Pareto fitted in stage 04 (no Python)"),
+     "PYTHON: the distribution selected in stage 04a (candidate fit, default); NATIVE: a single-parameter Pareto fitted in stage 04 (no candidate fit)"),
     ("freq_model", "Stochastic", "", "LIST", "POISSON,NEGBIN", True, "Frequency distribution"),
     ("ev_freq_source", "Stochastic", "", "LIST", "EXPERIENCE,SCENARIOS,BOTH", True,
      "Per-event simulation: historical events, EvScenarios (with a return period), or both"),
@@ -117,7 +117,7 @@ TABLES = {
                    "slower settlement). Prefer large-claim development or a case review; state the basis. "
                    "ATTRITIONAL: completion of total claims below the stop-loss large threshold (aggregate "
                    "development, unearned and unwritten), used by the stop-loss attritional model only. "
-                   "indicated_factor is written by Alteryx (reference only).",
+                   "indicated_factor is written by the tool (reference only).",
                    [("year", "INT", "", True), ("component", "LIST", "IBNR,UNEARNED,UNWRITTEN", True),
                     ("side", "LIST", "PRE_AP,POST_AP_AMOUNT,POST_AP_COUNT,ATTRITIONAL", True),
                     ("ap_band_from", "NUMBER", "", True), ("selected_factor", "NUMBER", "", True),

@@ -1,19 +1,17 @@
-"""Run the XoL pipeline in Python, without Alteryx (0.7.0, owner 2026-11-06; browser page: tools/ui/serve.py).
+"""Run the XoL pipeline (0.9.0: Python is the only route; the browser page tools/ui/serve.py calls this script).
 
     py tools\\run_python.py                       synthetic data, line adapter (01a), stages 00 to 07
     py tools\\run_python.py live 01c              live data, Merit adapter
     py tools\\run_python.py live 01c 00 04        stages 00 to 04 only (third / fourth argument: first / last stage)
-    py tools\\run_python.py synth 01a 04          start at stage 04 (00-03 already run IN PYTHON)
+    py tools\\run_python.py synth 01a 04          start at stage 04 (00-03 already run)
 
-Same arguments, run order, input files and output files as tools\\run_pipeline.bat (the Alteryx route): it runs the
-same committed workflows (alteryx/workflows for live, alteryx/workflows/synth for synth) in tools/alteryx/sim.py, the
-strict Python executor that the test suite checks against Alteryx Designer's own runs (tests/test_designer_twin.py,
-tests/test_python_route.py). Stops at the first workflow that ends with an error (a STOP check is an error).
-Log: data/output/<variant>/python_run.log.
+Runs the stage definitions in alteryx/workflows (live) or alteryx/workflows/synth (synth) with tools/alteryx/sim.py,
+the Python executor. The definitions were first written for Alteryx Designer and the executor reproduces Designer's own
+runs exactly (tests/test_designer_twin.py keeps that comparison); the tool does not use Alteryx from 0.9.0.
+Stops at the first workflow that ends with an error (a STOP check is an error). Log: data/output/<variant>/python_run.log.
 
-One route per run: the stage files (data/output/<variant>/stage/*.yxdb) that one route writes are not readable by the
-other. Starting after stage 00 is allowed only when stage 00 of the same variant last ran in Python
-(stage/ENGINE.txt); otherwise start at 00.
+Starting after stage 00 needs stage files written by this script (stage/ENGINE.txt says "python"); stage files left by
+an older Alteryx run are refused and the run must start from 00.
 
 Needs Python 3.12+ with the packages in requirements-native.txt (numpy, pandas, openpyxl; scipy for stage 04a).
 """
@@ -93,8 +91,8 @@ def main(argv: list[str]) -> int:
         shutil.copy(ROOT / "excel" / "templates" / "XoL_Results.xlsx", out / "XoL_Results.xlsx")
     marker = out / "stage" / MARKER
     if steps[0][0] != "00" and not (marker.exists() and marker.read_text(encoding="utf-8").startswith("python")):
-        print(f"Stage {steps[0][0]} needs the stage files of a Python run of stage 00 (stage files written by "
-              f"Alteryx cannot be read here). Run from stage 00: py tools\\run_python.py {variant} {adapter} 00 {last}")
+        print(f"Stage {steps[0][0]} needs the stage files of a run of stage 00 by this tool (the stage folder holds "
+              f"files of an older Alteryx run). Run from stage 00: py tools\\run_python.py {variant} {adapter} 00 {last}")
         return 2
     log = out / "python_run.log"
     started = datetime.now()

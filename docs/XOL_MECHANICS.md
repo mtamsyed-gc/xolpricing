@@ -4,7 +4,7 @@ XoL pricing tool 0.7.0 · 2026-11-06. This document follows one claim from the c
 and shows every calculation on the way, in the order the tool performs it. It is the "how" behind `docs/methodology.md`
 (the formula reference, organised by stage) and `docs/data-contracts.md` (the columns). Everything here is what the
 code does: `tools/alteryx/build_stage00.py` … `build_stage07.py` and `tools/excel/build_results.py`, each re-implemented
-independently in `tests/` and reproduced on the Alteryx engine (`tests/test_designer_twin.py`).
+independently in `tests/`; Designer's run of 2026-10-14 is kept as a baseline the tool still reproduces (`tests/test_designer_twin.py`; Alteryx itself is not used from 0.9.0).
 
 Notation: TY treaty year · Q quote year (the year being priced) · AP attachment point · L layer limit ·
 u severity fitting threshold · lives_Q expected lives in Q · EPI expected premium income in Q.

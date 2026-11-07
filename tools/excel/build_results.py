@@ -129,7 +129,7 @@ def inputs(wb):
     ws = wb.create_sheet("Inputs")
     title(ws, "Inputs and loadings",
           "Yellow cells are optional overrides: blank uses the value from the run. Changing a loading or an override "
-          "updates every exhibit without re-running Alteryx.")
+          "updates every exhibit without re-running the tool.")
     header(ws, 4, ["", "Item", "From the run", "Override", "Used", "Note"])
     items = [
         ("Quote currency", "=IFERROR(INDEX(pa_quote_ccy,1),\"\")", None, "Params quote_ccy"),
@@ -527,7 +527,7 @@ def readme(wb):
     lines = [
         ("How it is filled", BOLD),
         ("1. Copy this template once to data/output/<live|synth>/XoL_Results.xlsx (next to the stage folders).", BASE),
-        ("2. Run the workflows 00 -> 01 -> 02 -> 03 -> 04a -> 04 -> 05 -> 06 -> 07 in Alteryx. Stage 07 replaces the data "
+        ("2. Run stages 00 -> 01 -> 02 -> 03 -> 04a -> 04 -> 05 -> 06 -> 07 from the page (tools\\xol_ui.bat). Stage 07 replaces the data "
          "sheets (out_*, scn_summary); close this workbook in Excel before running it.", BASE),
         ("3. Open the workbook. Every exhibit recalculates from the data sheets and the Inputs sheet.", BASE),
         ("", BASE),
@@ -543,14 +543,14 @@ def readme(wb):
         ("Severity - candidates fitted above u in stage 04a (Python tool): parameters, AIC / BIC / KS, mean excess at "
          "each AP and survival against Kaplan-Meier; the distribution the simulation used.", BASE),
         ("Scenarios - one row per sensitivity run (Params scenario_id).", BASE),
-        ("out_* - data written by Alteryx (do not edit; they are replaced each run). out_run_log lists the "
+        ("out_* - data written by the tool (do not edit; they are replaced each run). out_run_log lists the "
          "parameters, justifications, scenario and data mode of the run; out_warnings every check (STOP / FLAG / INFO).",
          BASE),
         ("", BASE),
         ("Conventions", BOLD),
         ("Yellow cells are inputs (blue text). Grey cells show the run value. Formulas read the data sheets through "
          "names such as ss_mean_recovery (Formulas > Name Manager), defined with INDIRECT so that a data sheet "
-         "replaced by Alteryx never breaks a reference.", BASE),
+         "replaced by the tool never breaks a reference.", BASE),
         ("No VBA, no Power Query: every calculation is a cell formula.", BASE),
         ("Caveats: per-person completion factors from portfolio development may understate development above an "
          "attachment point; per-event frequency rests on few events (see credibility); the stop-loss attritional CoV "

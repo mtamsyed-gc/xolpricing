@@ -1,12 +1,13 @@
 # XoL Pricing Tool — user manual
 
-Version 0.9 · 7 November 2026 · screenshots (of 0.6, 22 October 2026) taken on the owner's laptop (Windows 11, Alteryx Designer 2026.2,
-Excel 365) during a full run on the synthetic portfolio.
+Version 0.9 · 7 November 2026 · screenshots taken on the owner's laptop (Windows 11, Excel 365, Chrome) during runs on
+the synthetic portfolio: the page and the folders on 7 November 2026 (0.9), the workbook sheets on 22 October 2026.
 
 The tool prices excess-of-loss reinsurance on a medical portfolio for the broker: expected claims cost per layer,
 an indicative reinsurance premium from high-level loadings, and the cedant's position with each structure. It takes
 claims and exposure data, a Control workbook of assumptions, and writes a Results workbook of exhibits. All data
-work and simulation run in Alteryx; the assumptions and the exhibits live in Excel.
+work and simulation run in Python on your laptop, driven from a page in your browser; the assumptions and the
+exhibits live in Excel. (Until 0.8 the stages also ran in Alteryx; from 0.9 Alteryx is not used.)
 
 ---
 
@@ -15,9 +16,8 @@ work and simulation run in Alteryx; the assumptions and the exhibits live in Exc
 | Item | Where | Notes |
 |---|---|---|
 | The tool folder | `C:\Users\<you>\Documents\xolpricing` (any folder works; keep the structure) | From the release zip or `git clone`. Keep the path short and local (not OneDrive). |
-| Alteryx Designer | installed per user, 2025.2 or later | The engine (`AlteryxEngineCmd.exe`) runs the workflows without opening Designer. |
-| Python in Designer | Designer's own Python environment with numpy, pandas, scipy | Needed by one step (04a, severity fitting). Without it, set `severity_source = NATIVE` and skip 04a. |
-| Python (optional) | Python 3.12 or later, installed per user, with `requirements-native.txt` | Runs the whole chain **without Alteryx** (section 5.1). Install once in a normal PowerShell window: `py -m pip install -r requirements-native.txt`. |
+| Python | 3.12 or later, installed per user | Runs every stage. Install the packages once, in a normal PowerShell window in the tool folder: `py -m pip install -r requirements-native.txt` (numpy, pandas, openpyxl, scipy). |
+| A browser | Chrome or Edge | The page (`tools\xol_ui.bat`) runs everything and shows the results of every stage. |
 | Excel | 2016 or later | Control workbook (inputs) and Results workbook (exhibits). No macros. |
 
 The folder:
@@ -26,13 +26,15 @@ The folder:
 
 | Folder | Holds |
 |---|---|
-| `alteryx\workflows\` | The eleven workflows, numbered in run order; `synth\` holds the same workflows wired to the synthetic data |
+| `alteryx\workflows\` | The stage definitions, numbered in run order (internal: the tool runs them; the folder keeps its historical name) |
+| `ui\` | The page and its guide |
 | `data\input\` | **Your** inputs: the Control workbook and the data files (never committed) |
 | `data\output\live\` | **Your** results: checks, results tables, the Results workbook, the run log |
-| `data\synthetic\` | A fictional portfolio for testing |
 | `excel\templates\` | `XoL_Control.xlsx` and `XoL_Results.xlsx`, the blank templates |
-| `tools\` | The batch files that run everything |
-| `tests\` | Automated tests (developers) |
+| `tools\` | The launchers: `xol_ui.bat` (the page), `run_pipeline.bat`, `import_merit.bat` |
+| `docs\` | This manual, the method (`methodology.md`, `XOL_MECHANICS.md`), the data contracts |
+
+The admin pack also holds `data\synthetic\` (a fictional portfolio for testing) and `tests\`.
 
 The `tools` folder:
 
@@ -40,24 +42,25 @@ The `tools` folder:
 
 | File | What it does |
 |---|---|
-| `run_pipeline.bat` | Runs the workflows in order through the Alteryx engine (section 5) |
+| `xol_ui.bat` | Starts the page: the normal way to run the tool (section 5) |
+| `run_pipeline.bat` | The same run from a command prompt, for scripted use (section 5.1) |
 | `import_merit.bat` | Copies Merit's outputs into the tool's input folder (section 3.3) |
-| `check_merit.bat` | Self-test of the Merit route on built-in synthetic data (section 7) |
-| `run_pipeline_python.bat` | Runs the same workflows in Python, without Alteryx (section 5.1) |
+| `check_merit.bat` | Admin pack only: self-test of the Merit route on built-in synthetic data (section 8) |
 
 ---
 
 ## 2. One-off setup
 
-1. Copy `excel\templates\XoL_Control.xlsx` to `data\input\XoL_Control.xlsx`. This is the workbook you fill in.
-2. Copy `excel\templates\XoL_Results.xlsx` to `data\output\live\XoL_Results.xlsx` (the run script does this for
-   you if the file is missing). Stage 07 fills its data sheets on every run and keeps your exhibits.
-3. Create `data\input\line\`, `data\input\claimant\` or `data\input\ete\` for your data, depending on the input mode
-   (section 3).
+1. Install the Python packages once (section 1).
+2. Double-click `tools\xol_ui.bat`; the page opens. Set **Book** to *Live pricing*.
+3. Copy `excel\templates\XoL_Control.xlsx` to `data\input\XoL_Control.xlsx` (the page offers the template with an
+   **Open template** button until the file exists). This is the workbook you fill in.
+4. Put your data in `data\input\line\`, `data\input\claimant\` or `data\input\ete\`, depending on the input mode
+   (section 3). The page's **Open data\input** button opens the folder.
+5. The Results workbook `data\output\live\XoL_Results.xlsx` is copied from the template on the first run. Stage 07
+   fills its data sheets on every run and keeps your exhibits.
 
-Try the tool on the synthetic portfolio first: double-click `tools\run_pipeline.bat` with no arguments. It runs the
-whole chain on `data\synthetic\` in about a minute and writes to `data\output\synth\`. Section 5 shows what you
-see.
+The page's **How to use** guide walks through the same steps with screenshots, adapted to your data source.
 
 ---
 
@@ -145,7 +148,7 @@ What the tool does with Merit's data:
 
 ## 4. The Control workbook
 
-`data\input\XoL_Control.xlsx` holds every assumption. Alteryx reads each sheet by name; the header is always in
+`data\input\XoL_Control.xlsx` holds every assumption. The tool reads each sheet by name; the header is always in
 row 4. **Yellow** cells are required inputs, **blue** cells are optional (blank = the default the description names),
 grey cells are labels or written back by the tool. Row 3 above every column says *required* or *optional*. Hover a
 column header, or a Params value cell, for what to enter, the allowed options and an example; list inputs have a
@@ -205,7 +208,7 @@ measure, and `sl_claims_basis` (GROSS or NET_OF_XOL). `active = 1` includes the 
 Multiplicative factors by year, component (IBNR, UNEARNED, UNWRITTEN) and side: PRE_AP applies to each claim before
 the attachment point; POST_AP_AMOUNT and POST_AP_COUNT to the layer amount and count after it; ATTRITIONAL to the
 total claims used by the stop loss. `ap_band_from` lets a factor vary by attachment point (larger claims settle
-more slowly). Alteryx writes an `indicated_factor` beside each unearned / unwritten input as a reference; the value
+more slowly). The tool writes an `indicated_factor` beside each unearned / unwritten input as a reference; the value
 used is always your `selected_factor`. Read the caveat at the top of the sheet: portfolio development understates
 development above an attachment point.
 
@@ -248,63 +251,57 @@ results are kept on the Results workbook's Scenarios sheet.
 
 ## 5. Running the tool
 
-Everything runs through the Alteryx engine from `tools\run_pipeline.bat`. Designer does not need to be open, and
-the Results workbook must be **closed** in Excel.
+Double-click `tools\xol_ui.bat`. A small command window opens (leave it open: it is the page's server; closing it
+closes the page) and the browser shows one page for the whole pricing. Nothing leaves your laptop. The Results
+workbook must be **closed** in Excel when stage 07 runs.
 
-| Command (from a command prompt in `tools`) | Runs |
-|---|---|
-| `run_pipeline.bat` | Synthetic data, line adapter, all stages (a double-click does this) |
-| `run_pipeline.bat live 01a` | Your data, line mode |
-| `run_pipeline.bat live 01b` | Your data, claimant mode |
-| `run_pipeline.bat live 01c` | Your data, Merit / ETE mode |
-| `run_pipeline.bat live 01a 04a` | From stage 04a onwards (when 00–03 have already run) |
-| `run_pipeline.bat live 01c 00 02` | Stages 00 to 02 only |
+![The page](img/10_page_top.png)
 
-A window shows each stage as it runs:
+Choose the **Book** (*Live pricing*) and the **Data source** (adapter 01a, 01b or 01c, matching `source_mode`), check
+that the Params table says *all required filled* and that every data file has a tick, then press **▶ Run**. The log
+follows each stage; the chips turn green (OK), amber (flags) or red (STOP) as each finishes.
 
-![Pipeline running](img/10_run_pipeline_running.jpg)
+![A run in progress](img/10b_page_running.png)
 
 The stages, in order:
 
-| Stage | Workflow | Does |
+| Stage | Name | Does |
 |---|---|---|
 | 00 | Read control | Reads and validates the Control workbook; applies the scenario |
 | 01 | Adapter (a, b or c) | Reads your data into the tool's internal tables; data checks |
 | 02 | Experience | Treaty years, exposure, indicated completion factors |
 | 03 | Burning cost | Trend, completion, caps, layer losses, weights, credibility: the deterministic cost |
-| 04a | Severity fit | Fits candidate severity distributions above the threshold (Python) |
-| 04 | Simulate | Per-person simulation: frequency, severity, caps, layers, reinstatements |
+| 04a | Severity fit | Fits candidate severity distributions above the fitting cut-off |
+| 04 | Simulate | Per-person simulation: frequency, severity, caps, layers, reinstatements; the band below the cut-off per `below_cutoff` |
 | 05 | Per event | Event identification, event simulation with scenarios |
 | 06 | Stop loss | Attritional model, gross claims, stop loss, programme, cedant-impact inputs |
 | 07 | Results | Writes every table to the Results workbook; run log and warnings |
 
-The synthetic chain takes about a minute. The script stops at the first stage that ends with an error, which
-includes any STOP check (section 6); the window says which stage and points to the log,
-`data\output\<live|synth>\engine_run.log`.
+On a laptop the full chain at 10,000 iterations takes about 7–11 minutes, most of it stage 04, and uses up to about
+9 GB of memory; on a 16 GB laptop close other programs or set `iterations` to 2,000–5,000 for working runs. A STOP stops
+the run at that stage and opens its card (section 6).
 
-After a run the output folder holds the checks, the results tables, the staging files and the workbook:
+![A stage card with a flag](img/10c_stage_card.png)
 
-![Output folder](img/11_output_folder.jpg)
+After a run the output folder (`data\output\live\`, **Open output folder** on the page) holds the checks, the results
+tables, the staging files, the Results workbook and the run log `python_run.log`.
 
-### 5.1 Without Alteryx
+### 5.1 From a command prompt
 
-`tools\run_pipeline_python.bat` runs the same workflows in Python, with the same arguments, the same input files and
-the same outputs (Results workbook included). Alteryx does not need to be installed. The log is
-`data\output\<live|synth>\python_run.log`.
+`tools\run_pipeline.bat` runs the same stages with the same outputs, without the page (for scripted or overnight
+runs). The log is `data\output\live\python_run.log`.
 
 | Command (from a command prompt in `tools`) | Runs |
 |---|---|
-| `run_pipeline_python.bat` | Synthetic data, line adapter, all stages |
-| `run_pipeline_python.bat live 01c` | Your data, Merit / ETE mode |
-| `run_pipeline_python.bat live 01c 00 04` | Stages 00 to 04 only |
+| `run_pipeline.bat live 01a` | Your data, line mode, all stages |
+| `run_pipeline.bat live 01b` | Your data, claimant mode |
+| `run_pipeline.bat live 01c` | Your data, Merit / ETE mode |
+| `run_pipeline.bat live 01a 04a` | From stage 04a onwards (when 00–03 have already run) |
+| `run_pipeline.bat live 01c 00 02` | Stages 00 to 02 only |
 
-- Use one route for a whole run. A run that starts after stage 00 must follow a stage 00 run on the same route;
-  otherwise it stops and asks you to start from 00.
-- The full synthetic chain at 10,000 iterations takes about 5½ minutes and needs about 13 GB of memory. On a 16 GB
-  laptop, close other programs or set `iterations` to 2,000–5,000 while you work, and keep 10,000 for the final run.
-- Results equal the Alteryx route's: stages 00 to 06 were compared with Designer's own run on the synthetic data,
-  and both routes' Results workbooks are checked against the same independent computation. Stage 04a's fitted
-  parameters can differ in the fifth or sixth significant figure; the selected distribution is the same.
+The results are those Alteryx Designer produced when the tool still used it: the Designer outputs of 14 October 2026
+are kept with the tests and every test run checks that the tool still reproduces them, and stage 04 has also been
+rebuilt independently from its specification and reconciled iteration by iteration (`tests\independent\`).
 
 ### 5.2 The browser page
 
@@ -313,7 +310,7 @@ pricing, top to bottom:
 
 | Section | What you do there |
 |---|---|
-| Inputs | Choose the book (synthetic or live) and the data source. **Open in Excel** opens the Control workbook; after you save it, the page shows a banner and a **Re-run** button. The data files the chosen source needs are listed with a tick or a cross. |
+| Inputs | Choose the book (live; the admin pack also offers the synthetic book) and the data source. **Open in Excel** opens the Control workbook; after you save it, the page shows a banner and a **Re-run** button. The data files the chosen source needs are listed with a tick or a cross. |
 | Run | Choose the first and last stage and press **Run**. The log follows the Python route live; the row of stage chips turns green, amber or red as each stage finishes. **Stop** ends the run. |
 | Stages 00 to 07 | One card per stage. The pill on the right says OK, how many flags, or STOP. Open a card for the check messages, the reconciliation counts and the stage's result tables; **Open CSV** opens any of them in Excel. A card with a STOP opens by itself: fix what it names and re-run from 00. |
 | Results workbook | **Open Results in Excel** after stage 07; **Save a dated copy** keeps a version before the next run overwrites the data sheets. |
@@ -405,7 +402,7 @@ accumulate; a re-run of the same id replaces its rows.
 
 ### 7.8 Data sheets
 
-The `out_*` sheets are written by Alteryx and replaced on every run. `out_run_log` lists the tool version, the run
+The `out_*` sheets are written by the tool and replaced on every run. `out_run_log` lists the tool version, the run
 time, every parameter with its justification and the data mode; `out_warnings` every check; `out_recon` the control
 totals. Do not edit them.
 
@@ -413,14 +410,12 @@ totals. Do not edit them.
 
 ---
 
-## 8. Self-test of the Merit route
+## 8. Self-test of the Merit route (admin pack)
 
-`tools\check_merit.bat` runs the Merit route on the synthetic Merit outputs that ship with the tool
+`tools\check_merit.bat` runs the Merit route on the synthetic Merit outputs that ship with the admin pack
 (`tests\fixtures\merit_v7`): it places a test Control workbook and the four files in `data\input`, runs stages 00
 to 02, removes them again, and then runs the synthetic ETE files through the same stages. It refuses to start when
-`data\input` already holds your own Control workbook or data. It takes about half a minute.
-
-![check_merit passed](img/20_check_merit_passed.jpg)
+`data\input` already holds your own Control workbook or data. It takes about a minute and ends with *CHECK PASSED*.
 
 Run it after installing the tool on a new computer, and after a Merit release, before pricing from Merit data.
 
@@ -430,10 +425,10 @@ Run it after installing the tool on a new computer, and after a Merit release, b
 
 1. Get the data in (section 3). For a Merit cedant: run Merit, then `import_merit.bat "<Merit output folder>"`.
 2. Fill in `data\input\XoL_Control.xlsx` (section 4). Justify every judgement input.
-3. Close the Results workbook if it is open. Run `run_pipeline.bat live 01c` (or `01a` / `01b`).
-4. Read `data\output\live\checks\` for STOPs and FLAGs. Fix and re-run if needed.
-5. Read `checks\out_completion_indicated.csv`. If you accept the indicated unearned / unwritten factors, copy them
-   into the Completion sheet and re-run from stage 00.
+3. Close the Results workbook if it is open. In the page: Book *Live pricing*, the adapter of your data, **▶ Run**.
+4. Read every stage card for STOPs and FLAGs. Fix and re-run if needed.
+5. Read the stage 02 card (`out_completion_indicated`). If you accept the indicated unearned / unwritten factors, copy
+   them into the Completion sheet and re-run from stage 00.
 6. Open the Results workbook. Review the Severity sheet, then Pricing, C1 and C2. Set the display currency and
    unit and any loading override on the Inputs sheet.
 7. For sensitivities: add Scenarios rows, set `scenario_id`, re-run from stage 00; the Scenarios sheet collects them.
@@ -446,20 +441,21 @@ Run it after installing the tool on a new computer, and after a Merit release, b
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| "Alteryx engine not found" | Designer not installed per user, or in another folder | Edit the `ENGINE` line at the top of `run_pipeline.bat` |
+| The page does not open / "site can't be reached" | The server window was closed, or port 8765 is taken | Double-click `tools\xol_ui.bat` again; or `tools\xol_ui.bat 9000` |
+| "Python packages missing" in the log | The packages are not installed for this Python | `py -m pip install -r requirements-native.txt` in a normal PowerShell window |
 | Stage 00 stops with P01–P04 | A required parameter blank, wrong type or not in the list | Fix the Params sheet |
 | Stage 00 stops with P04 on `default_benefit_limit` | A Control workbook made before 0.7 | Add the row to Params (copy it from `excel\templates\XoL_Control.xlsx`; a blank value means no default limit) |
-| Python route: "needs the stage files of a Python run of stage 00" | Stage 00 last ran in Alteryx | Run from stage 00 |
-| Python route stops at stage 04 with a memory error | Too little free memory for the iterations | Close other programs, or lower `iterations` |
+| "needs the stage files of a run of stage 00 by this tool" | The stage folder holds files of an old Alteryx run | Run from stage 00 |
+| Stage 04 stops with a memory error | Too little free memory for the iterations | Close other programs, or lower `iterations` |
 | Stage 01 stops with A03 | Fewer than 95% of claims match a member | Check the member id in both files |
 | Stage 04 stops with S08 | `fit_cutoff` is above a layer's attachment and `below_cutoff` = STOP | Lower `fit_cutoff`, or set `below_cutoff` to EMPIRICAL / IGNORE (§4.1) |
 | Stage 04 stops with S07 | `severity_source = PYTHON` but 04a has not run since the last 03 | Run from 04a, or set NATIVE |
-| Stage 04a fails on `import scipy` | Designer's Python environment lacks scipy | Set `severity_source = NATIVE` (Pareto fitted natively) and run from 04 |
+| Stage 04a fails on `import scipy` | scipy not installed | Install the packages (section 1), or set `severity_source = NATIVE` and run from 04 |
 | Stage 07 "cannot access the file" | The Results workbook is open in Excel | Close it and run from 07 |
 | Exhibits show blanks | The workbook was not recalculated, or the run stopped before 07 | Check the log; open the workbook again |
 | A sheet is missing from the workbook | A template re-saved by a tool other than Excel | Copy a fresh `excel\templates\XoL_Results.xlsx` |
 
-The run log, `engine_run.log`, holds every message the engine printed, stage by stage.
+The run log, `python_run.log` in the output folder, holds every message, stage by stage; the page shows it live.
 
 ---
 
@@ -467,5 +463,5 @@ The run log, `engine_run.log`, holds every message the engine printed, stage by 
 
 - `docs\methodology.md`: every formula, stage by stage, with its checks.
 - `docs\data-contracts.md`: every input column, every output column, every check code.
-- `docs\RUNNING.md`: the developer's run guide, including rebuilding the workflows.
+- `docs\RUNNING.md`: the developer's run guide, including rebuilding the stage definitions.
 - `docs\CHANGELOG.md`: what changed in each version.

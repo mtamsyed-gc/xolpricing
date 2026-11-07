@@ -22,8 +22,8 @@ sys.path.insert(0, str(ROOT / "tools" / "alteryx"))
 from xol_common import VERSION  # noqa: E402
 
 USER_EXCLUDE_PREFIX = ("data/synthetic/", "tests/", "reference/", "tools/synth/", "tools/release/", "tools/docs/",
-                       "alteryx/workflows/synth/", ".github/")
-USER_EXCLUDE_FILES = {"tools/check_merit.bat", ".gitignore", ".gitattributes"}
+                       "alteryx/workflows/synth/", ".github/", "tools/alteryx/build_")
+USER_EXCLUDE_FILES = {"tools/check_merit.bat", ".gitignore", ".gitattributes", "tools/alteryx/xmlkit.py"}
 
 START_USER = f"""XoL Pricing Tool {VERSION} - user pack ({date.today():%Y-%m-%d})
 
@@ -37,7 +37,7 @@ This pack holds no synthetic data: the page offers the live book only.
 START_ADMIN = f"""XoL Pricing Tool {VERSION} - admin pack ({date.today():%Y-%m-%d})
 
 The whole repository at this release: user pack contents plus the synthetic book (data\\synthetic), the test suite
-(tests\\, python tests\\run_all.py), the Designer twin baselines, the builders (tools\\alteryx\\build_*.py,
+(tests\\, python tests\\run_all.py), the Designer comparison baselines, the builders (tools\\alteryx\\build_*.py,
 tools\\excel\\build_*.py, tools\\synth), and tools\\release\\make_packs.py which built both packs.
 The page shows both books (synthetic and live). Use this pack to test a change; give users the user pack.
 """

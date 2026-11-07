@@ -2,7 +2,24 @@
 
 Methodology and data-contract changes, newest first.
 
-## 2026-11-07 — 0.9.0: layers attaching below the fitting cut-off (`below_cutoff`)
+## 2026-11-07 — 0.9.0: Python only (Alteryx dropped from the XoL tool); `below_cutoff`
+**Alteryx dropped (owner, 2026-11-07; this tool only — Merit and the ETE pipeline keep Alteryx).** The Python route
+reproduces Designer exactly (laptop checks 2026-11-06/07; Designer baseline in the tests), so the tool no longer
+installs, launches or mentions Alteryx:
+- `tools\run_pipeline.bat` is now the Python command-line route (the former `run_pipeline_python.bat`, same
+  arguments); the AlteryxEngineCmd launcher is gone. `check_merit.bat` (admin pack) runs on Python; `import_merit.bat`
+  points to the page. `run_python.py` still refuses stage files left by an old Alteryx run (start from 00).
+- Manual, RUNNING, README, guide, scope, methodology, data contracts, Control and Results workbook texts: Python and
+  the page only; the manual's section 5 is rewritten around the page with the 0.9 screenshots; troubleshooting rows for
+  the engine and Designer's Python environment replaced by the page / package rows.
+- Kept, as history and regression: the stage definitions in `alteryx/workflows/` (internal; the folder keeps its name;
+  the executor `tools/alteryx/sim.py` runs them), Designer's stored outputs and `tests/test_designer_twin.py`.
+- User pack: no builders (`tools/alteryx/build_*.py`, `xmlkit.py`) and no Alteryx launcher; `tests/test_packs.py` now
+  unpacks it and runs the live book 00 → 04a on its own.
+- Next (0.10, option 2): stages rewritten as plain pandas / numpy modules, starting with stage 04 (seconds instead of
+  minutes, a fraction of the memory), verified against the same oracles, the Designer baseline and the clean-room rebuild.
+
+### `below_cutoff`: layers attaching below the fitting cut-off
 Found by the independent reconciliation (0.8.0): a `fit_cutoff` above a layer's attachment silently dropped the
 claims between the AP and the cut-off from that layer's stochastic cost (−20 % / −31 % on the synthetic book), with
 only the indirect S05 flag. Owner's decision: let the user choose.
