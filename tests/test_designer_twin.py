@@ -88,11 +88,13 @@ def stage06() -> bool:
 
 
 def merit() -> bool:
-    """The Merit route on the engine (tests/fixtures/merit_v7 through LIVE 00 -> 01c -> 02, tools/check_merit.bat):
-    checks, recon and indicated factors equal the simulator's run of tests/test_merit.py."""
+    """The Merit route on the engine (tests/fixtures/merit_v7_twin through LIVE 00 -> 01c -> 02, tools/check_merit.bat
+    as run on 2026-10-22): checks, recon and indicated factors equal the simulator's run on the same files.
+    merit_v7_twin is the frozen copy of the Merit sample that Designer run used (Merit v7.6.0, contract IP4-10); the
+    contract test's own sample, tests/fixtures/merit_v7, follows Merit's current outputs (0.7.0)."""
     import test_merit
     d = TWIN / "merit"
-    out = test_merit.run("tmerit")
+    out = test_merit.run("tmerit_twin", ete=ROOT / "tests/fixtures/merit_v7_twin")
     good = True
     for f in ("checks_00", "checks_01c", "checks_02"):
         good &= pd.read_csv(d / f"{f}.csv", encoding="utf-8-sig").sort_values(["code", "item"]).reset_index(drop=True) \
@@ -217,7 +219,10 @@ def compare(f) -> bool:
             and np.allclose(d.indicated_factor, s.indicated_factor, rtol=1e-9)
         print(f"{'PASS' if good else 'FAIL'}  {f} (Designer 2026.2 vs simulator)")
         return bool(good)
-    if f.startswith("checks") or f == "out_scenario_applied":
+    if f.startswith("checks"):
+        # 0.7.0 limit-source INFO records (A18 / A19) are new since Designer's stored run (0.6): compared without them
+        good = d.equals(s[~s.code.isin(["A18", "A19"])].reset_index(drop=True))
+    elif f == "out_scenario_applied":
         good = d.equals(s)
     else:
         m = d.merge(s, on=["stage", "table", "measure"], how="outer", suffixes=("_d", "_s"))

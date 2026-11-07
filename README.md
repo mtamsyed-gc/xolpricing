@@ -4,14 +4,16 @@ Broker-side excess-of-loss pricing tool for medical (health) portfolios. For eac
 structure (per-person XoL, per-event XoL, aggregate stop loss; RA or LO) it produces (A) expected layer claims cost, (B) an indicative RI premium on high-level
 loadings, and (C) cedant impact — recoveries vs premium and retained-claims volatility.
 
-**Alteryx** does all data preparation, burning cost, distribution fitting and simulation.
+**Alteryx** workflows do all data preparation, burning cost, distribution fitting and simulation (run by the Alteryx
+engine, or without Alteryx by the Python route).
 **Excel** holds the inputs (Control workbook) and the loadings, cedant-impact exhibits and charts
 (Results workbook).
 
-> Status (0.6.1, 2026-10-28): all phases built — Control (00), adapters for line, claimant and ETE / Merit data (01a/b/c; Merit v7 final outputs read as written),
+> Status (0.7.0, 2026-11-06): all phases built — Control (00), adapters for line, claimant and ETE / Merit data (01a/b/c; Merit v8 final outputs read as written; benefit limits from the data, else the plan, else a default),
 > experience (02), per-person burning cost (03), severity candidates with the Python tool (04a) and simulation (04),
 > per-event XoL (05), stop loss and programme structures (06), Results workbook with pricing, C1, C2, expiring,
-> severity and scenarios (07). `tools\run_pipeline.bat` runs the chain with the Alteryx engine. Every workflow runs
+> severity and scenarios (07). `tools\run_pipeline.bat` runs the chain with the Alteryx engine;
+> `tools\run_pipeline_python.bat` runs the same workflows in Python, without Alteryx (`docs/RUNNING.md`). Every workflow runs
 > clean in Designer 2026.2 and matches the independent oracles exactly.
 > How to run: the illustrated [user manual](docs/manual/USER_MANUAL.md); developers: [`docs/RUNNING.md`](docs/RUNNING.md). Design: [`docs/scope.md`](docs/scope.md),
 > [`docs/data-contracts.md`](docs/data-contracts.md). Calculations: [`docs/XOL_MECHANICS.md`](docs/XOL_MECHANICS.md) (walkthrough with a worked example), [`docs/methodology.md`](docs/methodology.md) (formula reference by stage).
@@ -45,12 +47,14 @@ tools/alteryx/    workflow builders (build_all.py), xmlkit + strict simulator (v
 tools/excel/      Control and Results workbook specs and builders
 tools/python/     sevfit.py: severity fitting, embedded in the 04a Python tool
 tools/run_pipeline.bat   runs every workflow with AlteryxEngineCmd.exe
+tools/run_python.py      runs the same workflows in Python (run_pipeline_python.bat), no Alteryx
 tools/synth/      synthetic data generator (seeded, reproducible)
 tests/
   run_all.py              every test + structural check of the generated workflows
   validate_synthetic.py   reference implementation of the stage-01 adapter checks
   test_stage00.py … test_stage07.py   simulator runs vs independent oracles, incl. broken-input cases
   test_designer_twin.py   the simulator and oracles reproduce Designer's stored outputs
+  test_python_route.py    the Python route's runner, its guard and its outputs against Designer's
   twin_stage04/05/06.py   compare a Designer run with the numpy oracles
   reconciliation/         synthetic_controls.json (observed totals), synthetic_truth.json (ultimates)
 ```

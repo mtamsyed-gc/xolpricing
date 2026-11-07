@@ -2,6 +2,42 @@
 
 Methodology and data-contract changes, newest first.
 
+## 2026-11-06 — 0.7.0: Merit v8 safeguard, benefit limits from the data, Python route
+Owner's three asks: (A) get the Merit safeguard working again, (B) a Python route so pricing does not depend on
+Alteryx, (C) take the benefit limit from the data where it is available, else a global limit the user sets.
+- **(A) Merit safeguard.** `tests/test_merit.py`'s check that the fixture equals a fresh build from Merit's current
+  outputs failed after Merit moved to v8.0.11 (contract IP4-13; additive columns, two more manifest keys). Fixture
+  `tests/fixtures/merit_v7` rebuilt from those outputs (same row counts, fictitious names); the 0.6 sample Designer
+  ran on 2026-10-22 is kept unchanged as `tests/fixtures/merit_v7_twin` for the Designer comparison
+  (`test_designer_twin.py`). 00 → 01c → 02 on the new fixture passes every contract check.
+- **(C) Benefit limits.** Order, for every adapter: the data's own limit → the plan's limit on the Limits sheet → new
+  Params `default_benefit_limit` (quote currency; blank = no limit) → none.
+  - Merit (01c): Merit writes no limit amount, but where a claimant CAP binds on a life-period
+    (Σ `PayerShareExcess` > 0) Σ `PayerShareCapped` equals the cap, so that becomes the life-period's limit. A cap
+    that never binds is not visible in the outputs; those lives take the plan, then the default. Closes the open
+    decision in data-contracts §2.3. Priced amounts stay the actual Paid / OS; stage 03 applies the limit as before.
+  - Line (01a): members.csv `annual_limit` → plan → default. Claimant (01b): claimants.csv `annual_limit` → default.
+  - New INFO checks A18 (count taking the limit from the data) and A19 (count on the default), written only when the
+    case occurs. The default-limit row is new in Params: **a Control workbook made before 0.7 stops at P04**; add the
+    row from `excel/templates/XoL_Control.xlsx` (blank value = previous behaviour).
+  - Tests: planted binding cap, plan-limit and default cases on the Merit fixture (`test_merit.py`); blank member and
+    claimant limits taking the default in line and claimant mode (`test_stage01.py`).
+- **(B) Python route.** `tools/run_python.py` (and `tools/run_pipeline_python.bat`) runs the committed workflows in the
+  strict executor `tools/alteryx/sim.py`, same arguments, inputs and outputs as `run_pipeline.bat`, log
+  `python_run.log`. Stage files are route-specific: `stage/ENGINE.txt` records which route ran stage 00 and the
+  Python route refuses to start later on Alteryx stage files (`run_pipeline.bat` now writes the marker too).
+  `requirements-native.txt` pins numpy, pandas, openpyxl and scipy for it.
+  - Executor: an output is released once its last consumer has run (the 10,000-iteration stage 04 ran out of memory
+    holding every tool's output).
+  - Verified in the build container on the synthetic book at 10,000 iterations: 00 → 07 in 320 s (stage 04 194 s,
+    07 87 s), peak memory 13.3 GB. Stage 04, 05 and 06 outputs equal Designer's stored run file for file; 00–03
+    checks, reconciliations and burning-cost tables equal it (`tests/test_python_route.py`); stage 04a selects the
+    same distribution with the same severity grid, fitted parameters within 1e-5 relative (scipy 1.18 vs Designer's
+    1.16). 13 GB suits the owner's laptop (63.5 GB); on 16 GB laptops lower `iterations` for working runs until
+    stage 04 is vectorised.
+- Laptop check pending: `tools\run_pipeline_python.bat` on the synthetic data; optionally `tools\run_pipeline.bat`
+  to confirm the regenerated workflows still run clean in Designer.
+
 ## 2026-10-28 — 0.6.1: Merit v7.6.0 re-verified
 - Merit moved from v7.0.2 to v7.6.0 (contract IP4-10) since the fixture was built. Its changes are additive; the XoL tool reads columns by name, so the new `LifeID`, `ScopeStatus`, `ScopeRule`, `PayerShareCapped`, `PayerShareExcess` and the manifest's `contract_version` pass through unused. Fixture `tests/fixtures/merit_v7` rebuilt from the v7.6.0 synthetic outputs (totals unchanged; one empty member-month row no longer written); 00 → 01c → 02 and the Designer twin reconcile as before.
 - `docs/XOL_MECHANICS.md`: the calculations end to end (claim → unit → adjusted amount → layer loss → burning cost → severity fit → simulation → premium), with a worked example.

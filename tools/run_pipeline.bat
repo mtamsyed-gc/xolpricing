@@ -28,6 +28,10 @@ if not defined ADW (echo Unknown adapter %AD%: use 01a, 01b or 01c & goto :end)
 if not exist "%ENGINE%" (echo Alteryx engine not found: %ENGINE% & goto :end)
 set "OUT=%ROOT%\data\output\%VAR%"
 for %%D in ("%OUT%" "%OUT%\stage" "%OUT%\checks" "%OUT%\results") do if not exist "%%~D" mkdir "%%~D"
+rem 0.7.0: stage files are route-specific. Starting after 00 needs stage files this engine wrote; a run from 00
+rem marks them as Alteryx-written (tools\run_python.py will not read them, and this script will not read Python ones)
+if /i not "%FROM%"=="00" if exist "%OUT%\stage\ENGINE.txt" findstr /b /i "python" "%OUT%\stage\ENGINE.txt" >nul && (echo Stage %FROM% needs the stage files of an Alteryx run of stage 00 ^(the last stage 00 ran in Python^). Run from stage 00: run_pipeline.bat %VAR% %AD% 00 %TO% & set "RC=2" & goto :end)
+if /i "%FROM%"=="00" (echo alteryx %date% %time%)> "%OUT%\stage\ENGINE.txt"
 if not exist "%OUT%\XoL_Results.xlsx" copy "%ROOT%\excel\templates\XoL_Results.xlsx" "%OUT%\XoL_Results.xlsx" >nul
 set "LOG=%OUT%\engine_run.log"
 echo XoL pipeline: variant %VAR%, adapter %ADW%, stages %FROM% to %TO% > "%LOG%"

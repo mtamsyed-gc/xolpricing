@@ -38,6 +38,8 @@ PARAMS = [
     ("years_included", "Data", "years", "CSV", "", True, "Experience years used (comma list, 2-5 years)"),
     ("output_threshold_pct_min_ap", "Data", "%", "NUMBER", "", True, "Write claimant rows above this % of the lowest AP"),
     ("policy_limit", "Data", "quote ccy", "NUMBER", "", False, "Overall per-person policy limit (blank = none)"),
+    ("default_benefit_limit", "Data", "quote ccy", "NUMBER", "", False,
+     "Benefit limit for a life with none in the data or on the Limits sheet (blank = no limit)"),
     ("outlier_method", "Outliers", "", "LIST", "VALUE,IQR,NONE", True, "Outlier threshold rule"),
     ("outlier_value", "Outliers", "quote ccy", "NUMBER", "", False, "Threshold when outlier_method = VALUE"),
     ("iqr_multiplier", "Outliers", "x", "NUMBER", "", False, "Multiplier when outlier_method = IQR"),

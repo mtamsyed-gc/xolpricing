@@ -15,7 +15,7 @@ Notation: TY = treaty year, Q = quote year, AP = attachment point, L = layer lim
 | Paid run-off | If `paid_runoff_months` is set: paid lines with paid date > TY end + run-off are excluded (E04 flags them) |
 | Existing QS | All amounts × `qs_cedant_retention_pct` (1 = no QS) |
 | Accumulation unit | member × TY, plus × policy when `pp_accumulation = POLICY_YEAR` (line data). Claimant data: the supplied period × TY |
-| Benefit limit of a unit | Max of the unit's line limits (quote currency) |
+| Benefit limit of a unit | Max of the unit's line limits (quote currency). A line's limit (stage 01, 0.7.0): the data's own (`annual_limit`; Merit: the life-period's binding CAP = Σ PayerShareCapped where Σ PayerShareExcess > 0), else the plan's limit on the Limits sheet, else `default_benefit_limit`, else none (A18 / A19 INFO count the data and default cases) |
 | Years | Units outside `years_included` are excluded (reconciled in `recon_02`) |
 
 ## 2. Exposure and indicated completion factors (stage 02)
