@@ -12,6 +12,7 @@
   "variants": {
     "synth": {
       "label": "Synthetic book",
+      "requires": "data/synthetic",
       "control": "data/synthetic/XoL_Control_synthetic.xlsx",
       "output": "data/output/synth",
       "inputs": [
