@@ -151,6 +151,10 @@
   async function renderStage(s, st) {
     const c = stageCards[s.code], def = stageDefs[s.code] || {};
     const status = runningStage(st) === s.code ? "running" : s.stale ? "stale" : s.status;
+    // rebuild the card only when something it shows has changed: open tables and scroll positions survive the polling
+    const key = JSON.stringify([variant, status, s.checks_mtime, s.stop, s.flag, s.info, s.tables.map((t) => t.mtime)]);
+    if (c.dataset.key === key) return;
+    c.dataset.key = key;
     const counts = s.status === "none" ? "" : `${s.stop ? s.stop + " STOP · " : ""}${s.flag ? s.flag + (s.flag > 1 ? " flags · " : " flag · ") : ""}${s.info} info`;
     c.setStatus(status, status === "ok" ? "OK · " + counts : status === "stale" ? "earlier run" : status === "none" || status === "running" ? undefined : counts);
     const body = el("div", {});
@@ -172,8 +176,9 @@
       }
     }
     c.setBody(body);
-    if ((s.status === "stop" || s.status === "flag") && !s.stale && !c.dataset.seen) { c.classList.add("open"); }
-    c.dataset.seen = "1";
+    // a card with a STOP or a flag opens itself the first time that state appears (not on an earlier run's outputs)
+    const alert = (s.status === "stop" || s.status === "flag") && !s.stale ? s.checks_mtime : "";
+    if (alert && c.dataset.alerted !== alert) { c.classList.add("open"); c.dataset.alerted = alert; }
   }
   async function loadTable(t, holder) {
     const key = variant + "/" + t.name, cached = tableCache[key];

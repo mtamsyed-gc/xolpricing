@@ -23,6 +23,11 @@ a saved workbook; the theme and behaviour are shared so the other tools can adop
 - Tests: `tests/test_ui.py` (served files, state, a run of 00-03 through the API, table endpoint, change
   detection, planted STOP, refusals). Not in scope yet: the Alteryx engine route from the page, editing Params in
   the browser, charts.
+- Laptop check of the page (2026-11-07, `Documents\20261107`, Chrome): started from `start_ui.cmd`, run 00 → 07 from
+  the page in 6 min 50 s (stage 04 298 s), live log and stage chips, Open in Excel on the Control workbook, stage
+  card with its flag and tables, dated copy of the Results workbook, Open Results in Excel. Two fixes from it: a
+  card is rebuilt only when its status or files change (open tables survived the polling badly before), and a
+  flagged card opens itself when the flag first appears.
 - Laptop check (0.7.0, 2026-11-06, `Documents\20261106_v2`): `run_pipeline_python.bat synth 01a` on Python 3.14.6,
   every stage ok in 641 s (stage 04 484 s), peak Python working set 9.3 GB of 15.8 GB; 43 output files equal
   Designer's stored run; the Results workbook recalculates with 0 formula errors.
