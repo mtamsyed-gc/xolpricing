@@ -3,6 +3,23 @@
 Methodology and data-contract changes, newest first.
 
 ## 2026-11-07 — 0.8.0: browser interface
+- **Independent reconciliation of stage 04** (`tests/independent/`). A separate agent rebuilt the per-person
+  simulation from a neutral specification and parameter packs only (seed, iterations, λ, φ, count distribution, u,
+  M, the selected severity distribution and its parameters, the caps in order, the layer terms); it never saw the
+  repository. Eight variants of the synthetic book: base (Pareto, Poisson, seed 12345, 2,000 iterations), seed 777,
+  GPD, lognormal (boundary fit, forced by `fit_selected`), negative binomial (φ = 1.80), `fit_cutoff` 150,000,
+  `severity_source = NATIVE`, and Designer's stored 10,000-iteration run. Findings: (1) the seeded rebuild reproduces
+  every iteration of every layer (max relative difference 3e-12), Designer's run included; (2) the tool's mean
+  recovery is within 1.4 SE of the closed-form λ·E[layer loss] on all 32 layer-variants, and a 200,000-iteration
+  Monte Carlo with an independent generator agrees with the closed form within 1.5 SE, so the 50-point-per-decade
+  grid adds no visible bias for GPD or lognormal; (3) movements agree: GPD −1.0 / −6.6 / −1.2 / −3.7 % on the four
+  options in both the tool and the closed form, lognormal −0.3 / −2.3 / −0.4 / −1.2 %, negative binomial 0 % on the
+  mean with SD +11 / +2 / +12 / +5 % (as expected: more dispersion, same mean), seed change ±0.7 % (Monte Carlo
+  noise at 2,000 iterations), cut-off 150k −19.6 / −1.7 / −30.7 / −2.5 % in the tool against −19.4 / −1.3 / −30.6 /
+  −2.3 % closed form. (4) `sd_recovery` is the population SD (n), not the sample SD (n − 1): documented here. (5) A
+  fitting cut-off above a layer's attachment removes the claims between the AP and u from that layer's stochastic
+  cost (the −20 % and −31 % above): the S05 flag fires (deterministic / stochastic 1.28 and 1.51), as designed;
+  worth a dedicated check (owner to decide).
 - **Interactive guide (same day).** `ui/xol/guide.html` ("How to use" in the page header; also opens from disk):
   the user picks the data they have (line data, claimant listing, Merit outputs) and the nine steps adapt (install,
   start the page, Control workbook, data files, run, checks, Results workbook, re-runs, troubleshooting), each with
