@@ -490,10 +490,14 @@ class Handler(BaseHTTPRequestHandler):
             return p if t.allowed(p) else None
         return None
 
+    OPENABLE = {".xlsx", ".xlsm", ".csv", ".txt", ".log", ".json", ".md"}   # never a script or an executable
+
     def open_(self, v, b):
         p = self.resolve_open(v, b)
         if p is None or not p.exists() or not self.tool.allowed(p):
             return self.send_json({"error": "file not found or outside the allowed folders"}, 404)
+        if p.is_file() and p.suffix.lower() not in self.OPENABLE:
+            return self.send_json({"error": f"{p.suffix} files are not opened from the page"}, 403)
         self.audit(v, f"open {p.relative_to(ROOT)}")
         try:
             if sys.platform == "win32":

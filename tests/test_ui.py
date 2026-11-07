@@ -137,6 +137,13 @@ def main() -> int:
 
         st, r = c.json("/api/open", {"variant": "synth", "what": "input", "path": "../etc/hosts"})
         ok &= report("open outside the allowed roots refused", st == 404)
+        bad = OUT / "stage" / "planted.cmd"
+        try:
+            bad.write_text("@echo off\n", encoding="utf-8")
+            st, r = c.json("/api/open", {"variant": "synth", "what": "input", "path": "data/output/synth/stage/planted.cmd"})
+            ok &= report("open of a .cmd inside the allowed roots refused (403)", st == 403)
+        finally:
+            bad.unlink(missing_ok=True)
         st, r = c.json("/api/open", {"variant": "synth", "what": "table", "name": "nope"})
         ok &= report("open of a missing table refused", st == 404)
         st, r = c.json("/api/run", {"variant": "synth", "adapter": "01a", "first": "03", "last": "02"})

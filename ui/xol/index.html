@@ -165,9 +165,13 @@
     }
     if (!j.running) { logPoll.stop(); refresh(true); }
   }
+  let runKey = null;
   function renderRun(st) {
     const run = st.run, running = run && run.running;
     const codes = st.stage_codes;
+    const key = JSON.stringify([variant, adapter, run && [run.started, run.finished, run.rc, running], st.stages.map((s) => [s.status, s.stale, s.checks_mtime]), runningStage(st)]);
+    if (runKey === key) return;
+    runKey = key;
     if (selFirst.options.length !== codes.length || selFirst.options[1].value !== codes[1]) {
       stageOptions(codes, selFirst, "00"); stageOptions(codes, selLast, "07");
     }

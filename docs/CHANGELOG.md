@@ -32,6 +32,8 @@ a saved workbook; the theme and behaviour are shared so the other tools can adop
   the chosen book and shows a readiness table (required ● / optional ○, blank required values in red, values outside
   the allowed list amber, rows missing from a pre-0.7 workbook named); `/api/spec` feeds an Input guide card
   mirroring the Guide sheet; the page's own controls (book, adapter) carry help text. Tests in `test_ui.py`.
+- Server: `/api/open` opens only workbook, CSV, text, log, JSON and Markdown files (and folders); a script dropped
+  under `data/` is refused rather than executed. The Run card is rebuilt only when the run state changes.
 - Laptop check of the page (2026-11-07, `Documents\20261107`, Chrome): started from `start_ui.cmd`, run 00 → 07 from
   the page in 6 min 50 s (stage 04 298 s), live log and stage chips, Open in Excel on the Control workbook, stage
   card with its flag and tables, dated copy of the Results workbook, Open Results in Excel. Two fixes from it: a
