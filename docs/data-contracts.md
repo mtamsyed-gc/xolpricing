@@ -6,7 +6,7 @@ This document defines:
 - §2: the input templates (standalone mode) and the ETE mapping (extension mode)
 - §3: the **internal schema** both adapters write to
 - §4: the **Control workbook** that drives a run
-- §5: the **Results workbook** tables Alteryx writes back
+- §5: the **Results workbook** tables the tool writes back
 
 ## 1. Conventions
 
@@ -209,7 +209,7 @@ Every adapter writes exactly these tables, and everything downstream reads only 
 
 ## 4. Control workbook (`excel/templates/XoL_Control.xlsx`)
 
-Every input block is an **Excel Table** (or a named range) with a fixed name, which Alteryx reads by name. Formatting conventions:
+Every input block is a sheet with a fixed name and its header in row 4, which the tool reads by name. Formatting conventions:
 - Yellow cells are required inputs, blue cells optional (0.8.0); grey cells are labels or written back. Row 3 carries the required / optional marker, headers and Params value cells carry a help comment, and the Guide sheet lists every input (`control_spec.PARAM_EXAMPLES`, `COLUMN_HELP`). There are no formulas in input tables.
 - Each judgement input has a `justification` column, carried into the run log.
 - Caveat text sits in a comment row above the block.
@@ -220,7 +220,7 @@ Every input block is an **Excel Table** (or a named range) with a fixed name, wh
 | `tbl_fx` | Currency | currency, priced_rate_to_quote_ccy, rate_date |
 | `tbl_limits` | Plan | plan, annual_limit, sub_limit_notes |
 | `tbl_trend` | Year | year, client_pct, market_pct, inflation_pct, residual_pct, weight_client, weight_market, weight_inflation, one_off_adj, large_claim_trend_pct (O), premium_trend_pct |
-| `tbl_completion` | Year × component × side × ap_band | year, component (`IBNR` / `UNEARNED` / `UNWRITTEN`), side (`PRE_AP` / `POST_AP_AMOUNT` / `POST_AP_COUNT` / `ATTRITIONAL` — total claims below the stop-loss large threshold, stop loss only), ap_band_from (default 0), selected_factor, indicated_factor (written back by Alteryx, read-only), justification |
+| `tbl_completion` | Year × component × side × ap_band | year, component (`IBNR` / `UNEARNED` / `UNWRITTEN`), side (`PRE_AP` / `POST_AP_AMOUNT` / `POST_AP_COUNT` / `ATTRITIONAL` — total claims below the stop-loss large threshold, stop loss only), ap_band_from (default 0), selected_factor, indicated_factor (written back by the tool, read-only), justification |
 | `tbl_weights` | Year | year, months_complete, use_default (1/0), custom_weight, justification |
 | `tbl_layers` | Cover × option × layer | cover (`PP` / `EV` / `SL`), option_id (1–4), layer (1/2), label (O), limit_basis (`AMOUNT` / `TO_BENEFIT_LIMIT`), ap, limit, aal, aad, co_participation_pct, reinstatements_n (blank = unlimited), reinstatement_cost_pct, reinst_pro_rata_time (1/0), sl_claims_basis (`GROSS` / `NET_OF_XOL`), sl_measure (`PCT_BUDGET` / `PCT_EPI` / `AMOUNT`), sl_ap, sl_limit, active |
 | `tbl_programme` | Order | step, cover (`QS` / `PP` / `EV` / `SL`; a QS step is informative, the retention is `qs_cedant_retention_pct`), option_id, active. Used by `evaluate_mode = PROGRAMME` (structure `4 PROGRAMME`) and by NET_OF_XOL stop losses; order PP → EV → SL (G12) |
@@ -245,7 +245,7 @@ Every input block is an **Excel Table** (or a named range) with a fixed name, wh
 | QS | qs_cedant_retention_pct | 100% |
 | General | scenario_id (blank / 0 = best estimate; n = apply Scenarios rows with that id) | — |
 | Programme | evaluate_mode (STANDALONE / PROGRAMME) | STANDALONE |
-| Stochastic | iterations, seed, fit_cutoff (blank = lowest PP AP), fit_candidates, fit_selected (blank = lowest AIC), severity_source (PYTHON/NATIVE), fit_years, freq_model (POISSON/NEGBIN), ev_freq_source (EXPERIENCE/SCENARIOS/BOTH), sl_attritional_threshold, sl_cov_floor, sl_attritional_dist (LOGNORMAL/NORMAL) | 10000, 12345, POISSON, BOTH, 100000, 0.05, LOGNORMAL |
+| Stochastic | iterations, seed, fit_cutoff (blank = lowest PP AP), fit_candidates, fit_selected (blank = lowest AIC), below_cutoff (0.9.0: STOP / EMPIRICAL / IGNORE for layers attaching below fit_cutoff), severity_source (PYTHON/NATIVE), fit_years, freq_model (POISSON/NEGBIN), ev_freq_source (EXPERIENCE/SCENARIOS/BOTH), sl_attritional_threshold, sl_cov_floor, sl_attritional_dist (LOGNORMAL/NORMAL) | 10000, 12345, POISSON, BOTH, 100000, 0.05, LOGNORMAL |
 | Cedant impact | net_claims_budget (blank = best-estimate gross claims), reference_lives, return_periods (comma list), currency_display (QUOTE/USD) | 20000; "5,50,250" |
 
 ## 5. Results workbook (`excel/templates/XoL_Results.xlsx`)

@@ -1,7 +1,7 @@
 {
   "name": "xol",
   "title": "XoL Pricing Tool",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "runner": "tools/run_python.py",
   "kit": "ui/kit",
   "results_name": "XoL_Results.xlsx",
@@ -53,7 +53,7 @@
      "note": "Candidate distributions above the fitting cut-off; the selected one (lowest AIC, or fit_selected) feeds the simulation."},
     {"code": "04", "name": "04_simulate", "title": "Per-person simulation", "checks": "checks_04.csv",
      "tables": ["recon_04", "out_sim_summary", "out_fit"],
-     "note": "Frequency × severity simulation per layer; expected loss blended with the burning cost by credibility. The longest stage."},
+     "note": "Frequency × severity simulation per layer; expected loss blended with the burning cost by credibility. The longest stage. A layer attaching below fit_cutoff is handled by Params below_cutoff (STOP / EMPIRICAL / IGNORE): out_sim_summary shows lambda_band and mean_recovery_band, checks S08–S11 say what was done."},
     {"code": "05", "name": "05_per_event", "title": "Per-event XoL", "checks": "checks_05.csv",
      "tables": ["recon_05", "out_ev_events", "out_ev_bc_summary", "out_ev_sim_summary", "out_ev_scenarios"],
      "note": "Event grouping, event burning cost and simulation; empty tables when no EV layer is defined."},

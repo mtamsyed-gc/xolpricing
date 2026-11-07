@@ -1,4 +1,4 @@
-/* GC tool UI kit 0.8.0 — shared theme for the browser front ends of the pricing tools.
+/* GC tool UI kit 0.9.0 — shared theme for the browser front ends of the pricing tools.
    Navy / teal on white. Tokens first; components below. Tool pages add nothing but a manifest and index.html. */
 :root {
   --navy: #0b2545; --navy-2: #13315c; --teal: #1a8a8a; --teal-2: #0f6b6b; --teal-soft: #e3f2f2;

@@ -39,7 +39,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-VERSION = "0.8.0"
+VERSION = "0.9.0"
 ROOT = Path(__file__).resolve().parents[2]
 MAX_ROWS = 500
 LOG_TAIL = 200
@@ -229,7 +229,36 @@ class Tool:
                          "description": desc, "default": S.DEFAULTS.get(pid, "")})
         not_in_sheet = [pid for pid, *_ in S.PARAMS if pid not in values]
         return {"exists": True, "rows": rows, "missing_required": missing, "invalid": invalid,
-                "not_in_sheet": not_in_sheet, "mtime": fmt_t(mtime(ctl))}
+                "not_in_sheet": not_in_sheet, "mtime": fmt_t(mtime(ctl)), "cutoff": self._cutoff_advice(ctl, values)}
+
+    def _cutoff_advice(self, ctl, values) -> dict | None:
+        """0.9.0: fit_cutoff against the active per-person layers' attachments, with the below_cutoff mode."""
+        from openpyxl import load_workbook
+        S = self._spec_module()
+        try:
+            wb = load_workbook(ctl, read_only=True, data_only=True)
+            if "Layers" not in wb.sheetnames:
+                return None
+            it = wb["Layers"].iter_rows(values_only=True)
+            for _ in range(S.HEADER_ROW - 1):
+                next(it, None)
+            head = [str(h).strip() if h is not None else "" for h in next(it, [])]
+            lays = [dict(zip(head, r)) for r in it]
+            wb.close()
+        except Exception:  # noqa: BLE001
+            return None
+        pp = [l for l in lays if str(l.get("cover") or "").upper() == "PP" and str(l.get("active") or "").strip() in ("1", "1.0")
+              and l.get("ap") not in (None, "")]
+        if not pp:
+            return None
+        min_ap = min(float(l["ap"]) for l in pp)
+        raw = values.get("fit_cutoff", (None, None))[0]
+        u = float(raw) if raw not in (None, "") else min_ap
+        mode = (values.get("below_cutoff", (None, None))[0] or "STOP")
+        mode = str(mode).strip().upper() or "STOP"
+        below = [{"label": l.get("label") or f"PP option {l.get('option_id')}", "ap": float(l["ap"]), "option_id": l.get("option_id")}
+                 for l in pp if float(l["ap"]) < u]
+        return {"u": u, "min_ap": min_ap, "mode": mode, "layers_below": below, "cutoff_set": raw not in (None, "")}
 
     def input_files(self, v: str) -> list[dict]:
         out = []

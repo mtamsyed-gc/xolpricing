@@ -77,9 +77,9 @@
         <li>Unzip the pack anywhere you keep work files (for example <code>C:\\XoL\\</code>). Keep the folder structure: the workflows find their files by relative path. Do not put client data inside OneDrive-synced folders unless your policy allows it.</li>
         <li>Python 3.12 or later: on a GC laptop it is installed; check with <kbd>py --version</kbd> in a command prompt.</li>
         <li>Once, in a normal PowerShell or command window in the tool folder: <kbd>py -m pip install -r requirements-native.txt</kbd> (numpy, pandas, openpyxl, scipy from GC Artifactory; takes a minute).</li>
-        <li>Alteryx is <b>not</b> needed: the page runs the workflows in Python. If you have Alteryx Designer, <code>tools\\run_pipeline.bat</code> runs the same workflows through its engine.</li>
+        <li>Nothing else is installed: every stage runs in Python on your laptop (Alteryx is not used from version 0.9). Excel opens the Control and Results workbooks; this page does the rest.</li>
       </ol>`),
-      fig("g01_tools_folder.png", "The tools folder: xol_ui.bat starts the page; run_pipeline_python.bat is the command-line route."),
+      fig("g01_tools_folder.png", "The tools folder: xol_ui.bat starts the page; run_pipeline.bat is the same run from a command prompt; import_merit.bat copies Merit's outputs in."),
       doneWhen("install", "py --version shows 3.12 or later and pip install finished without errors")) },
     { id: "start", title: "Start the page", sub: "tools\\xol_ui.bat", body: () => el("div", {},
       html(`<p>Double-click <code>tools\\xol_ui.bat</code>. A small command window opens and stays open (it is the server; closing it closes the page), and your browser opens <code>http://127.0.0.1:8765/</code>. Nothing leaves the laptop: the page only talks to that window.</p>
@@ -109,7 +109,16 @@
           <li class="only only-E"><b>Limits</b>: benefit limit per Merit plan where no CAP binds; <code>ete_payer_filter</code> = the payer to price (several payers in one run are flagged A16); <code>premium_basis</code> GROSS or NET; <b>EvScenarios</b> for per-event cover (Merit has no event fields, so set <code>ev_freq_source = SCENARIOS</code>).</li>
           <li class="only only-C"><b>EvScenarios</b> if you price per-event cover: the listing has no event grouping unless it carries <code>event_id</code>.</li>
           <li><b>Expiring</b> (optional): the expiring structure and rate, for the comparison exhibit. <b>Scenarios</b> (optional): sensitivity overrides, see step 8.</li>
-        </ul>`),
+        </ul>
+        <h3>The fitting cut-off and layers attaching below it</h3>
+        <p>The stochastic model fits a severity distribution to claims above <code>fit_cutoff</code> (blank = the lowest attachment of your active per-person options, which is the safe default). If you raise the cut-off to get a cleaner tail fit, any layer whose attachment is below it has a band of claims — between the AP and the cut-off — that the fitted distribution does not cover. <code>below_cutoff</code> says what to do with that band:</p>
+        <table class="gc"><thead><tr><th>below_cutoff</th><th>What happens</th><th>When to use</th></tr></thead><tbody>
+          <tr><td><code>STOP</code> (default)</td><td>Stage 04 stops (S08) and names the layers; the page warns before you run.</td><td>You did not mean to price a layer below the cut-off.</td></tr>
+          <tr><td><code>EMPIRICAL</code></td><td>The band is simulated from the data's own adjusted claims in that band, with their own frequency, spliced with the fitted tail above the cut-off (S10 shows the band's share of each layer).</td><td>You want a high cut-off for the tail fit and still price low layers.</td></tr>
+          <tr><td><code>IGNORE</code></td><td>The band is left out; S09 flags each layer with the band's frequency and deterministic cost.</td><td>The band is priced or retained elsewhere and you want a pure tail view — justify it.</td></tr></tbody></table>
+        <p>The page's Params table shows the exact situation for your workbook (which layers, which cut-off, which mode) before you run: red for STOP, amber for IGNORE, blue for EMPIRICAL.</p>
+        <figure><img src="img/g13_cutoff_banner.png" alt="Cut-off banner" loading="lazy"><figcaption>The banner under Params in this workbook, here for EMPIRICAL with a 150,000 cut-off and two layers attaching below it.</figcaption></figure>
+        <figure><img src="img/g14_s10_checks.png" alt="S10 checks on the stage 04 card" loading="lazy"><figcaption>After the run, the stage 04 card lists one S10 row per affected layer with the band's frequency and its share of the layer's loss.</figcaption></figure>`),
       doneWhen("control", "the page shows ALL REQUIRED FILLED next to Params in this workbook")) },
     { id: "data", title: "Put the data files in place", sub: "data\\input\\…", body: () => el("div", {},
       el("div", { class: "only only-L" },
@@ -154,6 +163,10 @@
         <tr><td>B02</td><td>03</td><td>Credibility below 1 on a layer (fewer than full_cred_n claims)</td><td>The stochastic result carries the balance; read the Pricing sheet's blend</td></tr>
         <tr><td>F06</td><td>04a</td><td>A candidate distribution ended on a boundary</td><td>Not selected automatically; read the Severity sheet before overriding fit_selected</td></tr>
         <tr><td>S07</td><td>04</td><td>severity_source = PYTHON but 04a has not run since 03</td><td>Run from 04a</td></tr>
+        <tr><td>S08</td><td>04</td><td>fit_cutoff is above a layer's attachment and below_cutoff = STOP</td><td>Lower fit_cutoff, or set below_cutoff (step 3)</td></tr>
+        <tr><td>S09</td><td>04</td><td>below_cutoff = IGNORE: the band between AP and cut-off is left out (frequency and cost quoted)</td><td>Justify, or set EMPIRICAL</td></tr>
+        <tr><td>S10</td><td>04</td><td>below_cutoff = EMPIRICAL: band simulated from the data (share of the layer quoted)</td><td>Information; read the share</td></tr>
+        <tr><td>S11</td><td>04</td><td>EMPIRICAL but no claim in the data between AP and cut-off</td><td>Lower fit_cutoff</td></tr>
         <tr><td>V06</td><td>05</td><td>Few events in the layer</td><td>The per-event price leans on EvScenarios; review them</td></tr>
         <tr><td>X01–X04</td><td>00</td><td>A Scenarios row matched no rows or named an unknown column</td><td>Fix the Scenarios sheet</td></tr></tbody></table>`),
       doneWhen("checks", "every STOP is cleared and every flag has been read")) },
@@ -181,10 +194,10 @@
         <tr><td>Stage 00 stops with P04 on default_benefit_limit</td><td>A Control workbook made before 0.7</td><td>Add the row from the template (blank = no default limit)</td></tr>
         <tr><td>Stage 04 stops with a memory error</td><td>Too little free memory</td><td>Close other programs or lower <code>iterations</code></td></tr>
         <tr><td>Stage 07 "cannot access the file"</td><td>The Results workbook is open in Excel</td><td>Close it, run from 07</td></tr>
-        <tr><td>"needs the stage files of a Python run of stage 00"</td><td>Stage 00 last ran through Alteryx</td><td>Run from 00</td></tr>
+        <tr><td>"needs the stage files of a run of stage 00 by this tool"</td><td>The stage folder holds files of an old Alteryx run</td><td>Run from 00</td></tr>
         <tr><td>Exhibits show blanks</td><td>The run stopped before 07</td><td>Read the stage cards; the header pill says where</td></tr>
         <tr><td>Open in Excel does nothing</td><td>The file does not exist yet, or Excel is busy with a dialog</td><td>Check the path shown next to the button; close the Excel dialog</td></tr></tbody></table>
-        <p>Developer references: <code>docs\\RUNNING.md</code>, <code>docs\\XOL_MECHANICS.md</code> (the calculations with a worked example), <code>docs\\methodology.md</code>, <code>docs\\data-contracts.md</code>. The illustrated manual <code>docs\\manual\\USER_MANUAL.html</code> covers the Alteryx route and every Results sheet.</p>`)) },
+        <p>Developer references: <code>docs\\RUNNING.md</code>, <code>docs\\XOL_MECHANICS.md</code> (the calculations with a worked example), <code>docs\\methodology.md</code>, <code>docs\\data-contracts.md</code>. The illustrated manual <code>docs\\manual\\USER_MANUAL.html</code> covers every Control and Results sheet in detail.</p>`)) },
   ];
 
   function doneWhen(id, text) {

@@ -103,6 +103,16 @@
     if (nMiss) parts.push(el("div", { class: "banner stop", style: "margin-top:6px" }, el("b", {}, "Required and blank: "), pr.missing_required.join(", "), " — stage 00 will stop (P-checks). Fill them in Excel and save."));
     if (nBad) parts.push(el("div", { class: "banner flag", style: "margin-top:6px" }, el("b", {}, "Not an allowed value: "), pr.invalid.map((n) => { const r = pr.rows.find((x) => x.name === n); return `${n} = "${r.value}" (allowed: ${r.options.join(", ")})`; }).join("; ")));
     if (nOld) parts.push(el("div", { class: "banner flag", style: "margin-top:6px" }, el("b", {}, "Rows missing from the Params sheet: "), (pr.not_in_sheet || []).join(", "), " — this workbook predates the current template; add the rows from excel/templates/XoL_Control.xlsx."));
+    const co = pr.cutoff;
+    if (co && co.layers_below.length) {
+      const names = co.layers_below.map((l) => `${l.label} (AP ${Number(l.ap).toLocaleString("en-GB")})`).join(", ");
+      const u = Number(co.u).toLocaleString("en-GB");
+      const what = { STOP: ["stop", el("span", {}, el("b", {}, "The run will stop at stage 04 (S08). "), `fit_cutoff ${u} is above the attachment of ${names}: claims between the AP and the cut-off would not be simulated. In the Control workbook either lower fit_cutoff to ${Number(co.min_ap).toLocaleString("en-GB")} or below, or set Params below_cutoff to EMPIRICAL (simulate those claims from the data, spliced with the fitted tail) or IGNORE (leave them out and see their cost in a flag).`)],
+                     IGNORE: ["flag", el("span", {}, el("b", {}, "below_cutoff = IGNORE. "), `Claims between the AP and fit_cutoff ${u} are left out of the stochastic result for ${names}; stage 04 flags each layer (S09) with the band's frequency and deterministic cost so you can justify it. Set EMPIRICAL to price the band instead.`)],
+                     EMPIRICAL: ["info", el("span", {}, el("b", {}, "below_cutoff = EMPIRICAL. "), `For ${names}, claims between the AP and fit_cutoff ${u} are simulated from the data's own adjusted claims (their own frequency), spliced with the fitted tail above the cut-off; the stage 04 card shows the band's share of each layer (S10).`)] }[co.mode] ||
+                   ["flag", el("span", {}, `below_cutoff = "${co.mode}" is not an allowed value (STOP, EMPIRICAL, IGNORE).`)];
+      parts.push(el("div", { class: "banner " + what[0], style: "margin-top:6px" }, what[1]));
+    }
     if (paramsOpen) {
       const rows = pr.rows.map((r) => el("tr", { class: r.required && r.blank ? "sev-STOP" : r.invalid ? "sev-FLAG" : "" },
         el("td", {}, r.required ? el("span", { class: "req-mark", title: "required" }, "●") : el("span", { class: "opt-mark", title: "optional" }, "○"), " ", el("code", {}, r.name)),
