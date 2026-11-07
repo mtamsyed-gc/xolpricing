@@ -88,6 +88,9 @@ are marked "earlier run". The server opens and reads files only under `data/` an
 deletes, runs one pipeline at a time and logs every open to `data/output/<variant>/ui_actions.log`. Tool pages share
 `ui/kit/` (theme and behaviour); a tool is described by `ui/<tool>/manifest.json`. Tests: `tests/test_ui.py`.
 Another port: `tools\xol_ui.bat 9000`; without opening a browser: `py tools\ui\serve.py --no-browser`.
+"How to use" in the header opens `ui/xol/guide.html`, the interactive guide (steps adapt to the data source; screenshots
+in `ui/xol/img`). Release packs: `python tools/release/make_packs.py` writes `dist/xolpricing_user_<ver>.zip` (no
+synthetic data or tests; the page then offers the live book only) and `dist/xolpricing_admin_<ver>.zip` (everything).
 
 ## Running without Alteryx (Python route, 0.7.0)
 `tools\run_pipeline_python.bat` (or `py tools\run_python.py`) runs the same committed workflows in Python, with the

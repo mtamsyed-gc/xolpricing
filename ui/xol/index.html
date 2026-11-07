@@ -12,6 +12,7 @@
   <span class="brand">XoL Pricing Tool <small id="ver"></small></span>
   <span class="meta" id="hmeta"></span>
   <span class="spacer"></span>
+  <a href="/ui/xol/guide.html" class="btn sm" style="color:#fff;border-color:#9fb3c8;background:transparent;margin-right:12px" title="Step-by-step guide with screenshots">How to use</a>
   <span id="overall"></span>
 </header>
 <main class="gc-main" id="main"></main>
@@ -46,8 +47,12 @@
       try { await api("/api/open", Object.assign({ variant }, body)); toast("Opened " + label); } catch (e) { toast(e.message, 4000); } } }, label);
   }
 
+  let inputsKey = null;
   function renderInputs(st) {
     const ctl = st.control, files = st.inputs.filter((f) => f.mode === adapter);
+    const key = JSON.stringify([variant, adapter, ctl, files]);
+    if (inputsKey === key) return;
+    inputsKey = key;
     const missing = files.filter((f) => !f.exists);
     inputsCard.setBody(el("div", {},
       el("div", { class: "gc-row", style: "margin-bottom:4px" },
@@ -283,6 +288,7 @@
       el("span", {}, "Last run ", el("b", {}, st.run ? st.run.started.slice(0, 16) : "—")),
       el("span", {}, "Control saved ", el("b", {}, st.control.mtime ? st.control.mtime.slice(0, 16) : "—")));
     $("#overall").replaceChildren(pill(st.overall, st.overall === "ok" ? "All checks OK" : st.overall === "flag" ? "Flags to review" : st.overall === "stop" ? "Stopped" : st.overall === "running" ? "Running" : "No run"));
+    if (!st.variants.includes(variant)) { variant = st.variant; savePrefs(); }
     if (selVariant.options.length === 0) {
       selVariant.replaceChildren(...st.variants.map((v) => el("option", { value: v }, manifest.variants[v].label)));
       selAdapter.replaceChildren(...Object.entries(st.adapters).map(([k, v]) => el("option", { value: k }, k + " · " + v)));

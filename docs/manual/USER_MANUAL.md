@@ -311,6 +311,9 @@ pricing, top to bottom:
 | Stages 00 to 07 | One card per stage. The pill on the right says OK, how many flags, or STOP. Open a card for the check messages, the reconciliation counts and the stage's result tables; **Open CSV** opens any of them in Excel. A card with a STOP opens by itself: fix what it names and re-run from 00. |
 | Results workbook | **Open Results in Excel** after stage 07; **Save a dated copy** keeps a version before the next run overwrites the data sheets. |
 
+**How to use** in the page header opens the interactive guide (`ui\xol\guide.html`): choose your data source and
+follow the nine steps, each with a screenshot and a "Done when" box.
+
 Grey "earlier run" pills mean that stage's outputs are older than the current run (for instance after running
 00 to 03 only). Everything the page shows is in `data\output\<live|synth>\` as before; the page is a window on it,
 not a second copy.

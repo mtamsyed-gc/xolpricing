@@ -88,8 +88,12 @@ class Tool:
         self.kit_dir = ROOT / self.m.get("kit", "ui/kit")
 
     # ---- paths
+    def variants(self) -> list[str]:
+        """Variants present in this installation: one whose manifest 'requires' folder is absent is hidden (user pack)."""
+        return [k for k, v in self.m["variants"].items() if not v.get("requires") or (ROOT / v["requires"]).exists()]
+
     def variant(self, v: str) -> dict:
-        if v not in self.m["variants"]:
+        if v not in self.variants():
             raise ValueError(f"unknown variant {v}")
         return self.m["variants"][v]
 
@@ -339,6 +343,8 @@ class Handler(BaseHTTPRequestHandler):
     def send_json(self, obj, code=200):
         b = json.dumps(obj).encode("utf-8")
         self.send_response(code)
+        if self.headers.get("Origin") == "null":      # the guide opened from disk (file://); no other origin is allowed
+            self.send_header("Access-Control-Allow-Origin", "null")
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(b)))
         self.send_header("Cache-Control", "no-store")
@@ -387,13 +393,23 @@ class Handler(BaseHTTPRequestHandler):
                 if "/" in name or ".." in name:
                     return self.send_json({"error": "bad path"}, 400)
                 return self.send_file(self.tool.kit_dir / name)
+            if u.path == "/guide":
+                self.send_response(302); self.send_header("Location", "/ui/xol/guide.html"); self.end_headers(); return
+            if u.path.startswith("/ui/"):
+                rel = u.path[4:]
+                if ".." in rel or rel.startswith("/") or "\\" in rel:
+                    return self.send_json({"error": "bad path"}, 400)
+                return self.send_file(ROOT / "ui" / rel)
             if u.path.startswith("/page/"):
                 name = u.path[6:]
-                if "/" in name or ".." in name:
+                if ".." in name or name.startswith("/"):
                     return self.send_json({"error": "bad path"}, 400)
                 return self.send_file(self.tool.page_dir / name)
             if u.path == "/api/state":
-                return self.send_json(self.state(q.get("variant", "synth"), q.get("adapter", "01a")))
+                v = q.get("variant", "synth")
+                if v not in self.tool.variants():
+                    v = self.tool.variants()[0]
+                return self.send_json(self.state(v, q.get("adapter", "01a")))
             if u.path == "/api/table":
                 return self.table(q.get("variant", "synth"), q.get("name", ""))
             if u.path == "/api/log":
@@ -422,7 +438,7 @@ class Handler(BaseHTTPRequestHandler):
         return {
             "tool": {"name": t.m["name"], "title": t.m["title"], "version": t.m.get("version", ""),
                      "server_version": VERSION, "repo": str(ROOT)},
-            "variant": v, "adapter": adapter, "variants": list(t.m["variants"]), "adapters": t.m["adapters"],
+            "variant": v, "adapter": adapter, "variants": t.variants(), "adapters": t.m["adapters"],
             "control": {"path": str(ctl.relative_to(ROOT)), "exists": ctl.exists(), "mtime": fmt_t(ctl_m),
                         "changed_since_run": bool(run and ctl_m and run.get("control_mtime") and
                                                   ctl_m > run["control_mtime"] + 0.5)},
@@ -448,6 +464,14 @@ class Handler(BaseHTTPRequestHandler):
                 lines = f.read().splitlines()[-LOG_TAIL:]
         run = self.runner.status(v)
         return self.send_json({"lines": lines, "running": bool(run and run.get("running")), "run": run})
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        if self.headers.get("Origin") == "null":
+            self.send_header("Access-Control-Allow-Origin", "null")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST")
+        self.end_headers()
 
     # ---- POST
     def do_POST(self):
@@ -485,6 +509,14 @@ class Handler(BaseHTTPRequestHandler):
             return t.table_path(v, b.get("name", ""))
         if what == "folder":
             return t.out_dir(v)
+        if what == "input_dir":
+            grp = t.variant(v).get("inputs", [])
+            g = next((x for x in grp if x["mode"] == b.get("mode")), grp[0] if grp else None)
+            if g is None:
+                return None
+            p = ROOT / g["dir"]
+            p.mkdir(parents=True, exist_ok=True)      # the live input folder may not exist yet
+            return p
         if what == "input":
             p = ROOT / b.get("path", "")
             return p if t.allowed(p) else None

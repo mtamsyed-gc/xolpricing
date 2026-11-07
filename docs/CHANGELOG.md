@@ -3,6 +3,16 @@
 Methodology and data-contract changes, newest first.
 
 ## 2026-11-07 — 0.8.0: browser interface
+- **Interactive guide (same day).** `ui/xol/guide.html` ("How to use" in the page header; also opens from disk):
+  the user picks the data they have (line data, claimant listing, Merit outputs) and the nine steps adapt (install,
+  start the page, Control workbook, data files, run, checks, Results workbook, re-runs, troubleshooting), each with
+  a screenshot of the real window from the laptop run of 2026-11-07 (`ui/xol/img`), a "Done when" checkbox (kept
+  in the browser) and buttons that open the template, the input folder and the workbooks through the page. The
+  server serves `ui/` read-only and accepts `file://` calls from the guide (Origin null only).
+- **Two packs** (`tools/release/make_packs.py` → `dist/`): the **user pack** holds the page, guide, Python route,
+  live workflows, templates and docs and no synthetic data, tests, reference material or builders; the page hides
+  the synthetic book when `data/synthetic` is absent (manifest `requires`). The **admin pack** is the whole
+  repository. `tests/test_packs.py` checks the contents and serves the unpacked user pack.
 Owner's ask: a contained workflow in one browser page, so a pricing does not mean switching between Explorer,
 command windows and Excel; Excel stays where it is the interface (Control and Results workbooks); the page notices
 a saved workbook; the theme and behaviour are shared so the other tools can adopt the same front end.

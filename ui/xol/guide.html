@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>XoL Pricing Tool — how to use it</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../kit/gc_ui.css">
+<script src="../kit/gc_ui.js"></script>
+<style>
+  .guide-main { max-width: 1100px; }
+  .steps-nav { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 10px; }
+  .steps-nav .step { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: var(--fs-1); cursor: pointer; }
+  .steps-nav .step.done { border-color: var(--ok); color: var(--ok); } .steps-nav .step.done::before { content: "✓"; font-weight: 700; }
+  .steps-nav .step.current { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .progress { height: 6px; background: var(--line-2); border-radius: 3px; overflow: hidden; margin: 6px 0 2px; }
+  .progress > div { height: 100%; background: var(--teal); transition: width .3s; }
+  .mode-pick { display: flex; gap: 8px; flex-wrap: wrap; }
+  .mode-pick label { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; background: #fff; display: flex; gap: 8px; align-items: flex-start; max-width: 330px; }
+  .mode-pick label.on { border-color: var(--teal); background: var(--teal-soft); }
+  .mode-pick label b { display: block; }
+  .mode-pick label span { font-size: var(--fs-1); color: var(--ink-2); }
+  figure { margin: 10px 0 14px; } figure img { max-width: 100%; border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); }
+  figure figcaption { font-size: var(--fs-0); color: var(--ink-3); margin-top: 4px; }
+  .done-when { background: var(--ok-soft); border-left: 3px solid var(--ok); padding: 6px 10px; font-size: var(--fs-1); margin-top: 10px; border-radius: 4px; }
+  .done-when label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .only { display: none; } .mode-L .only-L, .mode-C .only-C, .mode-E .only-E { display: block; }
+  .only-inline { display: none; } .mode-L .only-inline-L, .mode-C .only-inline-C, .mode-E .only-inline-E { display: inline; }
+  .gc-card > .body { padding-bottom: 16px; } .gc-card h3 { font-size: var(--fs-2); margin: 12px 0 4px; color: var(--navy); }
+  .gc-card p, .gc-card li { font-size: var(--fs-2); } .gc-card ol, .gc-card ul { margin: 4px 0 8px; padding-left: 22px; }
+  kbd { font-family: var(--mono); background: var(--line-2); padding: 0 5px; border-radius: 3px; font-size: var(--fs-0); }
+  .sev { font-weight: 700; } .sev.STOP { color: var(--stop); } .sev.FLAG { color: var(--flag); } .sev.INFO { color: var(--info); }
+  .offline { display: none; } body.is-offline .offline { display: block; } body.is-offline .needs-server { display: none; }
+</style>
+</head>
+<body>
+<header class="gc-header">
+  <span class="brand">XoL Pricing Tool <small>how to use it</small></span>
+  <span class="meta"><span id="progress-text"></span></span>
+  <span class="spacer"></span>
+  <a class="btn sm needs-server" href="index.html" style="color:#fff;border-color:#9fb3c8;background:transparent">Open the tool page →</a>
+</header>
+<main class="gc-main guide-main">
+  <div class="banner info offline">This guide is open as a file: the buttons that open folders and workbooks need the tool page running (double-click <code>tools\xol_ui.bat</code>). Everything else works.</div>
+  <section class="gc-card always">
+    <div class="head"><h2>Your pricing</h2><span class="sub">pick the data you have; the steps below adapt</span></div>
+    <div class="body">
+      <div class="mode-pick" id="modes">
+        <label data-mode="L"><input type="radio" name="mode" value="L"><div><b>Line data</b><span>Claim lines and a member list from the cedant or TPA. Every stage runs. Adapter <code>01a</code>, <code>source_mode = L</code>.</span></div></label>
+        <label data-mode="C"><input type="radio" name="mode" value="C"><div><b>Claimant listing</b><span>Large-claimant listing above a threshold plus monthly exposure, premium and total claims. Adapter <code>01b</code>, <code>source_mode = C</code>.</span></div></label>
+        <label data-mode="E"><input type="radio" name="mode" value="E"><div><b>Merit / ETE outputs</b><span>The final tables of a Merit run (dim_life, fact_member_month, fact_claims). Adapter <code>01c</code>, <code>source_mode = E</code>.</span></div></label>
+      </div>
+      <div class="progress"><div id="bar" style="width:0"></div></div>
+      <div class="steps-nav" id="nav"></div>
+    </div>
+  </section>
+  <div id="steps"></div>
+</main>
+<script>
+(function () {
+  const { $, el, api } = GC;
+  const API = location.protocol === "file:" ? "http://127.0.0.1:8765" : "";
+  const prefs = JSON.parse(localStorage.getItem("xol_guide") || "{}");
+  let mode = prefs.mode || "L", done = prefs.done || {};
+  const save = () => localStorage.setItem("xol_guide", JSON.stringify({ mode, done }));
+  async function open(what, extra) {
+    try { await api(API + "/api/open", Object.assign({ variant: "live", what }, extra || {})); GC.toast("Opened"); }
+    catch (e) { GC.toast("Start the tool page first (tools\\xol_ui.bat): " + e.message, 5000); }
+  }
+  const btn = (label, what, extra) => el("button", { class: "btn sm needs-server", onclick: () => open(what, extra) }, label);
+  const fig = (src, cap) => el("figure", {}, el("img", { src: "img/" + src, alt: cap, loading: "lazy" }), el("figcaption", {}, cap));
+  const html = (s) => el("div", { html: s });
+  const sev = (s) => `<span class="sev ${s}">${s}</span>`;
+
+  const STEPS = [
+    { id: "install", title: "Install once", sub: "Python and the tool folder", body: () => el("div", {},
+      html(`<ol>
+        <li>Unzip the pack anywhere you keep work files (for example <code>C:\\XoL\\</code>). Keep the folder structure: the workflows find their files by relative path. Do not put client data inside OneDrive-synced folders unless your policy allows it.</li>
+        <li>Python 3.12 or later: on a GC laptop it is installed; check with <kbd>py --version</kbd> in a command prompt.</li>
+        <li>Once, in a normal PowerShell or command window in the tool folder: <kbd>py -m pip install -r requirements-native.txt</kbd> (numpy, pandas, openpyxl, scipy from GC Artifactory; takes a minute).</li>
+        <li>Alteryx is <b>not</b> needed: the page runs the workflows in Python. If you have Alteryx Designer, <code>tools\\run_pipeline.bat</code> runs the same workflows through its engine.</li>
+      </ol>`),
+      fig("g01_tools_folder.png", "The tools folder: xol_ui.bat starts the page; run_pipeline_python.bat is the command-line route."),
+      doneWhen("install", "py --version shows 3.12 or later and pip install finished without errors")) },
+    { id: "start", title: "Start the page", sub: "tools\\xol_ui.bat", body: () => el("div", {},
+      html(`<p>Double-click <code>tools\\xol_ui.bat</code>. A small command window opens and stays open (it is the server; closing it closes the page), and your browser opens <code>http://127.0.0.1:8765/</code>. Nothing leaves the laptop: the page only talks to that window.</p>
+        <p>The page is one scroll, top to bottom: <b>Inputs</b> (Control workbook and data files), <b>Input guide</b>, <b>Run</b>, one card per <b>stage</b> 00 to 07, and the <b>Results workbook</b>. The header pill says where the last run stands.</p>`),
+      fig("g02_page_top.png", "The page: header with the run status, Inputs card (Control workbook, data files, Params readiness), Input guide, Run card."),
+      html(`<p>Set <b>Book</b> to <i>Live pricing</i> and <b>Data source</b> to the adapter of your data (<span class="only-inline only-inline-L">01a for line data</span><span class="only-inline only-inline-C">01b for a claimant listing</span><span class="only-inline only-inline-E">01c for Merit outputs</span>). The page remembers both.</p>`),
+      doneWhen("start", "the page is open and shows Book: Live pricing")) },
+    { id: "control", title: "Fill the Control workbook", sub: "every assumption, one workbook", body: () => el("div", {},
+      html(`<p>The Control workbook is the only place assumptions are entered. Make it once per pricing:</p>
+        <ol>
+          <li>Copy <code>excel\\templates\\XoL_Control.xlsx</code> to <code>data\\input\\XoL_Control.xlsx</code> (the page shows "No Control workbook" with an <b>Open template</b> button until it exists).</li>
+          <li>Open it from the page (<b>Open in Excel</b>). <b>Yellow</b> cells are required, <b>blue</b> cells optional (blank = the default the description names), grey cells are labels or written back by the tool. Row 3 above every column says <i>required</i> or <i>optional</i>.</li>
+          <li>Hover a column header, or a Params value cell, for what to enter, the allowed options and an example. List inputs have a drop-down. The <b>Guide</b> sheet lists every input of every sheet; the page's <b>Input guide</b> card shows the same.</li>
+          <li>Save and close. The page notices the save and shows a <b>Re-run</b> banner; the <b>Params in this workbook</b> table turns red on any required value still blank.</li>
+        </ol>`),
+      el("div", { class: "gc-row" }, btn("Open the template", "control_template"), btn("Open my Control workbook", "control"), btn("Open data\\input", "input_dir")),
+      fig("g11_control_readme.png", "The README sheet: the colour legend and the list of sheets."),
+      fig("g03_control_params.png", "Params sheet: yellow required, blue optional, row 3 markers; hovering a value cell shows REQUIRED / optional, the options and the description."),
+      fig("g04_control_guide.png", "The Guide sheet: every sheet and column with required / optional, type, options, example."),
+      html(`<h3>Sheets to fill for your data</h3>
+        <ul>
+          <li><b>Params</b>: cedant, currency, treaty start and quote year, <code>source_mode = <span class="only-inline only-inline-L">L</span><span class="only-inline only-inline-C">C</span><span class="only-inline only-inline-E">E</span></code>, basis (RA / LO, incurred / paid), EPI for the quote year, the years included, credibility and simulation settings (the defaults are a sensible start).</li>
+          <li><b>FX</b>: one row per currency in the data, at the rate you price at. <b>Trend</b>: one row per year from the first experience year to the quote year.</li>
+          <li><b>Completion</b>: your selected IBNR / unearned / unwritten factors by year and side; the tool writes its indicated factors next to them after stage 02 (reference only).</li>
+          <li><b>Weights</b>: months complete per experience year (default weights follow). <b>Layers</b>: up to 4 options per cover (PP, EV, SL), <code>active = 1</code> to price. <b>Loadings</b>: reinsurer expense, brokerage, profit, tax, risk load per cover.</li>
+          <li class="only only-L"><b>Limits</b>: annual benefit limit per plan for members whose <code>annual_limit</code> is blank; else <code>default_benefit_limit</code> in Params.</li>
+          <li class="only only-E"><b>Limits</b>: benefit limit per Merit plan where no CAP binds; <code>ete_payer_filter</code> = the payer to price (several payers in one run are flagged A16); <code>premium_basis</code> GROSS or NET; <b>EvScenarios</b> for per-event cover (Merit has no event fields, so set <code>ev_freq_source = SCENARIOS</code>).</li>
+          <li class="only only-C"><b>EvScenarios</b> if you price per-event cover: the listing has no event grouping unless it carries <code>event_id</code>.</li>
+          <li><b>Expiring</b> (optional): the expiring structure and rate, for the comparison exhibit. <b>Scenarios</b> (optional): sensitivity overrides, see step 8.</li>
+        </ul>`),
+      doneWhen("control", "the page shows ALL REQUIRED FILLED next to Params in this workbook")) },
+    { id: "data", title: "Put the data files in place", sub: "data\\input\\…", body: () => el("div", {},
+      el("div", { class: "only only-L" },
+        html(`<p>Folder <code>data\\input\\line\\</code>, three CSV files (templates with the exact headers in <code>data\\templates\\</code>: <code>line_members.csv</code>, <code>line_claims_lines.csv</code>, <code>run_meta.csv</code>):</p>
+          <table class="gc"><thead><tr><th>File</th><th>One row per</th><th>Required columns</th><th>Optional</th></tr></thead><tbody>
+          <tr><td><code>members.csv</code></td><td>member cover period</td><td>member_id, policy_id, scheme_id, policy_start, policy_end, cover_start, cover_end, currency, written_premium</td><td>plan, annual_limit, segment, site, dob, gender, relation</td></tr>
+          <tr><td><code>claims_lines.csv</code></td><td>claim line</td><td>claim_line_id, claim_id, member_id, treatment_date, amount (payer share, signed), status, currency; reported_date for the reported basis; paid_date for the paid trigger</td><td>policy_id, admission_date, discharge_date, event_id, cause_code, icd_code, segment</td></tr>
+          <tr><td><code>run_meta.csv</code></td><td>the extract</td><td>valuation_date, currency_basis</td><td>listing_threshold (0), data_source_note</td></tr></tbody></table>
+          <p>Dates <code>yyyy-mm-dd</code>; amounts plain numbers; claims must match a member on <code>member_id</code> for at least 95% of lines (A03 stops otherwise); reversals share the <code>claim_id</code> and are netted.</p>`)),
+      el("div", { class: "only only-C" },
+        html(`<p>Folder <code>data\\input\\claimant\\</code>, four CSV files (templates in <code>data\\templates\\claimant_*.csv</code> and <code>run_meta.csv</code>):</p>
+          <table class="gc"><thead><tr><th>File</th><th>One row per</th><th>Required columns</th><th>Optional</th></tr></thead><tbody>
+          <tr><td><code>claimants.csv</code></td><td>member × accumulation period</td><td>member_id, period_start, period_end, paid_amount, os_amount, currency; cohort_month for RA</td><td>scheme_id, first_treatment_date, claim_count, annual_limit, event_id, site, segment</td></tr>
+          <tr><td><code>exposure_monthly.csv</code></td><td>segment × month</td><td>month, lives_inforce, written_premium, earned_premium; lives_new for RA</td><td>segment</td></tr>
+          <tr><td><code>claims_aggregate_monthly.csv</code></td><td>segment × incurred month, all claims</td><td>incurred_month, paid_amount, os_amount</td><td>segment, cohort_month, claim_count</td></tr>
+          <tr><td><code>run_meta.csv</code></td><td>the extract</td><td>valuation_date, listing_threshold (amount above which the listing is complete; 0 = complete), currency_basis</td><td>data_source_note</td></tr></tbody></table>`)),
+      el("div", { class: "only only-E" },
+        html(`<p>Run Merit as usual. Then copy its four final tables into <code>data\\input\\ete\\</code> with <code>tools\\import_merit.bat "C:\\Merit_Client\\04_Outputs"</code> (it looks in <code>\\csv\\</code> first); Merit's own folder is not changed. Files: <code>dim_life.csv</code>, <code>fact_member_month.csv</code>, <code>fact_claims.csv</code>, <code>run_manifest_claims.csv</code>. Nothing is edited in them: limits, trend, completion and layers all come from the Control workbook.</p>
+          <p>Claims treated after Merit's valuation date are excluded and flagged (A04); Merit's IBNR ultimates are not used (your completion factors apply); life-periods without cover that carry claims are flagged (A17).</p>`)),
+      el("div", { class: "gc-row" }, btn("Open data\\input", "input_dir")),
+      fig("g05_data_files.png", "The Inputs card lists the files the chosen adapter needs, with a tick or a cross and their last-saved time."),
+      doneWhen("data", "every file in the Data files list has a tick")) },
+    { id: "run", title: "Run", sub: "00 → 07, about 7 minutes on a 16 GB laptop", body: () => el("div", {},
+      html(`<p>Leave <b>From stage</b> at 00 and <b>To stage</b> at 07 and press <b>▶ Run</b>. The log follows each workflow; the stage chips turn green (OK), amber (flags) or red (STOP) as each finishes; the header pill says <i>Running</i>. <b>Stop</b> ends the run. Stage 04 (the simulation) is the long one: about 5 minutes at 10,000 iterations.</p>
+        <ul>
+          <li>Partial runs: after changing only the Control workbook's loadings or layers, run from the stage that first reads them (the Input guide says which); the chips of stages not reached go grey, <i>earlier run</i>.</li>
+          <li>The Results workbook must be <b>closed</b> in Excel when stage 07 runs.</li>
+          <li>Memory: 10,000 iterations use about 9 GB. On a laptop with less free memory set <code>iterations</code> to 2,000–5,000 for working runs and 10,000 for the final one.</li>
+        </ul>`),
+      fig("g06_running.png", "A run in progress: live log, stage chips, the running stage card marked blue."),
+      doneWhen("run", "the log ends with All workflows ran and the header pill is green or amber")) },
+    { id: "checks", title: "Read the checks", sub: "every stage card, before the numbers", body: () => el("div", {},
+      html(`<p>Each stage writes a checks table. The pill on its card counts them: ${sev("STOP")} the run stops at this stage (fix and re-run from 00); ${sev("FLAG")} the run continues but you must read and, if needed, justify (they go into the Results warnings sheet and the run log); ${sev("INFO")} for information. A card with a STOP or a flag opens by itself; the reconciliation table below the checks shows rows and amounts in and out of the stage.</p>`),
+      fig("g07_stage_card.png", "A stage card with a flag: the check row is highlighted, the reconciliation and result tables follow, every table opens as CSV."),
+      html(`<h3>Codes you will meet</h3>
+        <table class="gc"><thead><tr><th>Code</th><th>Stage</th><th>Means</th><th>Do</th></tr></thead><tbody>
+        <tr><td>P01–P04</td><td>00</td><td>A required parameter is blank, wrong type or not in the allowed list</td><td>Fix the Params sheet (the page's readiness table names it first)</td></tr>
+        <tr><td>A03</td><td>01</td><td>Fewer than 95% of claims match a member</td><td>Check member_id in both files</td></tr>
+        <tr class="only only-E"><td>A04</td><td>01c</td><td>Claims treated after Merit's valuation date excluded</td><td>Expected when the claims extract runs later; note the count</td></tr>
+        <tr class="only only-E"><td>A16</td><td>01c</td><td>Several payers in the run</td><td>Set ete_payer_filter unless a pooled price is intended</td></tr>
+        <tr><td>A18 / A19</td><td>01</td><td>How many lives take their benefit limit from the data / from the default</td><td>Information; check the default is what you mean</td></tr>
+        <tr><td>B02</td><td>03</td><td>Credibility below 1 on a layer (fewer than full_cred_n claims)</td><td>The stochastic result carries the balance; read the Pricing sheet's blend</td></tr>
+        <tr><td>F06</td><td>04a</td><td>A candidate distribution ended on a boundary</td><td>Not selected automatically; read the Severity sheet before overriding fit_selected</td></tr>
+        <tr><td>S07</td><td>04</td><td>severity_source = PYTHON but 04a has not run since 03</td><td>Run from 04a</td></tr>
+        <tr><td>V06</td><td>05</td><td>Few events in the layer</td><td>The per-event price leans on EvScenarios; review them</td></tr>
+        <tr><td>X01–X04</td><td>00</td><td>A Scenarios row matched no rows or named an unknown column</td><td>Fix the Scenarios sheet</td></tr></tbody></table>`),
+      doneWhen("checks", "every STOP is cleared and every flag has been read")) },
+    { id: "results", title: "Read the Results workbook", sub: "Pricing, structures, cedant impact", body: () => el("div", {},
+      html(`<p>Press <b>Open Results in Excel</b>. Excel recalculates on opening. Read in this order: <b>Severity</b> (which distribution was selected and why), <b>Pricing</b> (expected loss per option: burning cost, stochastic, credibility blend, loadings, indicative premium), <b>Reinsurance Structures</b> (C1), <b>Cedant Impact</b> (C2: recoveries against premium, retained volatility at the return periods), <b>Expiring</b>, <b>Scenarios</b>.</p>
+        <p>The <b>Inputs</b> sheet (display currency and unit, reference lives, EPI, budget, return periods, loading overrides) can be changed without a re-run. The data sheets (<code>out_*</code>) are rewritten by stage 07 on every run, so press <b>Save a dated copy</b> before the next run to keep a version; the copy sits next to the original in <code>data\\output\\live\\</code>.</p>`),
+      el("div", { class: "gc-row" }, btn("Open the Results workbook", "results"), btn("Open the output folder", "folder")),
+      fig("g08_results_card.png", "The Results card after stage 07: open, dated copy, output folder."),
+      fig("g09_results_pricing.png", "The Pricing sheet: deterministic, stochastic and blended expected loss per option, loadings, target premium."),
+      fig("g12_results_c2.png", "Cedant Impact (C2): surplus or loss against the net claims budget at the return periods, with and without each structure."),
+      doneWhen("results", "a dated copy of the Results workbook is saved under the placement's name")) },
+    { id: "rerun", title: "Change something and re-run", sub: "scenarios, accepted completion factors, new layers", body: () => el("div", {},
+      html(`<ul>
+        <li><b>Accept the indicated completion factors</b>: after stage 02, copy the indicated factors you accept from the stage 02 card (<code>out_completion_indicated</code>) into the Completion sheet's <code>selected_factor</code>, save, re-run from 00.</li>
+        <li><b>Sensitivities</b>: add rows to the Scenarios sheet (one numeric override each, e.g. trend +2pp: Trend / ALL / residual_pct / ADD / 0.02), set Params <code>scenario_id</code>, save, re-run from 00. The Results Scenarios sheet keeps every scenario's rows; set <code>scenario_id</code> back to blank for the best estimate.</li>
+        <li><b>New layer options</b>: edit the Layers sheet (up to 4 per cover, <code>active = 1</code>), re-run from 03.</li>
+        <li>Every save of the Control workbook shows the <b>Control workbook changed</b> banner with a Re-run button, so you cannot read results against a stale workbook by accident.</li>
+      </ul>`),
+      fig("g10_changed_banner.png", "The banner after saving the Control workbook: re-run from 00 to use it."),
+      doneWhen("rerun", "the header shows the run that matches the saved workbook")) },
+    { id: "trouble", title: "When something goes wrong", sub: "symptoms and fixes", body: () => el("div", {},
+      html(`<table class="gc"><thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead><tbody>
+        <tr><td>The page does not open / "site can't be reached"</td><td>The server window was closed, or port 8765 is taken</td><td>Double-click <code>tools\\xol_ui.bat</code> again; or <code>tools\\xol_ui.bat 9000</code> and open that port</td></tr>
+        <tr><td>"Python packages missing" in the log</td><td>pip install not done for this Python</td><td>Step 1 in a normal PowerShell window (not inside LenAI)</td></tr>
+        <tr><td>Stage 00 stops with P04 on default_benefit_limit</td><td>A Control workbook made before 0.7</td><td>Add the row from the template (blank = no default limit)</td></tr>
+        <tr><td>Stage 04 stops with a memory error</td><td>Too little free memory</td><td>Close other programs or lower <code>iterations</code></td></tr>
+        <tr><td>Stage 07 "cannot access the file"</td><td>The Results workbook is open in Excel</td><td>Close it, run from 07</td></tr>
+        <tr><td>"needs the stage files of a Python run of stage 00"</td><td>Stage 00 last ran through Alteryx</td><td>Run from 00</td></tr>
+        <tr><td>Exhibits show blanks</td><td>The run stopped before 07</td><td>Read the stage cards; the header pill says where</td></tr>
+        <tr><td>Open in Excel does nothing</td><td>The file does not exist yet, or Excel is busy with a dialog</td><td>Check the path shown next to the button; close the Excel dialog</td></tr></tbody></table>
+        <p>Developer references: <code>docs\\RUNNING.md</code>, <code>docs\\XOL_MECHANICS.md</code> (the calculations with a worked example), <code>docs\\methodology.md</code>, <code>docs\\data-contracts.md</code>. The illustrated manual <code>docs\\manual\\USER_MANUAL.html</code> covers the Alteryx route and every Results sheet.</p>`)) },
+  ];
+
+  function doneWhen(id, text) {
+    const cb = el("input", { type: "checkbox", onchange: (e) => { done[id] = e.target.checked; save(); render(); } });
+    cb.checked = !!done[id];
+    return el("div", { class: "done-when" }, el("label", {}, cb, el("span", {}, el("b", {}, "Done when: "), text)));
+  }
+  function render() {
+    document.body.classList.remove("mode-L", "mode-C", "mode-E"); document.body.classList.add("mode-" + mode);
+    GC.$$("#modes label").forEach((l) => { l.classList.toggle("on", l.dataset.mode === mode); l.querySelector("input").checked = l.dataset.mode === mode; });
+    const n = STEPS.filter((s) => done[s.id]).length, total = STEPS.filter((s) => s.id !== "trouble").length;
+    $("#bar").style.width = (100 * n / total) + "%";
+    $("#progress-text").textContent = `${n} of ${total} steps done`;
+    $("#nav").replaceChildren(...STEPS.map((s, i) => el("span", { class: "step" + (done[s.id] ? " done" : ""), onclick: () => { const c = $("#step-" + s.id); c.classList.add("open"); c.scrollIntoView({ behavior: "smooth", block: "start" }); } }, `${i + 1}. ${s.title}`)));
+    const host = $("#steps");
+    if (!host.children.length) {
+      STEPS.forEach((s, i) => {
+        const c = GC.card({ id: "step-" + s.id, num: String(i + 1), title: s.title, sub: s.sub, open: i === 0 });
+        c.setBody(s.body()); host.append(c);
+      });
+    }
+    STEPS.forEach((s) => { const c = $("#step-" + s.id); if (c) c.setStatus(done[s.id] ? "ok" : "none", done[s.id] ? "done" : "to do"); });
+  }
+  GC.$$("#modes input").forEach((r) => r.addEventListener("change", (e) => { mode = e.target.value; save(); render(); }));
+  if (location.protocol === "file:") document.body.classList.add("is-offline");
+  render();
+})();
+</script>
+</body>
+</html>
