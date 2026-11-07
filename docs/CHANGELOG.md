@@ -2,6 +2,31 @@
 
 Methodology and data-contract changes, newest first.
 
+## 2026-11-07 — 0.8.0: browser interface
+Owner's ask: a contained workflow in one browser page, so a pricing does not mean switching between Explorer,
+command windows and Excel; Excel stays where it is the interface (Control and Results workbooks); the page notices
+a saved workbook; the theme and behaviour are shared so the other tools can adopt the same front end.
+- **`tools\xol_ui.bat`** starts `tools/ui/serve.py` (standard library only, 127.0.0.1, port 8765) and opens the
+  page. One page, top to bottom: Inputs (Control workbook: Open in Excel, last saved, data files present for the
+  chosen adapter), Run (Python route, from / to stage, live log, stage timeline), one card per stage in run order
+  (status pill from `checks_NN.csv`: OK / flags / STOP, the check rows, the stage's reconciliation and result tables,
+  Open CSV), Results workbook (Open in Excel, save a dated copy, open the output folder).
+- **Change detection.** The server records the Control workbook's mtime when a run starts; a later save shows a
+  banner with a Re-run button. Outputs written before the current run started show as "earlier run" (grey), so a
+  partial run cannot be mistaken for a full one. A STOP opens its card and marks the run and the header.
+- **Reusable kit.** `ui/kit/gc_ui.css` (tokens: navy / teal on white; pills, cards, tables, banners, log) and
+  `ui/kit/gc_ui.js` (API calls, polling, table rendering, cards). A tool page is `ui/<tool>/manifest.json`
+  (variants, adapters, stages and their files) plus a thin `index.html`; `serve.py` reads the manifest.
+- **Safety.** The server binds to localhost, opens and reads files only under `data/` and `excel/templates/`
+  (resolved paths, `..` refused), never deletes, allows one run at a time, and logs every open and copy to
+  `data/output/<variant>/ui_actions.log`. Run state is in `ui_run.json`, the log in `ui_run.log`.
+- Tests: `tests/test_ui.py` (served files, state, a run of 00-03 through the API, table endpoint, change
+  detection, planted STOP, refusals). Not in scope yet: the Alteryx engine route from the page, editing Params in
+  the browser, charts.
+- Laptop check (0.7.0, 2026-11-06, `Documents\20261106_v2`): `run_pipeline_python.bat synth 01a` on Python 3.14.6,
+  every stage ok in 641 s (stage 04 484 s), peak Python working set 9.3 GB of 15.8 GB; 43 output files equal
+  Designer's stored run; the Results workbook recalculates with 0 formula errors.
+
 ## 2026-11-06 — 0.7.0: Merit v8 safeguard, benefit limits from the data, Python route
 Owner's three asks: (A) get the Merit safeguard working again, (B) a Python route so pricing does not depend on
 Alteryx, (C) take the benefit limit from the data where it is available, else a global limit the user sets.
@@ -35,8 +60,7 @@ Alteryx, (C) take the benefit limit from the data where it is available, else a 
     same distribution with the same severity grid, fitted parameters within 1e-5 relative (scipy 1.18 vs Designer's
     1.16). 13 GB suits the owner's laptop (63.5 GB); on 16 GB laptops lower `iterations` for working runs until
     stage 04 is vectorised.
-- Laptop check pending: `tools\run_pipeline_python.bat` on the synthetic data; optionally `tools\run_pipeline.bat`
-  to confirm the regenerated workflows still run clean in Designer.
+- Laptop check: passed 2026-11-06 (see 0.8.0).
 
 ## 2026-10-28 — 0.6.1: Merit v7.6.0 re-verified
 - Merit moved from v7.0.2 to v7.6.0 (contract IP4-10) since the fixture was built. Its changes are additive; the XoL tool reads columns by name, so the new `LifeID`, `ScopeStatus`, `ScopeRule`, `PayerShareCapped`, `PayerShareExcess` and the manifest's `contract_version` pass through unused. Fixture `tests/fixtures/merit_v7` rebuilt from the v7.6.0 synthetic outputs (totals unchanged; one empty member-month row no longer written); 00 → 01c → 02 and the Designer twin reconcile as before.

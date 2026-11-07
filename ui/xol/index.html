@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>XoL Pricing Tool</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/kit/gc_ui.css">
+<script src="/kit/gc_ui.js"></script>
+</head>
+<body>
+<header class="gc-header">
+  <span class="brand">XoL Pricing Tool <small id="ver"></small></span>
+  <span class="meta" id="hmeta"></span>
+  <span class="spacer"></span>
+  <span id="overall"></span>
+</header>
+<main class="gc-main" id="main"></main>
+<script>
+(async function () {
+  const { $, el, api, toast, pill, table, card, poll, fmtWhen } = GC;
+  const manifest = await (await fetch("/page/manifest.json")).json();
+  const stageDefs = Object.fromEntries(manifest.stages.map((s) => [s.code, s]));
+  const prefs = JSON.parse(localStorage.getItem("xol_ui") || "{}");
+  let variant = prefs.variant || "synth", adapter = prefs.adapter || "01a";
+  let state = null, lastRunKey = null;
+  const tableCache = {};   // name -> {mtime, node}
+  const main = $("#main");
+
+  // ---------------------------------------------------------------- 1. inputs card
+  const inputsCard = card({ id: "inputs", num: "", title: "Inputs", sub: "Control workbook and data files", always: true });
+  // ---------------------------------------------------------------- 2. run card
+  const runCard = card({ id: "run", num: "", title: "Run", sub: "Python route (tools/run_python.py)", always: true });
+  // ---------------------------------------------------------------- 3. stage cards (built on first state)
+  const stageCards = {};
+  // ---------------------------------------------------------------- 4. results card
+  const resultsCard = card({ id: "results", num: "", title: "Results workbook", sub: "Pricing, structures, cedant impact", always: true });
+  main.append(inputsCard, runCard, resultsCard);
+
+  const selVariant = el("select", { onchange: (e) => { variant = e.target.value; savePrefs(); refresh(true); } });
+  const selAdapter = el("select", { onchange: (e) => { adapter = e.target.value; savePrefs(); refresh(true); } });
+  const selFirst = el("select"), selLast = el("select");
+  function savePrefs() { localStorage.setItem("xol_ui", JSON.stringify({ variant, adapter })); }
+
+  function openBtn(label, body, cls) {
+    return el("button", { class: "btn " + (cls || ""), onclick: async () => {
+      try { await api("/api/open", Object.assign({ variant }, body)); toast("Opened " + label); } catch (e) { toast(e.message, 4000); } } }, label);
+  }
+
+  function renderInputs(st) {
+    const ctl = st.control, files = st.inputs.filter((f) => f.mode === adapter);
+    const missing = files.filter((f) => !f.exists);
+    inputsCard.setBody(el("div", {},
+      el("div", { class: "gc-row", style: "margin-bottom:10px" },
+        el("label", { class: "fld" }, "Book", selVariant),
+        el("label", { class: "fld" }, "Data source (adapter)", selAdapter)),
+      ctl.changed_since_run ? el("div", { class: "banner flag", style: "margin-bottom:10px" },
+        el("b", {}, "Control workbook changed"), ` saved ${fmtWhen(ctl.mtime)}, after the last run started. Re-run from stage 00 to use it.`,
+        el("span", { class: "spacer" }),
+        el("button", { class: "btn sm primary", onclick: () => startRun("00", "07") }, "Re-run 00 → 07")) : null,
+      !ctl.exists ? el("div", { class: "banner stop", style: "margin-bottom:10px" }, el("b", {}, "No Control workbook"),
+        ` at ${ctl.path}. Save a filled copy of the template there.`, el("span", { class: "spacer" }),
+        openBtn("Open template", { what: "control_template" }, "sm")) : null,
+      el("div", { class: "gc-grid-2" },
+        el("div", {},
+          el("div", { class: "gc-row" }, el("b", {}, "Control workbook"), el("span", { class: "muted mono" }, ctl.path)),
+          el("div", { class: "gc-row", style: "margin:6px 0" },
+            openBtn("Open in Excel", { what: "control" }, "primary"),
+            el("span", { class: "muted" }, ctl.exists ? "saved " + fmtWhen(ctl.mtime) : "missing")),
+          el("p", { class: "note" }, "Edit the yellow cells, save, close. The page notices the save and offers the re-run.")),
+        el("div", {},
+          el("div", { class: "gc-row" }, el("b", {}, "Data files"), el("span", { class: "muted" }, st.adapters[adapter]),
+            missing.length ? pill("stop", missing.length + " missing") : pill("ok", "all present")),
+          el("ul", { class: "files" }, files.map((f) => el("li", {},
+            el("span", { class: f.exists ? "ok" : "miss" }, f.exists ? "✓" : "✗"),
+            el("span", { class: "path" }, f.path),
+            el("span", { class: "when" }, f.exists ? fmtWhen(f.mtime) : "not found"),
+            f.exists ? openBtn("Open", { what: "input", path: f.path }, "sm") : null)))))));
+  }
+
+  // ---------------------------------------------------------------- run
+  let logPoll = null;
+  const logBox = el("div", { class: "log" }, el("span", { class: "dim" }, "Run log appears here."));
+  function stageOptions(codes, sel, value) {
+    sel.replaceChildren(...codes.map((c) => el("option", { value: c }, c + " · " + (stageDefs[c] ? stageDefs[c].title : c))));
+    sel.value = codes.includes(value) ? value : codes[0];
+  }
+  async function startRun(first, last) {
+    try {
+      await api("/api/run", { variant, adapter, first: first || selFirst.value, last: last || selLast.value });
+      toast("Run started"); refresh(true); logPoll.start();
+    } catch (e) { toast(e.message, 4000); }
+  }
+  async function stopRun() {
+    try { await api("/api/stop", { variant }); toast("Stop requested"); } catch (e) { toast(e.message, 4000); }
+  }
+  async function refreshLog() {
+    const j = await api(`/api/log?variant=${variant}`);
+    {
+      logBox.replaceChildren(...j.lines.map((l) => el("div", { class: /FAILED|STOPPED|Error|Traceback/.test(l) ? "bad" : /\bok\b|ALL DONE|All workflows ran/.test(l) ? "ok" : /^\[|^=====/.test(l) ? "dim" : "" }, l)));
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+    if (!j.running) { logPoll.stop(); refresh(true); }
+  }
+  function renderRun(st) {
+    const run = st.run, running = run && run.running;
+    const codes = st.stage_codes;
+    if (selFirst.options.length !== codes.length || selFirst.options[1].value !== codes[1]) {
+      stageOptions(codes, selFirst, "00"); stageOptions(codes, selLast, "07");
+    }
+    const summary = run ? el("div", { class: "kv", style: "margin-top:8px" },
+      el("dt", {}, "Last run"), el("dd", {}, `${run.started}${run.finished ? " → " + run.finished.slice(11) : " (running)"} · ${run.adapter} · stages ${run.first} → ${run.last}`),
+      el("dt", {}, "Result"), el("dd", {}, running ? pill("running") : run.rc === 0 ? pill("ok", "completed") : run.rc === null ? pill("none", "interrupted") : pill("stop", "stopped, exit " + run.rc))) : el("p", { class: "note" }, "No run yet for this book.");
+    const timeline = el("div", { class: "timeline", style: "margin-top:10px" }, st.stages.map((s) => {
+      const status = runningStage(st) === s.code ? "running" : s.stale ? "stale" : s.status;
+      return el("span", { class: "step " + status, title: s.title, onclick: () => { const c = stageCards[s.code]; if (c) { c.classList.add("open"); c.scrollIntoView({ behavior: "smooth", block: "start" }); } } },
+        el("span", { class: "dot" }), s.code);
+    }));
+    runCard.setBody(el("div", {},
+      el("div", { class: "gc-row" },
+        el("label", { class: "fld" }, "From stage", selFirst), el("label", { class: "fld" }, "To stage", selLast),
+        running ? el("button", { class: "btn danger", onclick: stopRun }, "Stop") :
+          el("button", { class: "btn primary", onclick: () => startRun() }, "▶ Run"),
+        el("span", { class: "muted" }, running ? "running…" : "Starts tools/run_python.py in the background; this page follows the log.")),
+      summary, timeline, logBox));
+    runCard.setStatus(running ? "running" : st.overall === "none" ? "none" : st.overall);
+    if (running && !logPoll.active) logPoll.start();
+  }
+  function runningStage(st) {
+    if (!(st.run && st.run.running)) return null;
+    // the stage after the last checks file written since the run started
+    const codes = st.stage_codes; let last = -1;
+    st.stages.forEach((s, i) => { if (s.status !== "none" && !s.stale) last = i; });
+    const i = Math.max(codes.indexOf(st.run.first), last + 1);
+    return i <= codes.indexOf(st.run.last) ? codes[i] : null;
+  }
+
+  // ---------------------------------------------------------------- stages
+  function ensureStageCards(st) {
+    const wanted = st.stages.map((s) => s.code);
+    Object.keys(stageCards).forEach((c) => { if (!wanted.includes(c)) { stageCards[c].remove(); delete stageCards[c]; } });
+    let anchor = runCard;
+    for (const s of st.stages) {
+      let c = stageCards[s.code];
+      if (!c) {
+        c = stageCards[s.code] = card({ id: "stage-" + s.code, num: s.code, title: s.title, sub: s.name, status: "none" });
+        anchor.after(c);
+      }
+      anchor = c;
+    }
+  }
+  async function renderStage(s, st) {
+    const c = stageCards[s.code], def = stageDefs[s.code] || {};
+    const status = runningStage(st) === s.code ? "running" : s.stale ? "stale" : s.status;
+    const counts = s.status === "none" ? "" : `${s.stop ? s.stop + " STOP · " : ""}${s.flag ? s.flag + (s.flag > 1 ? " flags · " : " flag · ") : ""}${s.info} info`;
+    c.setStatus(status, status === "ok" ? "OK · " + counts : status === "stale" ? "earlier run" : status === "none" || status === "running" ? undefined : counts);
+    const body = el("div", {});
+    body.append(el("p", { class: "note" }, def.note || ""));
+    if (s.status === "none") {
+      body.append(el("p", { class: "muted" }, "Not run yet."));
+    } else {
+      if (s.stale) body.append(el("div", { class: "banner info" }, "These outputs come from an earlier run; the current run has not reached this stage."));
+      if (s.stop) body.append(el("div", { class: "banner stop" }, el("b", {}, "The run stopped here."), " Fix the STOP items below in the Control workbook or the data, then re-run from stage 00."));
+      body.append(el("div", { class: "tbl-head" }, el("b", {}, "Checks"), el("span", { class: "n" }, s.checks.length ? "" : "no flags · " + fmtWhen(s.checks_mtime)),
+        el("span", { class: "spacer" }), openBtn("Open CSV", { what: "table", name: (def.checks || "").replace(".csv", "") }, "sm")));
+      if (s.checks.length) body.append(table(["code", "severity", "item", "message"], s.checks.map((r) => [r.code, r.severity, r.item, r.message]), { textCols: ["code", "item", "message"] }));
+      for (const t of s.tables) {
+        if (!t.exists) continue;
+        const holder = el("div", {});
+        body.append(el("div", { class: "tbl-head" }, el("b", {}, t.name), el("span", { class: "n", id: "n-" + s.code + "-" + t.name }, fmtWhen(t.mtime)),
+          el("span", { class: "spacer" }), openBtn("Open CSV", { what: "table", name: t.name }, "sm")), holder);
+        loadTable(t, holder);
+      }
+    }
+    c.setBody(body);
+    if ((s.status === "stop" || s.status === "flag") && !s.stale && !c.dataset.seen) { c.classList.add("open"); }
+    c.dataset.seen = "1";
+  }
+  async function loadTable(t, holder) {
+    const key = variant + "/" + t.name, cached = tableCache[key];
+    if (cached && cached.mtime === t.mtime) { holder.replaceChildren(cached.node); return; }
+    holder.replaceChildren(el("span", { class: "muted" }, "loading…"));
+    try {
+      const j = await api(`/api/table?variant=${variant}&name=${t.name}`);
+      const node = el("div", {}, table(j.columns, j.rows), j.truncated ? el("div", { class: "muted", style: "font-size:12px;margin-top:4px" }, `first ${j.rows.length} of ${j.n_rows.toLocaleString()} rows; Open CSV for all`) : null);
+      tableCache[key] = { mtime: t.mtime, node }; holder.replaceChildren(node);
+    } catch (e) { holder.replaceChildren(el("span", { class: "muted" }, e.message)); }
+  }
+
+  // ---------------------------------------------------------------- results
+  function renderResults(st) {
+    const r = st.results, s07 = st.stages.find((x) => x.code === "07");
+    resultsCard.setBody(el("div", {},
+      el("p", { class: "note" }, "Stage 07 fills the data sheets. Inputs (currency, EPI, return periods, loadings) are edited in the workbook and need no re-run. Save a copy to keep a version: the next run rewrites the data sheets."),
+      el("div", { class: "gc-row" },
+        openBtn("Open Results in Excel", { what: "results" }, "primary"),
+        el("button", { class: "btn", onclick: async () => { try { const j = await api("/api/copy", { variant }); toast("Saved " + j.path); refresh(true); } catch (e) { toast(e.message, 4000); } } }, "Save a dated copy"),
+        openBtn("Open output folder", { what: "folder" }),
+        el("span", { class: "muted mono" }, r.path), el("span", { class: "muted" }, r.exists ? "written " + fmtWhen(r.mtime) : "not written yet"))));
+    resultsCard.setStatus(!r.exists ? "none" : s07 && s07.status !== "none" && !s07.stale ? s07.status : "stale", !r.exists ? "no workbook" : s07 && !s07.stale && s07.status !== "none" ? "current" : "earlier run");
+  }
+
+  // ---------------------------------------------------------------- state
+  async function refresh(force) {
+    const st = await api(`/api/state?variant=${variant}&adapter=${adapter}`);
+    state = st;
+    $("#ver").textContent = "v" + st.tool.version;
+    $("#hmeta").replaceChildren(
+      el("span", {}, "Book ", el("b", {}, manifest.variants[variant].label)),
+      el("span", {}, "Adapter ", el("b", {}, adapter)),
+      el("span", {}, "Last run ", el("b", {}, st.run ? st.run.started.slice(0, 16) : "—")),
+      el("span", {}, "Control saved ", el("b", {}, st.control.mtime ? st.control.mtime.slice(0, 16) : "—")));
+    $("#overall").replaceChildren(pill(st.overall, st.overall === "ok" ? "All checks OK" : st.overall === "flag" ? "Flags to review" : st.overall === "stop" ? "Stopped" : st.overall === "running" ? "Running" : "No run"));
+    if (selVariant.options.length === 0) {
+      selVariant.replaceChildren(...st.variants.map((v) => el("option", { value: v }, manifest.variants[v].label)));
+      selAdapter.replaceChildren(...Object.entries(st.adapters).map(([k, v]) => el("option", { value: k }, k + " · " + v)));
+    }
+    selVariant.value = variant; selAdapter.value = adapter;
+    renderInputs(st); renderRun(st); ensureStageCards(st);
+    for (const s of st.stages) await renderStage(s, st);
+    renderResults(st);
+    const key = JSON.stringify([st.run && st.run.started, st.run && st.run.finished, st.control.mtime]);
+    if (lastRunKey && key !== lastRunKey && st.run && st.run.finished && !(st.run.running)) toast(st.run.rc === 0 ? "Run completed" : "Run stopped: see the stage cards", 4000);
+    lastRunKey = key;
+  }
+  logPoll = poll(refreshLog, 2000);
+  const statePoll = poll(refresh, 5000);
+  statePoll.start();
+  refreshLog().catch(() => {});
+})();
+</script>
+</body>
+</html>

@@ -77,6 +77,18 @@ tools\run_pipeline.bat live 01c 00 02   stop after 02 (fourth argument: last sta
 The synthetic chain takes about 25 seconds on the owner's laptop (Designer 2026.2 engine, 2026-10-14). Exit codes:
 0 ok, 1 warnings, 2 errors (a STOP check is an error).
 
+## The browser page (0.8.0)
+`tools\xol_ui.bat` starts a local server (`tools/ui/serve.py`, standard library only, `http://127.0.0.1:8765/`) and
+opens the page in the default browser. Keep the window open while the page is in use. The page shows, top to bottom,
+the Inputs (Control workbook with Open in Excel and last-saved time; the data files the chosen adapter needs), Run
+(Python route; from / to stage; live log; stage timeline), one card per stage with its checks (STOP / FLAG / INFO),
+reconciliation and result tables, and the Results workbook (Open in Excel, dated copy, output folder). A Control
+workbook saved after the last run started shows a banner with a Re-run button; outputs older than the current run
+are marked "earlier run". The server opens and reads files only under `data/` and `excel/templates/`, never
+deletes, runs one pipeline at a time and logs every open to `data/output/<variant>/ui_actions.log`. Tool pages share
+`ui/kit/` (theme and behaviour); a tool is described by `ui/<tool>/manifest.json`. Tests: `tests/test_ui.py`.
+Another port: `tools\xol_ui.bat 9000`; without opening a browser: `py tools\ui\serve.py --no-browser`.
+
 ## Running without Alteryx (Python route, 0.7.0)
 `tools\run_pipeline_python.bat` (or `py tools\run_python.py`) runs the same committed workflows in Python, with the
 same arguments, input files and output files as `run_pipeline.bat`:
