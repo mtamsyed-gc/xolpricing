@@ -1,7 +1,7 @@
 {
   "name": "xol",
   "title": "XoL Pricing Tool",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "runner": "tools/run_python.py",
   "kit": "ui/kit",
   "results_name": "XoL_Results.xlsx",

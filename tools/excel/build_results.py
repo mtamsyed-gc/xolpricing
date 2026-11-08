@@ -2,7 +2,7 @@
 
 Presentation sheets (formulas only, no VBA): README, Inputs (display, return periods, expected-loss basis, loadings with
 overrides), Pricing (indicative RI premium per option), Reinsurance Structures (Exhibit C1), Cedant Impact (Exhibit C2),
-Expiring, Scenarios. Data sheets (out_*, scn_summary) carry headers only; stage 07 replaces them each run.
+Premium Terms (swing rating and MDP, 0.9.1), Expiring, Scenarios; swing_calc is Premium Terms' working sheet. Data sheets (out_*, scn_summary) carry headers only; stage 07 replaces them each run.
 
 Formulas reach the data sheets only through workbook names such as ss_mean_recovery, each defined as
     INDEX(INDIRECT("'out_struct_summary'!$A$2:$BZ$60000"), 0, MATCH("mean_recovery", INDIRECT("'out_struct_summary'!$A$1:$BZ$1"), 0))
@@ -291,7 +291,7 @@ def structures(wb):
                    f'&". Indicative premiums from high-level loadings (Inputs)."', SUB)
     cols = ["Option", "Cover", "Exposed lives", "Annual premium", "Premium per exposed life p.a.",
             "Premium per reference lives", "Expected recoveries p.a.", "Expected cost of cover",
-            "Recoveries exceed premium 1 in N yrs"]
+            "Recoveries exceed premium 1 in N yrs", "Swing: expected premium (min - max)"]
     header(ws, 4, cols, col0=2)
     cell(ws, "G4", f'="Premium per "&TEXT({ii("ref")},"#,##0")&" lives"', HEAD,
          align=Alignment(wrap_text=True, horizontal="center", vertical="center"), fill=HFILL)
@@ -324,13 +324,236 @@ def structures(wb):
             cell(ws, f"{col}{r}", f'=IF({pres},{p(src, cv, o)}{mult},"")', fmt=fmt)
         cell(ws, f"J{r}", f'=IF({pres},{p("Recoveries exceed premium 1 in N yrs", cv, o)},"")', BOLD, fmt="0.0",
              align=Alignment(horizontal="center"))
-        for col in "BCDEFGHIJ":
+        sw = f'{t("Status", cv, o)}="Swing"'
+        cell(ws, f"K{r}", f'=IF(AND({pres},{sw}),TEXT({t("E[swing premium]", cv, o)}*{fac},"#,##0.0")&" ("&'
+                          f'TEXT({t("Min premium", cv, o)}*{fac},"#,##0.0")&" - "&TEXT({t("Max premium", cv, o)}*{fac},'
+                          f'"#,##0.0")&")","")', align=Alignment(horizontal="center"))
+        for col in "BCDEFGHIJK":
             ws[f"{col}{r}"].border = THIN
         r += 1
     cell(ws, f"B{r + 1}", "Premium per exposed life is in the display currency, full units. Per-person exposed lives "
                           "are lives whose benefit limit exceeds the attachment point; stop loss and per-event use all "
-                          "lives.", SUB)
-    widths(ws, {"A": 2, "B": 22, "C": 46, "D": 12, "E": 14, "F": 14, "G": 14, "H": 14, "I": 14, "J": 14})
+                          "lives. Swing column: options priced on swing terms on the Premium Terms sheet (no paid reinstatements).", SUB)
+    widths(ws, {"A": 2, "B": 22, "C": 46, "D": 12, "E": 14, "F": 14, "G": 14, "H": 14, "I": 14, "J": 14, "K": 22})
+    return ws
+
+
+# ------------------------------------------------------------------------------------------ Premium Terms (0.9.1)
+# Swing rating and MDP per option, formulas over the 999 simulated annual-recovery quantiles of the option
+# (out_struct_quantiles). Owner's decisions (2026-11-08): swing rate = loading x layer losses / exposure, clamped between
+# min and max; rate basis follows the option's (expiring) rate basis; a swing-rated option carries no paid
+# reinstatements (swing replaces them); MDP adjustment shown at user-set exposure scenarios (no exposure volatility in
+# the simulation; losses assumed to move in proportion to exposure).
+NQ = 999
+TCOLS = ["Cover", "Option", "Present", "Label", "Swing (YES / NO)", "Rate basis override", "Rate basis used",
+         "Swing loading", "Min rate", "Max rate", "Provisional rate", "Status", "Exposure (EPI or lives)",
+         "Flat technical premium", "Flat technical rate", "Min premium", "Max premium", "E[swing premium]",
+         "Swing vs flat", "P(min applies)", "P(max applies)", "E[recoveries] (simulated)", "Expected loss ratio",
+         "Break-even min rate", "Swing premium 1 in RP1", "Swing premium 1 in RP2", "Swing premium 1 in RP3",
+         "Provisional premium", "Expected adjustment"]
+TC = {n: L(i + 1) for i, n in enumerate(TCOLS)}
+T0 = 7                                     # first swing row
+TROW = {k: T0 + i for i, k in enumerate(OPTS)}
+M_SCN = 22                                 # MDP exposure-scenario inputs row
+M_HEAD = 23
+M0 = 24                                    # first MDP row
+MROW = {k: M0 + i for i, k in enumerate(OPTS)}
+MCOLS = ["Cover", "Option", "Present", "Label", "MDP % of deposit premium", "Instalments per year",
+         "Deposit premium basis", "Deposit premium", "MDP", "Instalment"]
+MC = {n: L(i + 1) for i, n in enumerate(MCOLS)}
+SCN = [-0.2, -0.1, 0.0, 0.1, 0.2]
+MF0 = len(MCOLS) + 1                       # first "final premium" column; then the "additional premium" columns
+HELP = ["r", "y", "sw", "s", "f"]          # per option on swing_calc: recovery, min(load r, max), swing premium,
+                                           # suffix sum of y, f_j = E[max(y_j, y)]
+
+
+def hcol(cv, o, k):
+    return L(2 + OPTS.index((cv, o)) * len(HELP) + HELP.index(k))
+
+
+def hrng(cv, o, k):
+    c = hcol(cv, o, k)
+    return f"swing_calc!${c}$3:${c}${NQ + 2}"
+
+
+def t(col, cv, o):
+    return f"'Premium Terms'!${TC[col]}${TROW[(cv, o)]}"
+
+
+def premium_terms(wb):
+    ws = wb.create_sheet("Premium Terms")
+    title(ws, "Premium terms: swing rating and minimum & deposit premium (MDP)",
+          "Quote currency, full units. Yellow cells are inputs and stay in this workbook across runs; nothing here "
+          "needs a re-run. Swing figures come from the option's 999 simulated annual-recovery quantiles.")
+    cell(ws, "A3", "Swing rate = swing loading x layer losses / exposure, never below the min rate or above the max "
+                    "rate. Enter % EPI rates as a percentage (1.85%) and PPPY rates as an amount per life. Loading 100/80 "
+                    "= 1.25. A swing-rated option carries no paid reinstatements (swing replaces them), so it is compared "
+                    "with the flat technical premium including the expected reinstatement premium.", SUB)
+    cell(ws, "A5", "1. Swing rating", BOLD)
+    header(ws, 6, TCOLS)
+    dv_yes = DataValidation(type="list", formula1='"YES,NO"', allow_blank=True)
+    dv_b = DataValidation(type="list", formula1='"PCT_EPI,PPPY"', allow_blank=True)
+    dv_n = DataValidation(type="list", formula1='"1,2,4,12"', allow_blank=True)
+    for d in (dv_yes, dv_b, dv_n):
+        ws.add_data_validation(d)
+    notes = {
+        "Swing (YES / NO)": "YES prices this option on swing terms. Blank or NO: flat premium (Pricing sheet).",
+        "Rate basis override": "Optional. PCT_EPI (rate x EPI) or PPPY (rate x lives in the quote year). Blank: PPPY "
+                               "when the expiring layer matched to this option is PPPY, otherwise PCT_EPI.",
+        "Swing loading": "Required for swing. Multiplier on the layer losses, e.g. 1.25 for 100/80, 1.10 for 100/90.",
+        "Min rate": "Required for swing. Rate charged however good the year (same basis as the rate basis used).",
+        "Max rate": "Required for swing. Cap on the rate however bad the year; must be at least the min rate.",
+        "Provisional rate": "Optional. Rate charged as deposit and adjusted at expiry. Blank: the flat technical rate.",
+        "Break-even min rate": "Min rate at which the expected swing premium equals the flat technical premium, for "
+                               "the loading and max rate entered.",
+        "P(min applies)": "Share of the 999 simulated years in which loading x losses is below the min premium.",
+        "P(max applies)": "Share of the 999 simulated years in which loading x losses is above the max premium.",
+    }
+    for n, txt in notes.items():
+        ws[f"{TC[n]}6"].comment = Comment(txt, "XoL tool")
+    for (cv, o), r in TROW.items():
+        c = lambda n: f"{TC[n]}{r}"  # noqa: E731
+        cell(ws, c("Cover"), cv, BOLD)
+        cell(ws, c("Option"), o)
+        cell(ws, c("Present"), f"={p('Present', cv, o)}", SMALL)
+        cell(ws, c("Label"), f'=IF({c("Present")},{p("Label", cv, o)},"")')
+        for n in ("Swing (YES / NO)", "Rate basis override", "Swing loading", "Min rate", "Max rate", "Provisional rate"):
+            fmt = "0.00" if n == "Swing loading" else "General" if "rate" in n.lower() and n != "Rate basis override" else None
+            cell(ws, c(n), None, INPUT, fmt=fmt, fill=YFILL)
+        dv_yes.add(c("Swing (YES / NO)"))
+        dv_b.add(c("Rate basis override"))
+        pp_basis = (f'IF(COUNTIFS(xp_cover,"{cv}",xp_matched_option,{o},xp_rate_basis,"PPPY")>0,"PPPY","PCT_EPI")'
+                    if cv != "SL" else '"PCT_EPI"')
+        cell(ws, c("Rate basis used"), f'=IF({c("Rate basis override")}<>"",{c("Rate basis override")},'
+                                       f'IFERROR({pp_basis},"PCT_EPI"))')
+        on = f'AND({c("Present")},{c("Swing (YES / NO)")}="YES")'
+        cell(ws, c("Status"),
+             f'=IF(NOT({c("Present")}),"",IF({c("Swing (YES / NO)")}<>"YES","Flat",'
+             f'IF(OR(N({c("Swing loading")})<=0,{c("Min rate")}="",{c("Max rate")}=""),"STOP: enter loading, min and max",'
+             f'IF({c("Max rate")}<{c("Min rate")},"STOP: max rate below min rate","Swing"))))', BOLD)
+        act = f'{c("Status")}="Swing"'
+        cell(ws, c("Exposure (EPI or lives)"),
+             f'=IF({c("Present")},IF({c("Rate basis used")}="PPPY",{ii("lives")},{ii("epi")}),"")', fmt=AMT)
+        cell(ws, c("Flat technical premium"), f'=IF({c("Present")},{p("Target premium (incl. reinst.)", cv, o)},"")',
+             fmt=AMT)
+        cell(ws, c("Flat technical rate"),
+             f'=IF({c("Present")},IFERROR({c("Flat technical premium")}/{c("Exposure (EPI or lives)")},""),"")',
+             fmt="General")
+        ex = c("Exposure (EPI or lives)")
+        cell(ws, c("Min premium"), f'=IF({act},{c("Min rate")}*{ex},"")', fmt=AMT)
+        cell(ws, c("Max premium"), f'=IF({act},{c("Max rate")}*{ex},"")', fmt=AMT)
+        sw, rr, s_, f_ = (hrng(cv, o, k) for k in ("sw", "r", "s", "f"))
+        cell(ws, c("E[swing premium]"), f'=IF({act},AVERAGE({sw}),"")', BOLD, fmt=AMT)
+        cell(ws, c("Swing vs flat"), f'=IF({act},{c("E[swing premium]")}/{c("Flat technical premium")}-1,"")', fmt=PCT)
+        cell(ws, c("P(min applies)"),
+             f'=IF({act},COUNTIF({rr},"<"&{c("Min premium")}/{c("Swing loading")})/{NQ},"")', fmt="0.0%")
+        cell(ws, c("P(max applies)"),
+             f'=IF({act},COUNTIF({rr},">"&{c("Max premium")}/{c("Swing loading")})/{NQ},"")', fmt="0.0%")
+        cell(ws, c("E[recoveries] (simulated)"), f'=IF({act},AVERAGE({rr}),"")', fmt=AMT)
+        cell(ws, c("Expected loss ratio"),
+             f'=IF({act},IFERROR({c("E[recoveries] (simulated)")}/{c("E[swing premium]")},""),"")', fmt=PCT)
+        tgt, mx = c("Flat technical premium"), c("Max premium")
+        cnt = f'COUNTIF({f_},"<"&{tgt})'
+        cell(ws, c("Break-even min rate"),
+             f'=IF({act},IF({tgt}>{mx},"Not reachable: max too low",IF({cnt}=0,"Not binding",'
+             f'({NQ}*{tgt}-INDEX({s_},{cnt}))/{cnt}/{ex})),"")', BOLD, fmt="General")
+        for k in range(3):
+            qm = f'ROUND(1000*(1-1/{ii("rp" + str(k + 1))}),0)'
+            cell(ws, c(f"Swing premium 1 in RP{k + 1}"), f'=IF({act},INDEX({sw},{qm}),"")', fmt=AMT)
+        cell(ws, c("Provisional premium"),
+             f'=IF({act},IF({c("Provisional rate")}="",{c("Flat technical rate")},{c("Provisional rate")})*{ex},"")',
+             fmt=AMT)
+        cell(ws, c("Expected adjustment"), f'=IF({act},{c("E[swing premium]")}-{c("Provisional premium")},"")', fmt=AMT)
+        for col in TCOLS:
+            ws[c(col)].border = THIN
+    for k in range(3):
+        ws[f"{TC[f'Swing premium 1 in RP{k + 1}']}6"] = f'="Swing premium 1 in "&TEXT({ii("rp" + str(k + 1))},"0")&" yrs"'
+        ws[f"{TC[f'Swing premium 1 in RP{k + 1}']}6"].font = HEAD
+    cell(ws, f"A{T0 + len(OPTS)}", "Rates in the rate basis used: % EPI as a fraction of EPI, PPPY per life. Return-"
+                                   "period swing premiums are on the recovery quantile of that return period.", SUB)
+
+    # MDP
+    cell(ws, f"A{M_SCN - 1}", "2. Minimum & deposit premium (MDP) and adjustment", BOLD)
+    cell(ws, f"D{M_SCN}", "Actual exposure vs estimate (edit) ->", SMALL)
+    header(ws, M_HEAD, MCOLS)
+    for j, sv in enumerate(SCN):
+        cf, ca = L(MF0 + j), L(MF0 + len(SCN) + j)
+        cell(ws, f"{cf}{M_SCN}", sv, INPUT, fmt='+0%;-0%;0%', fill=YFILL)
+        cell(ws, f"{ca}{M_SCN}", f"={cf}{M_SCN}", SMALL, fmt='+0%;-0%;0%')
+        ws[f"{cf}{M_HEAD}"] = f'="Final premium, exposure "&TEXT({cf}${M_SCN},"+0%;-0%;0%")'
+        ws[f"{ca}{M_HEAD}"] = f'="Additional premium, exposure "&TEXT({ca}${M_SCN},"+0%;-0%;0%")'
+        for x in (cf, ca):
+            ws[f"{x}{M_HEAD}"].font, ws[f"{x}{M_HEAD}"].fill = HEAD, HFILL
+            ws[f"{x}{M_HEAD}"].alignment = Alignment(wrap_text=True, vertical="center", horizontal="center")
+    ws[f"{MC['MDP % of deposit premium']}{M_HEAD}"].comment = Comment(
+        "Optional. e.g. 85% or 100%. Blank: no MDP shown for this option.", "XoL tool")
+    ws[f"{MC['Instalments per year']}{M_HEAD}"].comment = Comment("1, 2, 4 or 12. Blank: 1.", "XoL tool")
+    for (cv, o), r in MROW.items():
+        c = lambda n: f"{MC[n]}{r}"  # noqa: E731
+        cell(ws, c("Cover"), cv, BOLD)
+        cell(ws, c("Option"), o)
+        cell(ws, c("Present"), f"={p('Present', cv, o)}", SMALL)
+        cell(ws, c("Label"), f'=IF({c("Present")},{p("Label", cv, o)},"")')
+        cell(ws, c("MDP % of deposit premium"), None, INPUT, fmt=PCT, fill=YFILL)
+        cell(ws, c("Instalments per year"), None, INPUT, fill=YFILL)
+        dv_n.add(c("Instalments per year"))
+        swing = f'{t("Status", cv, o)}="Swing"'
+        on = f'AND({c("Present")},{c("MDP % of deposit premium")}<>"")'
+        cell(ws, c("Deposit premium basis"),
+             f'=IF({on},IF({swing},"Swing: provisional premium","Flat: upfront premium"),"")')
+        cell(ws, c("Deposit premium"),
+             f'=IF({on},IF({swing},{t("Provisional premium", cv, o)},{p("Upfront annual premium", cv, o)}),"")', fmt=AMT)
+        cell(ws, c("MDP"), f'=IF({on},{c("MDP % of deposit premium")}*{c("Deposit premium")},"")', BOLD, fmt=AMT)
+        cell(ws, c("Instalment"), f'=IF({on},{c("MDP")}/MAX(1,N({c("Instalments per year")})),"")', fmt=AMT)
+        sw = hrng(cv, o, "sw")
+        for j in range(len(SCN)):
+            cf, ca = L(MF0 + j), L(MF0 + len(SCN) + j)
+            g = f"(1+{cf}${M_SCN})"
+            fin = (f'IF({swing},{g}*AVERAGE({sw})+SUMPRODUCT(({c("MDP")}>{g}*{sw})*({c("MDP")}-{g}*{sw}))/{NQ},'
+                   f'MAX({c("MDP")},{g}*{p("Upfront annual premium", cv, o)}))')
+            cell(ws, f"{cf}{r}", f'=IF({on},{fin},"")', fmt=AMT)
+            cell(ws, f"{ca}{r}", f'=IF({on},{cf}{r}-{c("MDP")},"")', fmt=AMT)
+        for j in range(1, MF0 + 2 * len(SCN)):
+            ws[f"{L(j)}{r}"].border = THIN
+    cell(ws, f"A{M0 + len(OPTS)}",
+         "Deposit premium: the provisional premium for a swing-rated option, else the upfront premium (Pricing). MDP is "
+         "payable in instalments and not returned. Final premium = the flat premium (or each simulated year's swing "
+         "premium) restated at the actual exposure, never below the MDP; swing finals are expectations over the 999 "
+         "years. Losses are assumed to move in proportion to exposure (the simulation has no exposure volatility). "
+         "Reinstatement premiums are not included.", SUB)
+    widths(ws, {L(i + 1): 14 for i in range(max(len(TCOLS), MF0 + 2 * len(SCN)))})
+    ws.column_dimensions["C"].hidden = True
+    ws.column_dimensions["D"].width = 26
+    ws.column_dimensions["L"].width = 24
+    ws.freeze_panes = "E7"
+    return ws
+
+
+def swing_calc(wb):
+    """Working sheet: per option the 999 recovery quantiles r (ascending), y = min(loading x r, max premium),
+    sw = max(min premium, y), s_j = sum of y beyond j, f_j = (j y_j + s_j) / 999 = E[max(y_j, y)] (the expected
+    swing premium if the min premium were y_j; non-decreasing in j, so the break-even min premium lies between the
+    two nodes that straddle the flat premium)."""
+    ws = wb.create_sheet("swing_calc")
+    ws.sheet_properties.tabColor = "A6A6A6"
+    cell(ws, "A1", "Working sheet for Premium Terms (do not edit)", SMALL)
+    cell(ws, "A2", "qm", BOLD)
+    for i in range(NQ):
+        ws.cell(row=3 + i, column=1, value=i + 1)
+    for cv, o in OPTS:
+        key = f'"{KEY[cv]}{o}"'
+        act = f'{t("Status", cv, o)}="Swing"'
+        ld, mn, mx = t("Swing loading", cv, o), t("Min premium", cv, o), t("Max premium", cv, o)
+        cr, cy, csw, cs, cf = (hcol(cv, o, k) for k in HELP)
+        for k in HELP:
+            cell(ws, f"{hcol(cv, o, k)}2", f"{cv}{o} {k}", BOLD)
+        for i in range(NQ):
+            r = 3 + i
+            ws[f"{cr}{r}"] = f"=IF({act},SUMIFS(sq_recovery,sq_struct_key,{key},sq_qm,$A{r}),0)"
+            ws[f"{cy}{r}"] = f"=IF({act},MIN({ld}*{cr}{r},{mx}),0)"
+            ws[f"{csw}{r}"] = f"=IF({act},MAX({mn},{cy}{r}),0)"
+            ws[f"{cs}{r}"] = "=0" if i == NQ - 1 else f"={cs}{r + 1}+{cy}{r + 1}"
+            ws[f"{cf}{r}"] = f"=($A{r}*{cy}{r}+{cs}{r})/{NQ}"
     return ws
 
 
@@ -539,6 +762,10 @@ def readme(wb):
         ("Reinsurance Structures - Exhibit C1 (client format).", BASE),
         ("Cedant Impact - Exhibit C2: surplus / (loss) against the net claims budget for the average year and the "
          "return periods, without RI and with each structure.", BASE),
+        ("Premium Terms - swing rating (loading, min / max rate, provisional rate) and minimum & deposit premium per "
+         "option, priced on the 999 simulated recovery quantiles: expected swing premium, chance the min / max applies, "
+         "break-even min rate, MDP, instalments and the adjustment at exposure scenarios. Inputs stay across runs.",
+         BASE),
         ("Expiring - expiring rate trended vs indicated premium; as-if experience by treaty year.", BASE),
         ("Severity - candidates fitted above u in stage 04a (Python tool): parameters, AIC / BIC / KS, mean excess at "
          "each AP and survival against Kaplan-Meier; the distribution the simulation used.", BASE),
@@ -578,10 +805,12 @@ def build(path=OUT):
     pricing(wb)
     structures(wb)
     impact(wb)
+    premium_terms(wb)
     expiring(wb)
     severity(wb)
     scenarios(wb)
     data_sheets(wb)
+    swing_calc(wb)
     define_names(wb)
     wb.calculation.fullCalcOnLoad = True
     path.parent.mkdir(parents=True, exist_ok=True)

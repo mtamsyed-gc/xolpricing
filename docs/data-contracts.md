@@ -275,7 +275,7 @@ written as `results/<name>.csv`.
 
 Presentation sheets: **Inputs** (currency and unit, lives, EPI, budget, return periods, expected-loss basis, loadings
 from Control with overrides), **Pricing** (premium by option, methodology §11), **Reinsurance Structures**
-(Exhibit C1), **Cedant Impact** (Exhibit C2), **Expiring**, **Severity** (methodology §8.1), **Scenarios**, **README**. A loading or input change
+(Exhibit C1, with a swing column from 0.9.1), **Cedant Impact** (Exhibit C2), **Premium Terms** (0.9.1: swing rating and MDP per option over `out_struct_quantiles`; XOL_MECHANICS §7.5; working sheet `swing_calc`), **Expiring**, **Severity** (methodology §8.1), **Scenarios**, **README**. A loading or input change
 recalculates them without a re-run. Close the workbook in Excel before running stage 07.
 
 ## 6. Validation at the adapters (stage 01)

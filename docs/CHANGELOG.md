@@ -2,6 +2,24 @@
 
 Methodology and data-contract changes, newest first.
 
+## 2026-11-08 — 0.9.1: swing rating and MDP (Results workbook)
+Owner's request: results had no allowance for swing rates (min / max) or MDPs. Owner's decisions: swing rate =
+loading × layer losses / exposure, clamped min / max; the rate basis follows the option's (expiring) basis; swing
+replaces paid reinstatements; MDP adjustment at exposure scenarios.
+- **New Results sheet Premium Terms** (formulas only; no stage or data-contract change, no re-run): per option the
+  swing inputs (Swing YES/NO, rate basis override, loading, min, max, provisional rate) with a Status (STOP until
+  complete), expected swing premium over the 999 recovery quantiles vs the flat technical premium, P(min) and P(max)
+  apply, expected loss ratio, break-even min rate (closed form on the sorted quantiles), swing premium at the return
+  periods, provisional premium and expected adjustment; MDP % and instalments with the deposit premium, MDP,
+  instalment, and final / additional premium at five editable exposure scenarios. Working sheet `swing_calc`.
+  XOL_MECHANICS §7.5; manual §7.5.
+- C1 gains a column "Swing: expected premium (min - max)" for swing-rated options.
+- C2 is unchanged: it still shows the flat premium (the swing premium in a return-period year needs the recovery of
+  that iteration, which `out_struct_quantiles` does not carry; a later change if wanted).
+- Existing live workbooks do not have the sheet: replace `data\output\live\XoL_Results.xlsx` with the 0.9.1
+  template (save a dated copy first); the data sheets refill on the next stage 07.
+- Tests: `tests/test_stage07.py` checks every new figure against numpy on the quantiles (break-even by brentq).
+
 ## 2026-11-07 — 0.9.0: Python only (Alteryx dropped from the XoL tool); `below_cutoff`
 **Alteryx dropped (owner, 2026-11-07; this tool only — Merit and the ETE pipeline keep Alteryx).** The Python route
 reproduces Designer exactly (laptop checks 2026-11-06/07; Designer baseline in the tests), so the tool no longer

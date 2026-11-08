@@ -475,6 +475,37 @@ P. **As-if by year**: the matched option's `xl_aa` per TY (trended to Q) against
 quote-year level (PPPY rate × (1 + leveraged trend) × exposure; % EPI × the year's premium × premium trend), and
 actual untrended recoveries against the premium at that year's own level.
 
+### 7.5 Premium terms: swing rating and MDP (0.9.1)
+
+Sheet **Premium Terms**, formulas only (inputs stay in the workbook across runs). Owner's decisions 2026-11-08.
+
+**Swing.** Per option: loading `l` (100/80 = 1.25), min and max rate, optional provisional rate, rate basis (blank:
+PPPY when the expiring layer matched to the option is PPPY, else % EPI; stop loss % EPI). Exposure `X` = lives_Q
+(PPPY) or EPI. With `r_q` the option's annual recovery at quantile q = 1..999 (`out_struct_quantiles`, total of its
+layers):
+
+    swing premium_q = min( max( l · r_q , min rate · X ) , max rate · X )
+    E[swing premium] = mean over the 999 quantiles
+
+A swing-rated option carries **no paid reinstatements** (swing replaces them; recoveries unchanged), so it is
+compared with the flat technical premium `P_target = (E[L] + k·SD)/(1 − Σ loadings)` (§7.2), which already includes
+the expected reinstatement premium. Reported: E[swing premium] vs P_target, P(min applies) = share of `l·r_q < min`,
+P(max applies), expected loss ratio = mean r_q / E[swing premium], swing premium at the three return periods
+(quantile `round(1000(1 − 1/N))`), provisional premium and expected adjustment (E[swing] − provisional).
+
+**Break-even min rate** for the loading and max entered: with `y_q = min(l·r_q, max·X)` ascending,
+`f(m) = mean(max(m, y_q))` is continuous and non-decreasing; at the nodes `f(y_j) = (j·y_j + Σ_{i>j} y_i)/999`.
+With `c` = number of nodes where `f < P_target`: `m* = (999·P_target − Σ_{i>c} y_i)/c`; `c = 0` → "not binding"
+(E[swing] ≥ P_target at any min); `P_target > max·X` → "not reachable". Break-even rate = `m*/X`.
+
+**MDP.** MDP = MDP % × deposit premium (swing: provisional premium; flat: upfront premium P), in 1/2/4/12 instalments,
+not returnable. Final premium at an actual-exposure scenario `s` (user grid, default −20 % … +20 %), losses assumed to
+move with exposure (the simulation has no exposure volatility): flat `max(MDP, (1+s)·P)`; swing
+`mean_q max(MDP, (1+s)·swing premium_q)`. Additional premium = final − MDP. Reinstatement premiums are excluded.
+
+Basis note: the swing figures use the **simulated** recovery distribution, while P_target uses the expected-loss basis
+chosen on Inputs (blended by default). The same convention as "recoveries exceed premium 1 in N" (§7.4).
+
 ---
 
 ## 8. Worked example
