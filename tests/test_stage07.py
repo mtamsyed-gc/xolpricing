@@ -174,6 +174,78 @@ def exhibit_checks(calc, R, ctl, tag=""):
     return premium
 
 
+def swing_checks(book, R, premium):
+    """0.9.1 Premium Terms: swing on PP 1 (loading 1.25, min / max at 0.6 / 2.5 x the flat rate), MDP 90% quarterly on
+    PP 1 and 100% on EV 1 (flat), SL 1 switched to swing without terms (STOP status); against numpy on the quantiles."""
+    from scipy.optimize import brentq
+    sq = pd.read_csv(R / "out_struct_quantiles.csv")
+    xp = pd.read_excel(book, sheet_name="out_expiring")
+    el = pd.read_csv(R / "out_exposed_lives.csv")
+    pa = pd.read_excel(book, sheet_name="out_params")
+    pp1, ev1 = premium("PP", 1), premium("EV", 1)
+    tgt = pp1["p"] * (1 + pp1["r"])
+    basis = "PPPY" if ((xp.cover == "PP") & (xp.matched_option == 1) & (xp.rate_basis == "PPPY")).any() else "PCT_EPI"
+    expo = el.lives_quote_year.iloc[0] if basis == "PPPY" else float(pa.epi_quote_year.iloc[0])
+    flat = tgt / expo
+    T, M = build_results.TROW, build_results.MROW
+    tc = lambda n, k: f"{build_results.TC[n]}{T[k]}"  # noqa: E731
+    mc = lambda n, k: f"{build_results.MC[n]}{M[k]}"  # noqa: E731
+    wb = load_workbook(book)
+    ws = wb["Premium Terms"]
+    ws[tc("Swing (YES / NO)", ("PP", 1))] = "YES"
+    ws[tc("Swing loading", ("PP", 1))] = 1.25
+    ws[tc("Min rate", ("PP", 1))] = 0.6 * flat
+    ws[tc("Max rate", ("PP", 1))] = 2.5 * flat
+    ws[tc("Swing (YES / NO)", ("SL", 1))] = "YES"
+    ws[mc("MDP % of deposit premium", ("PP", 1))] = 0.9
+    ws[mc("Instalments per year", ("PP", 1))] = 4
+    ws[mc("MDP % of deposit premium", ("EV", 1))] = 1.0
+    sw_path = OUT / "results_swing.xlsx"
+    wb.save(sw_path)
+    rc = recalc(sw_path)
+    ok(f"Premium Terms recalculation: {rc.get('total_formulas')} formulas, 0 errors",
+       rc.get("status") == "success" and rc.get("total_errors") == 0)
+    w = load_workbook(sw_path, data_only=True)["Premium Terms"]
+    g = lambda n, k=("PP", 1): w[tc(n, k)].value  # noqa: E731
+    r = sq[sq.struct_key == "1 PP 1"].sort_values("qm").recovery.to_numpy()
+    mn, mx = 0.6 * flat * expo, 2.5 * flat * expo
+    y = np.minimum(1.25 * r, mx)
+    sw = np.maximum(mn, y)
+    ok(f"swing PP 1: status Swing, rate basis {basis}", g("Status") == "Swing" and g("Rate basis used") == basis)
+    close("swing PP 1: flat technical premium (incl. reinstatements)", [g("Flat technical premium")], [tgt])
+    close("swing PP 1: E[swing premium], P(min), P(max), loss ratio",
+          [g("E[swing premium]"), g("P(min applies)"), g("P(max applies)"), g("Expected loss ratio")],
+          [sw.mean(), (1.25 * r < mn).mean(), (1.25 * r > mx).mean(), r.mean() / sw.mean()])
+    be = g("Break-even min rate")
+    if tgt > mx:
+        ok("swing PP 1: break-even not reachable", be == "Not reachable: max too low")
+    elif np.maximum(y.min(), y).mean() >= tgt:
+        ok("swing PP 1: break-even min not binding", be == "Not binding")
+    else:
+        m = brentq(lambda m: np.maximum(m, y).mean() - tgt, 0, mx)
+        close(f"swing PP 1: break-even min rate (brentq {m / expo:.6g})", [be], [m / expo], tol=1e-6)
+    rp = [int(round(1000 * (1 - 1 / k))) for k in (5, 50, 250)]
+    close("swing PP 1: swing premium at the return periods",
+          [g(f"Swing premium 1 in RP{k + 1}") for k in range(3)], [sw[q - 1] for q in rp])
+    ok(f"swing SL 1 without terms: '{g('Status', ('SL', 1))}'", str(g("Status", ("SL", 1))).startswith("STOP"))
+    # MDP
+    m = lambda n, k: w[mc(n, k)].value  # noqa: E731
+    mdp = 0.9 * tgt
+    close("MDP PP 1 (swing): deposit = provisional premium, MDP, quarterly instalment",
+          [m("Deposit premium", ("PP", 1)), m("MDP", ("PP", 1)), m("Instalment", ("PP", 1))], [tgt, mdp, mdp / 4])
+    f0 = build_results.MF0
+    fin = [w[f"{build_results.L(f0 + j)}{M[('PP', 1)]}"].value for j in range(5)]
+    close("MDP PP 1 (swing): final premium at exposure -20%..+20%", fin,
+          [np.maximum(mdp, (1 + s) * sw).mean() for s in build_results.SCN])
+    fin = [w[f"{build_results.L(f0 + j)}{M[('EV', 1)]}"].value for j in range(5)]
+    add = [w[f"{build_results.L(f0 + 5 + j)}{M[('EV', 1)]}"].value for j in range(5)]
+    close("MDP EV 1 (flat, 100%): final and additional premium at exposure -20%..+20%", fin + add,
+          [max(ev1["p"], (1 + s) * ev1["p"]) for s in build_results.SCN]
+          + [max(ev1["p"], (1 + s) * ev1["p"]) - ev1["p"] for s in build_results.SCN])
+    c1 = load_workbook(sw_path, data_only=True)["Reinsurance Structures"]["K5"].value
+    ok(f"C1 swing column for PP 1: '{c1}'", bool(c1) and "(" in c1)
+
+
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     shutil.copy(ROOT / C.SYNTH.control, CTL)
@@ -207,6 +279,7 @@ def main() -> int:
     ok(f"LibreOffice recalculation: {rc.get('total_formulas')} formulas, 0 errors",
        rc.get("status") == "success" and rc.get("total_errors") == 0)
     premium = exhibit_checks(calc, OUT / "results", CTL)
+    swing_checks(book, OUT / "results", premium)
 
     # loading override: +5% profit on PP
     ov = OUT / "results_override.xlsx"

@@ -39,7 +39,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-VERSION = "0.9.0"
+VERSION = "0.9.1"
 ROOT = Path(__file__).resolve().parents[2]
 MAX_ROWS = 500
 LOG_TAIL = 200

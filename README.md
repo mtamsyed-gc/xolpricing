@@ -10,7 +10,8 @@ and charts (Results workbook). Alteryx is not used from 0.9.0: the stage definit
 folder name) were first written for Designer and are run by the Python executor, which reproduces Designer's own runs
 exactly (`tests/test_designer_twin.py`).
 
-> Status (0.9.0, 2026-11-07): Python only; layers attaching below the fitting cut-off handled by `below_cutoff`
+> Status (0.9.1, 2026-11-08): swing rating and MDP on the Results workbook's Premium Terms sheet
+> (formulas over the simulated recovery quantiles; no re-run). 0.9.0: Python only; layers attaching below the fitting cut-off handled by `below_cutoff`
 > (STOP / EMPIRICAL / IGNORE); browser page with the interactive guide (**How to use**); input help on every Control
 > input; user pack without synthetic data, admin pack with everything (`tools/release/make_packs.py`). All phases
 > built: Control (00), adapters for line, claimant and ETE / Merit data (01a/b/c), experience (02), per-person

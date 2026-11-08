@@ -377,14 +377,34 @@ the exhibit show the premiums, mean net claims and quantiles behind each cell.
 
 ![Exhibit C2](img/16_results_c2.jpg)
 
-### 7.5 Expiring
+### 7.5 Premium Terms (swing rating and MDP)
+
+For quoting an option on **swing** terms instead of a flat rate, and for the **minimum & deposit premium**. Nothing
+here needs a re-run, and the yellow inputs stay in the workbook when stage 07 runs again.
+
+*Swing rating* (one row per option). Set **Swing** to YES, then enter the **swing loading** (100/80 = 1.25), the
+**min rate** and the **max rate** in the rate basis shown (% EPI as a percentage, e.g. 1.85 %; PPPY as an amount per
+life). The rate basis follows the expiring layer (PPPY or % EPI); override it in the yellow cell. The provisional
+rate is optional (blank: the flat technical rate). The Status column says *STOP* until loading, min and max are
+complete. For each of the 999 simulated years the swing premium is loading × losses, kept between the min and max
+premium; the sheet shows its average against the flat technical premium, how often the min and max apply, the
+reinsurer's expected loss ratio, the swing premium at your return periods, the expected adjustment against the
+provisional premium and the **break-even min rate** (the min rate at which swing earns the same as the flat premium).
+A swing-rated option has no paid reinstatements. Exhibit C1 shows the expected swing premium and its min–max range.
+
+*MDP* (one row per option). Enter the MDP % (e.g. 85 %) and the instalments per year. The deposit premium is the
+provisional premium (swing) or the upfront premium (flat). Edit the exposure scenarios in the yellow row (default
+−20 % to +20 % of the estimate) to see the final premium and the additional premium due at each; the MDP is never
+returned. The adjustment assumes claims move in proportion to exposure.
+
+### 7.6 Expiring
 
 The expiring rate trended against the indicated premium of the matching option, and the as-if experience of that
 option by treaty year.
 
 ![Expiring](img/17_results_expiring.jpg)
 
-### 7.6 Severity
+### 7.7 Severity
 
 The candidate distributions fitted in stage 04a: parameters, log-likelihood, AIC, BIC, KS, whether a fit ran to a
 boundary, which one was selected and which one the simulation used. Below: the mean excess at each attachment point
@@ -393,14 +413,14 @@ stochastic result; override the selection with `fit_selected` in the Control wor
 
 ![Severity](img/18_results_severity.jpg)
 
-### 7.7 Scenarios
+### 7.8 Scenarios
 
 One row per sensitivity run, for the structure chosen in the yellow cell. Runs with different `scenario_id`s
 accumulate; a re-run of the same id replaces its rows.
 
 ![Scenarios](img/19_results_scenarios.jpg)
 
-### 7.8 Data sheets
+### 7.9 Data sheets
 
 The `out_*` sheets are written by the tool and replaced on every run. `out_run_log` lists the tool version, the run
 time, every parameter with its justification and the data mode; `out_warnings` every check; `out_recon` the control
