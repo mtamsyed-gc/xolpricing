@@ -1,4 +1,4 @@
-"""Run the XoL pipeline (0.9.0: Python is the only route; the browser page tools/ui/serve.py calls this script).
+"""Run the XoL pipeline (0.9.0: Python is the only route; the browser page (ui/kit/gc_server.py via ui/xol/serve.py, 0.9.1) calls this script).
 
     py tools\\run_python.py                       synthetic data, line adapter (01a), stages 00 to 07
     py tools\\run_python.py live 01c              live data, Merit adapter

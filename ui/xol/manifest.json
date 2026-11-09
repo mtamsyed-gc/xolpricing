@@ -1,67 +1,352 @@
 {
-  "name": "xol",
-  "title": "XoL Pricing Tool",
-  "version": "0.9.0",
-  "runner": "tools/run_python.py",
-  "kit": "ui/kit",
-  "results_name": "XoL_Results.xlsx",
-  "control_template": "excel/templates/XoL_Control.xlsx",
-  "control_spec": "tools/excel/control_spec.py",
-  "allowed_roots": ["data", "excel/templates"],
-  "adapters": {"01a": "Line data (members, claim lines)", "01b": "Claimant listing", "01c": "Merit / ETE outputs"},
-  "variants": {
-    "synth": {
-      "label": "Synthetic book",
-      "requires": "data/synthetic",
-      "control": "data/synthetic/XoL_Control_synthetic.xlsx",
-      "output": "data/output/synth",
-      "inputs": [
-        {"mode": "01a", "label": "Line", "dir": "data/synthetic/line", "files": ["members.csv", "claims_lines.csv", "run_meta.csv"]},
-        {"mode": "01b", "label": "Claimant", "dir": "data/synthetic/claimant", "files": ["claimants.csv", "exposure_monthly.csv", "claims_aggregate_monthly.csv", "run_meta.csv"]},
-        {"mode": "01c", "label": "Merit / ETE", "dir": "data/synthetic/ete", "files": ["dim_life.csv", "fact_member_month.csv", "fact_claims.csv", "run_manifest_claims.csv"]}
-      ]
+ "name": "xol",
+ "title": "XoL Pricing Tool",
+ "version": "0.9.1",
+ "kit": "kit",
+ "kit_build": "1.1.1",
+ "plugin": "xol_plugin.py",
+ "port": 8765,
+ "launcher": "tools\\xol_ui.bat",
+ "allowed_roots": [
+  "data",
+  "excel/templates",
+  "ui",
+  "docs",
+  "README.md"
+ ],
+ "state_dir": "data/output/ui_state",
+ "lenai_dir": "data/output/lenai",
+ "glossary": [
+  "kit/common_glossary.json",
+  "glossary.json"
+ ],
+ "help_doc": "docs/RUNNING.md",
+ "manual": "docs/manual/USER_MANUAL.html",
+ "guide": "ui/xol/guide.html",
+ "runner": "tools/run_python.py",
+ "results_name": "XoL_Results.xlsx",
+ "control_template": "excel/templates/XoL_Control.xlsx",
+ "control_spec": "tools/excel/control_spec.py",
+ "adapters": {
+  "01a": "Line data (members, claim lines)",
+  "01b": "Claimant listing",
+  "01c": "Merit / ETE outputs"
+ },
+ "variants": {
+  "synth": {
+   "label": "Synthetic book",
+   "requires": "data/synthetic",
+   "control": "data/synthetic/XoL_Control_synthetic.xlsx",
+   "output": "data/output/synth",
+   "inputs": [
+    {
+     "mode": "01a",
+     "label": "Line",
+     "dir": "data/synthetic/line",
+     "files": [
+      "members.csv",
+      "claims_lines.csv",
+      "run_meta.csv"
+     ]
     },
-    "live": {
-      "label": "Live pricing",
-      "control": "data/input/XoL_Control.xlsx",
-      "output": "data/output/live",
-      "inputs": [
-        {"mode": "01a", "label": "Line", "dir": "data/input/line", "files": ["members.csv", "claims_lines.csv", "run_meta.csv"]},
-        {"mode": "01b", "label": "Claimant", "dir": "data/input/claimant", "files": ["claimants.csv", "exposure_monthly.csv", "claims_aggregate_monthly.csv", "run_meta.csv"]},
-        {"mode": "01c", "label": "Merit / ETE", "dir": "data/input/ete", "files": ["dim_life.csv", "fact_member_month.csv", "fact_claims.csv", "run_manifest_claims.csv"]}
-      ]
+    {
+     "mode": "01b",
+     "label": "Claimant",
+     "dir": "data/synthetic/claimant",
+     "files": [
+      "claimants.csv",
+      "exposure_monthly.csv",
+      "claims_aggregate_monthly.csv",
+      "run_meta.csv"
+     ]
+    },
+    {
+     "mode": "01c",
+     "label": "Merit / ETE",
+     "dir": "data/synthetic/ete",
+     "files": [
+      "dim_life.csv",
+      "fact_member_month.csv",
+      "fact_claims.csv",
+      "run_manifest_claims.csv"
+     ]
     }
+   ],
+   "workbook_id": "control_synth"
   },
-  "stages": [
-    {"code": "00", "name": "00_read_control", "title": "Read the Control workbook", "checks": "checks_00.csv",
-     "tables": ["out_scenario_applied"],
-     "note": "Validates Params, Layers, Trend, Completion and the other sheets. A scenario_id lists the overrides applied."},
-    {"code": "01a", "adapter": true, "name": "01a_adapter_line", "title": "Adapter: line data", "checks": "checks_01a.csv",
-     "tables": ["recon_01a"], "note": "Members and claim lines to the internal schema; rejected and unmatched lines are counted in the reconciliation."},
-    {"code": "01b", "adapter": true, "name": "01b_adapter_claimant", "title": "Adapter: claimant listing", "checks": "checks_01b.csv",
-     "tables": ["recon_01b"], "note": "Claimant listing, monthly exposure and aggregate claims to the internal schema."},
-    {"code": "01c", "adapter": true, "name": "01c_adapter_ete", "title": "Adapter: Merit / ETE outputs", "checks": "checks_01c.csv",
-     "tables": ["recon_01c"], "note": "Merit's dim_life, fact_member_month and fact_claims to the internal schema. A16 flags a pooled run, A18 / A19 count the benefit-limit sources."},
-    {"code": "02", "name": "02_experience", "title": "Treaty-year experience", "checks": "checks_02.csv",
-     "tables": ["recon_02", "out_completion_indicated"],
-     "note": "Exposure and claims by treaty year on the chosen basis. Indicated completion factors: copy the ones you accept into the Control workbook (Completion sheet)."},
-    {"code": "03", "name": "03_burning_cost", "title": "Per-person burning cost", "checks": "checks_03.csv",
-     "tables": ["recon_03", "out_bc_summary", "out_bc_by_year", "out_annualisation"],
-     "note": "Trended, capped and annualised large claims; burning cost per layer with credibility."},
-    {"code": "04a", "name": "04a_fit_severity", "title": "Severity fit (candidates)", "checks": "checks_04a.csv",
-     "tables": ["out_fit_candidates", "out_fit_mean_excess"],
-     "note": "Candidate distributions above the fitting cut-off; the selected one (lowest AIC, or fit_selected) feeds the simulation."},
-    {"code": "04", "name": "04_simulate", "title": "Per-person simulation", "checks": "checks_04.csv",
-     "tables": ["recon_04", "out_sim_summary", "out_fit"],
-     "note": "Frequency × severity simulation per layer; expected loss blended with the burning cost by credibility. The longest stage. A layer attaching below fit_cutoff is handled by Params below_cutoff (STOP / EMPIRICAL / IGNORE): out_sim_summary shows lambda_band and mean_recovery_band, checks S08–S11 say what was done."},
-    {"code": "05", "name": "05_per_event", "title": "Per-event XoL", "checks": "checks_05.csv",
-     "tables": ["recon_05", "out_ev_events", "out_ev_bc_summary", "out_ev_sim_summary", "out_ev_scenarios"],
-     "note": "Event grouping, event burning cost and simulation; empty tables when no EV layer is defined."},
-    {"code": "06", "name": "06_stop_loss", "title": "Aggregate stop loss", "checks": "checks_06.csv",
-     "tables": ["recon_06", "out_attritional_by_year", "out_gross_summary", "out_struct_summary", "out_exposed_lives"],
-     "note": "Attritional model, gross and net aggregate distributions, structure quantiles and reinstatement usage."},
-    {"code": "07", "name": "07_results", "title": "Results workbook", "checks": "checks_07.csv",
-     "tables": [],
-     "note": "Writes the data sheets of XoL_Results.xlsx. Close the workbook in Excel before running this stage."}
-  ]
+  "live": {
+   "label": "Live pricing",
+   "control": "data/input/XoL_Control.xlsx",
+   "output": "data/output/live",
+   "inputs": [
+    {
+     "mode": "01a",
+     "label": "Line",
+     "dir": "data/input/line",
+     "files": [
+      "members.csv",
+      "claims_lines.csv",
+      "run_meta.csv"
+     ]
+    },
+    {
+     "mode": "01b",
+     "label": "Claimant",
+     "dir": "data/input/claimant",
+     "files": [
+      "claimants.csv",
+      "exposure_monthly.csv",
+      "claims_aggregate_monthly.csv",
+      "run_meta.csv"
+     ]
+    },
+    {
+     "mode": "01c",
+     "label": "Merit / ETE",
+     "dir": "data/input/ete",
+     "files": [
+      "dim_life.csv",
+      "fact_member_month.csv",
+      "fact_claims.csv",
+      "run_manifest_claims.csv"
+     ]
+    }
+   ],
+   "workbook_id": "control_live"
+  }
+ },
+ "stages": [
+  {
+   "code": "00",
+   "name": "00_read_control",
+   "title": "Read the Control workbook",
+   "checks": "checks_00.csv",
+   "tables": [
+    "out_scenario_applied"
+   ],
+   "note": "Validates Params, Layers, Trend, Completion and the other sheets. A scenario_id lists the overrides applied."
+  },
+  {
+   "code": "01a",
+   "adapter": true,
+   "name": "01a_adapter_line",
+   "title": "Adapter: line data",
+   "checks": "checks_01a.csv",
+   "tables": [
+    "recon_01a"
+   ],
+   "note": "Members and claim lines to the internal schema; rejected and unmatched lines are counted in the reconciliation."
+  },
+  {
+   "code": "01b",
+   "adapter": true,
+   "name": "01b_adapter_claimant",
+   "title": "Adapter: claimant listing",
+   "checks": "checks_01b.csv",
+   "tables": [
+    "recon_01b"
+   ],
+   "note": "Claimant listing, monthly exposure and aggregate claims to the internal schema."
+  },
+  {
+   "code": "01c",
+   "adapter": true,
+   "name": "01c_adapter_ete",
+   "title": "Adapter: Merit / ETE outputs",
+   "checks": "checks_01c.csv",
+   "tables": [
+    "recon_01c"
+   ],
+   "note": "Merit's dim_life, fact_member_month and fact_claims to the internal schema. A16 flags a pooled run, A18 / A19 count the benefit-limit sources."
+  },
+  {
+   "code": "02",
+   "name": "02_experience",
+   "title": "Treaty-year experience",
+   "checks": "checks_02.csv",
+   "tables": [
+    "recon_02",
+    "out_completion_indicated"
+   ],
+   "note": "Exposure and claims by treaty year on the chosen basis. Indicated completion factors: copy the ones you accept into the Control workbook (Completion sheet)."
+  },
+  {
+   "code": "03",
+   "name": "03_burning_cost",
+   "title": "Per-person burning cost",
+   "checks": "checks_03.csv",
+   "tables": [
+    "recon_03",
+    "out_bc_summary",
+    "out_bc_by_year",
+    "out_annualisation"
+   ],
+   "note": "Trended, capped and annualised large claims; burning cost per layer with credibility."
+  },
+  {
+   "code": "04a",
+   "name": "04a_fit_severity",
+   "title": "Severity fit (candidates)",
+   "checks": "checks_04a.csv",
+   "tables": [
+    "out_fit_candidates",
+    "out_fit_mean_excess"
+   ],
+   "note": "Candidate distributions above the fitting cut-off; the selected one (lowest AIC, or fit_selected) feeds the simulation."
+  },
+  {
+   "code": "04",
+   "name": "04_simulate",
+   "title": "Per-person simulation",
+   "checks": "checks_04.csv",
+   "tables": [
+    "recon_04",
+    "out_sim_summary",
+    "out_fit"
+   ],
+   "note": "Frequency × severity simulation per layer; expected loss blended with the burning cost by credibility. The longest stage. A layer attaching below fit_cutoff is handled by Params below_cutoff (STOP / EMPIRICAL / IGNORE): out_sim_summary shows lambda_band and mean_recovery_band, checks S08–S11 say what was done."
+  },
+  {
+   "code": "05",
+   "name": "05_per_event",
+   "title": "Per-event XoL",
+   "checks": "checks_05.csv",
+   "tables": [
+    "recon_05",
+    "out_ev_events",
+    "out_ev_bc_summary",
+    "out_ev_sim_summary",
+    "out_ev_scenarios"
+   ],
+   "note": "Event grouping, event burning cost and simulation; empty tables when no EV layer is defined."
+  },
+  {
+   "code": "06",
+   "name": "06_stop_loss",
+   "title": "Aggregate stop loss",
+   "checks": "checks_06.csv",
+   "tables": [
+    "recon_06",
+    "out_attritional_by_year",
+    "out_gross_summary",
+    "out_struct_summary",
+    "out_exposed_lives"
+   ],
+   "note": "Attritional model, gross and net aggregate distributions, structure quantiles and reinstatement usage."
+  },
+  {
+   "code": "07",
+   "name": "07_results",
+   "title": "Results workbook",
+   "checks": "checks_07.csv",
+   "tables": [],
+   "note": "Writes the data sheets of XoL_Results.xlsx. Close the workbook in Excel before running this stage."
+  }
+ ],
+ "editable_workbooks": {
+  "control_live": {
+   "path": "data/input/XoL_Control.xlsx",
+   "title": "XoL_Control.xlsx — live pricing inputs",
+   "header_row": 4,
+   "readonly_sheets": [
+    "Guide"
+   ],
+   "hidden_sheets": [],
+   "max_rows": 3000,
+   "help": "Every input of a pricing run: Params (one row per parameter; yellow = required, blue = optional; justify judgement inputs), Layers, Trend, Completion, FX, Limits, Scenarios. Save, then run from stage 00."
+  },
+  "control_synth": {
+   "path": "data/synthetic/XoL_Control_synthetic.xlsx",
+   "title": "XoL_Control_synthetic.xlsx — the synthetic book's inputs",
+   "header_row": 4,
+   "readonly_sheets": [
+    "Guide"
+   ],
+   "hidden_sheets": [],
+   "max_rows": 3000,
+   "help": "The fictional test portfolio's Control workbook (admin pack only). Edit to try a setting; the synthetic book's tests expect the shipped values."
+  }
+ },
+ "actions": {
+  "run": {
+   "title": "Run the pipeline",
+   "launcher": "tools\\run_python.py",
+   "command": [
+    "{py}",
+    "-B",
+    "{client}/tools/run_python.py"
+   ],
+   "args": {
+    "variant": {
+     "positional": true,
+     "choices": [
+      "synth",
+      "live"
+     ]
+    },
+    "adapter": {
+     "positional": true,
+     "choices": [
+      "01a",
+      "01b",
+      "01c"
+     ]
+    },
+    "first": {
+     "positional": true,
+     "pattern": "0[0-7]a?|0[1-7][abc]?"
+    },
+    "last": {
+     "positional": true,
+     "pattern": "0[0-7]a?|0[1-7][abc]?"
+    }
+   },
+   "minutes": "7–11 for the full chain at 10,000 iterations (stage 04 the longest)"
+  },
+  "install_control": {
+   "title": "Copy the Control template to data/input",
+   "launcher": "excel\\templates\\XoL_Control.xlsx",
+   "command": [
+    "{py}",
+    "-c",
+    "import shutil,sys,pathlib; d=pathlib.Path('data/input/XoL_Control.xlsx'); d.parent.mkdir(parents=True,exist_ok=True); sys.exit(1) if d.exists() else shutil.copy('excel/templates/XoL_Control.xlsx', d); print('copied template to', d)"
+   ],
+   "cwd": "."
+  }
+ },
+ "watch_files": {
+  "template": "excel/templates/XoL_Control.xlsx",
+  "results_live": "data/output/live/XoL_Results.xlsx",
+  "results_synth": "data/output/synth/XoL_Results.xlsx"
+ },
+ "help_docs": [
+  {
+   "label": "Running the tool (developer notes)",
+   "doc": "docs/RUNNING.md"
+  },
+  {
+   "label": "Scope",
+   "doc": "docs/scope.md"
+  },
+  {
+   "label": "Methodology",
+   "doc": "docs/methodology.md"
+  },
+  {
+   "label": "XoL mechanics",
+   "doc": "docs/XOL_MECHANICS.md"
+  },
+  {
+   "label": "Data contracts",
+   "doc": "docs/data-contracts.md"
+  },
+  {
+   "label": "Changelog",
+   "doc": "docs/CHANGELOG.md"
+  },
+  {
+   "label": "README",
+   "doc": "README.md"
+  }
+ ]
 }

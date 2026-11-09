@@ -29,7 +29,7 @@ def main() -> int:
                  not any(f.startswith(("data/synthetic/", "tests/", "reference/", "tools/synth/", "alteryx/workflows/synth/")) for f in user))
     ok &= report("user pack: no Alteryx launcher, no builders", not any(f in user for f in ("tools/run_pipeline_python.bat",
                  "tools/check_merit.bat", "tools/alteryx/xmlkit.py")) and not any(f.startswith("tools/alteryx/build_") for f in user))
-    need = ["tools/xol_ui.bat", "tools/run_pipeline.bat", "tools/ui/serve.py", "tools/run_python.py", "tools/alteryx/sim.py", "tools/python/sevfit.py",
+    need = ["tools/xol_ui.bat", "tools/run_pipeline.bat", "ui/xol/serve.py", "ui/xol/xol_plugin.py", "ui/xol/glossary.json", "ui/kit/gc_server.py", "ui/kit/HASHES.json", "ui/kit/gc_tokens.css", "ui/kit/common_glossary.json", "tools/run_python.py", "tools/alteryx/sim.py", "tools/python/sevfit.py",
             "tools/excel/control_spec.py", "ui/xol/index.html", "ui/xol/guide.html", "ui/xol/manifest.json", "ui/kit/gc_ui.css",
             "excel/templates/XoL_Control.xlsx", "excel/templates/XoL_Results.xlsx", "alteryx/workflows/00_read_control.yxmd",
             "alteryx/workflows/07_results.yxmd", "data/templates/line_members.csv", "docs/manual/USER_MANUAL.html",
@@ -43,25 +43,30 @@ def main() -> int:
             z.extractall(td)
         root = Path(td) / "xolpricing"
         ok &= report("user pack unpacks with data/input and data/output present", (root / "data/input").is_dir() and (root / "data/output").is_dir())
-        # serve the unpacked copy: the synthetic book must be hidden
-        src = (root / "tools/ui/serve.py").read_text(encoding="utf-8")
-        ns = {"__file__": str(root / "tools/ui/serve.py"), "__name__": "pack_serve"}
-        exec(compile(src, str(root / "tools/ui/serve.py"), "exec"), ns)
-        tool = ns["Tool"](root / "ui/xol/manifest.json")
-        ok &= report("unpacked page offers the live book only", tool.variants() == ["live"])
-        ns["Handler"].tool, ns["Handler"].runner = tool, ns["Runner"](tool)
-        httpd = ThreadingHTTPServer(("127.0.0.1", 0), ns["Handler"])
+        # serve the unpacked copy with its own vendored kit: the synthetic book must be hidden
+        import importlib
+        sys.path.insert(0, str(root / "ui/kit"))
+        for mod in ("gc_server",):
+            sys.modules.pop(mod, None)
+        GS = importlib.import_module("gc_server")
+        sys.path.pop(0)
+        tool = GS.Tool(root / "ui/xol/manifest.json", root)
+        GS.Handler.tool, GS.Handler.runner = tool, GS.Runner(tool)
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), GS.Handler)
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         base = f"http://127.0.0.1:{httpd.server_address[1]}"
         try:
-            st = json.loads(urllib.request.urlopen(base + "/api/state?variant=synth&adapter=01a", timeout=10).read())
-            ok &= report("state with a hidden variant falls back to live; no Control workbook yet",
-                         st["variant"] == "live" and st["variants"] == ["live"] and not st["control"]["exists"])
-            ok &= report("guide served", urllib.request.urlopen(base + "/ui/xol/guide.html", timeout=10).status == 200)
-            sp = json.loads(urllib.request.urlopen(base + "/api/spec", timeout=10).read())
+            st = json.loads(urllib.request.urlopen(base + "/api/state", timeout=30).read())
+            books = st["plugin"]["books"]
+            ok &= report("unpacked page offers the live book only; no Control workbook yet",
+                         st["plugin"]["variants"] == ["live"] and list(books) == ["live"] and not books["live"]["control"]["exists"])
+            ok &= report("guide served", urllib.request.urlopen(base + "/page/guide.html", timeout=10).status == 200)
+            sp = json.loads(urllib.request.urlopen(base + "/api/plugin/spec", timeout=10).read())
             ok &= report("input reference served from the pack's own spec", sp["sheets"][0]["sheet"] == "Params")
+            ok &= report("kit served from the pack", urllib.request.urlopen(base + "/kit/gc_ui.js", timeout=10).status == 200)
         finally:
             httpd.shutdown()
+            sys.modules.pop("gc_server", None)
         # the unpacked user pack runs on its own: live book, line data (copies of the synthetic files), stages 00-04a
         import shutil
         (root / "data/input/line").mkdir(parents=True, exist_ok=True)

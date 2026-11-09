@@ -1,0 +1,534 @@
+{
+ "$schema": "https://design-tokens.github.io/community-group/format/",
+ "$description": "GC UI kit tokens (UI_STANDARD \u00a78). Source of truth for gc_tokens.css (tools/build_tokens.py).",
+ "sets": {
+  "light": {
+   "navy": {
+    "$type": "color",
+    "$value": "#0b2545"
+   },
+   "navy-2": {
+    "$type": "color",
+    "$value": "#13315c"
+   },
+   "teal": {
+    "$type": "color",
+    "$value": "#1a8a8a"
+   },
+   "teal-2": {
+    "$type": "color",
+    "$value": "#0f6b6b"
+   },
+   "teal-soft": {
+    "$type": "color",
+    "$value": "#e3f2f2"
+   },
+   "ink": {
+    "$type": "color",
+    "$value": "#1d2733"
+   },
+   "ink-2": {
+    "$type": "color",
+    "$value": "#4a5663"
+   },
+   "ink-3": {
+    "$type": "color",
+    "$value": "#5f6c79"
+   },
+   "line": {
+    "$type": "color",
+    "$value": "#d9dee5"
+   },
+   "line-2": {
+    "$type": "color",
+    "$value": "#eceff3"
+   },
+   "bg": {
+    "$type": "color",
+    "$value": "#f4f6f9"
+   },
+   "card": {
+    "$type": "color",
+    "$value": "#ffffff"
+   },
+   "card-2": {
+    "$type": "color",
+    "$value": "#f8fafc"
+   },
+   "on-navy": {
+    "$type": "color",
+    "$value": "#ffffff"
+   },
+   "on-navy-2": {
+    "$type": "color",
+    "$value": "#c9d6e3"
+   },
+   "on-navy-3": {
+    "$type": "color",
+    "$value": "#9fb3c8"
+   },
+   "ok": {
+    "$type": "color",
+    "$value": "#1e7a44"
+   },
+   "ok-soft": {
+    "$type": "color",
+    "$value": "#e4f3ea"
+   },
+   "flag": {
+    "$type": "color",
+    "$value": "#8a5a0b"
+   },
+   "flag-soft": {
+    "$type": "color",
+    "$value": "#fbf0d9"
+   },
+   "stop": {
+    "$type": "color",
+    "$value": "#a8362b"
+   },
+   "stop-soft": {
+    "$type": "color",
+    "$value": "#f8e1de"
+   },
+   "info": {
+    "$type": "color",
+    "$value": "#526273"
+   },
+   "info-soft": {
+    "$type": "color",
+    "$value": "#eaeef2"
+   },
+   "run": {
+    "$type": "color",
+    "$value": "#1f5fbf"
+   },
+   "run-soft": {
+    "$type": "color",
+    "$value": "#e1ebfa"
+   },
+   "focus": {
+    "$type": "color",
+    "$value": "#1a8a8a"
+   },
+   "sel": {
+    "$type": "color",
+    "$value": "#d9f0f0"
+   },
+   "input-mark": {
+    "$type": "color",
+    "$value": "#b7791f"
+   },
+   "input-soft": {
+    "$type": "color",
+    "$value": "#fff7e0"
+   },
+   "check-soft": {
+    "$type": "color",
+    "$value": "#f1f3f5"
+   },
+   "log-bg": {
+    "$type": "color",
+    "$value": "#0f1b2d"
+   },
+   "log-ink": {
+    "$type": "color",
+    "$value": "#d8e1ea"
+   },
+   "log-ok": {
+    "$type": "color",
+    "$value": "#7bd88f"
+   },
+   "log-bad": {
+    "$type": "color",
+    "$value": "#ff8a80"
+   },
+   "log-dim": {
+    "$type": "color",
+    "$value": "#8fa0b3"
+   },
+   "font": {
+    "$type": "fontFamily",
+    "$value": "\"Segoe UI\", system-ui, -apple-system, Arial, sans-serif"
+   },
+   "mono": {
+    "$type": "fontFamily",
+    "$value": "Consolas, \"Cascadia Mono\", \"Courier New\", monospace"
+   },
+   "radius": {
+    "$type": "dimension",
+    "$value": "8px"
+   },
+   "radius-s": {
+    "$type": "dimension",
+    "$value": "6px"
+   },
+   "shadow": {
+    "$type": "shadow",
+    "$value": "0 1px 2px rgba(11, 37, 69, .08), 0 1px 6px rgba(11, 37, 69, .05)"
+   },
+   "sp-1": {
+    "$type": "dimension",
+    "$value": "4px"
+   },
+   "sp-2": {
+    "$type": "dimension",
+    "$value": "8px"
+   },
+   "sp-3": {
+    "$type": "dimension",
+    "$value": "12px"
+   },
+   "sp-4": {
+    "$type": "dimension",
+    "$value": "16px"
+   },
+   "sp-5": {
+    "$type": "dimension",
+    "$value": "24px"
+   },
+   "sp-6": {
+    "$type": "dimension",
+    "$value": "32px"
+   },
+   "fs-0": {
+    "$type": "dimension",
+    "$value": "12px"
+   },
+   "fs-1": {
+    "$type": "dimension",
+    "$value": "13px"
+   },
+   "fs-2": {
+    "$type": "dimension",
+    "$value": "14px"
+   },
+   "fs-3": {
+    "$type": "dimension",
+    "$value": "16px"
+   },
+   "fs-4": {
+    "$type": "dimension",
+    "$value": "20px"
+   },
+   "header-h": {
+    "$type": "dimension",
+    "$value": "48px"
+   },
+   "nav-w": {
+    "$type": "dimension",
+    "$value": "248px"
+   },
+   "status-h": {
+    "$type": "dimension",
+    "$value": "30px"
+   },
+   "primary": {
+    "$type": "color",
+    "$value": "#0f6b6b"
+   },
+   "on-primary": {
+    "$type": "color",
+    "$value": "#ffffff"
+   },
+   "primary-2": {
+    "$type": "color",
+    "$value": "#0b5555"
+   }
+  },
+  "dark": {
+   "navy": {
+    "$type": "color",
+    "$value": "#0b1a30"
+   },
+   "navy-2": {
+    "$type": "color",
+    "$value": "#10243f"
+   },
+   "teal": {
+    "$type": "color",
+    "$value": "#4cc2c2"
+   },
+   "teal-2": {
+    "$type": "color",
+    "$value": "#7fd6d6"
+   },
+   "teal-soft": {
+    "$type": "color",
+    "$value": "#163a3f"
+   },
+   "ink": {
+    "$type": "color",
+    "$value": "#e6edf5"
+   },
+   "ink-2": {
+    "$type": "color",
+    "$value": "#c3cedb"
+   },
+   "ink-3": {
+    "$type": "color",
+    "$value": "#9aa9bb"
+   },
+   "line": {
+    "$type": "color",
+    "$value": "#2b3a52"
+   },
+   "line-2": {
+    "$type": "color",
+    "$value": "#1f2b3e"
+   },
+   "bg": {
+    "$type": "color",
+    "$value": "#0f1826"
+   },
+   "card": {
+    "$type": "color",
+    "$value": "#172235"
+   },
+   "card-2": {
+    "$type": "color",
+    "$value": "#1c2940"
+   },
+   "on-navy": {
+    "$type": "color",
+    "$value": "#ffffff"
+   },
+   "on-navy-2": {
+    "$type": "color",
+    "$value": "#c9d6e3"
+   },
+   "on-navy-3": {
+    "$type": "color",
+    "$value": "#9fb3c8"
+   },
+   "ok": {
+    "$type": "color",
+    "$value": "#5ed39a"
+   },
+   "ok-soft": {
+    "$type": "color",
+    "$value": "#143426"
+   },
+   "flag": {
+    "$type": "color",
+    "$value": "#f0b84a"
+   },
+   "flag-soft": {
+    "$type": "color",
+    "$value": "#3a2c0e"
+   },
+   "stop": {
+    "$type": "color",
+    "$value": "#ff8f84"
+   },
+   "stop-soft": {
+    "$type": "color",
+    "$value": "#46201c"
+   },
+   "info": {
+    "$type": "color",
+    "$value": "#a9b8ca"
+   },
+   "info-soft": {
+    "$type": "color",
+    "$value": "#243247"
+   },
+   "run": {
+    "$type": "color",
+    "$value": "#7fb3ff"
+   },
+   "run-soft": {
+    "$type": "color",
+    "$value": "#1b2f4e"
+   },
+   "focus": {
+    "$type": "color",
+    "$value": "#4cc2c2"
+   },
+   "sel": {
+    "$type": "color",
+    "$value": "#1f3d44"
+   },
+   "input-mark": {
+    "$type": "color",
+    "$value": "#f0b84a"
+   },
+   "input-soft": {
+    "$type": "color",
+    "$value": "#2c2512"
+   },
+   "check-soft": {
+    "$type": "color",
+    "$value": "#1e2a3a"
+   },
+   "log-bg": {
+    "$type": "color",
+    "$value": "#0a1220"
+   },
+   "log-ink": {
+    "$type": "color",
+    "$value": "#d8e1ea"
+   },
+   "log-ok": {
+    "$type": "color",
+    "$value": "#7bd88f"
+   },
+   "log-bad": {
+    "$type": "color",
+    "$value": "#ff8a80"
+   },
+   "log-dim": {
+    "$type": "color",
+    "$value": "#8fa0b3"
+   },
+   "shadow": {
+    "$type": "shadow",
+    "$value": "0 1px 2px rgba(0, 0, 0, .5), 0 1px 8px rgba(0, 0, 0, .35)"
+   },
+   "primary": {
+    "$type": "color",
+    "$value": "#4cc2c2"
+   },
+   "on-primary": {
+    "$type": "color",
+    "$value": "#0b1a30"
+   },
+   "primary-2": {
+    "$type": "color",
+    "$value": "#7fd6d6"
+   }
+  }
+ },
+ "contrast_pairs": [
+  [
+   "ink",
+   "card",
+   4.5
+  ],
+  [
+   "ink",
+   "bg",
+   4.5
+  ],
+  [
+   "ink-2",
+   "card",
+   4.5
+  ],
+  [
+   "ink-3",
+   "card",
+   4.5
+  ],
+  [
+   "ink-3",
+   "bg",
+   4.5
+  ],
+  [
+   "teal-2",
+   "card",
+   4.5
+  ],
+  [
+   "on-navy",
+   "navy",
+   4.5
+  ],
+  [
+   "on-navy-2",
+   "navy",
+   4.5
+  ],
+  [
+   "on-navy-3",
+   "navy",
+   3.0
+  ],
+  [
+   "ok",
+   "ok-soft",
+   4.5
+  ],
+  [
+   "flag",
+   "flag-soft",
+   4.5
+  ],
+  [
+   "stop",
+   "stop-soft",
+   4.5
+  ],
+  [
+   "info",
+   "info-soft",
+   4.5
+  ],
+  [
+   "run",
+   "run-soft",
+   4.5
+  ],
+  [
+   "ok",
+   "card",
+   4.5
+  ],
+  [
+   "flag",
+   "card",
+   4.5
+  ],
+  [
+   "stop",
+   "card",
+   4.5
+  ],
+  [
+   "info",
+   "card",
+   4.5
+  ],
+  [
+   "run",
+   "card",
+   4.5
+  ],
+  [
+   "focus",
+   "card",
+   3.0
+  ],
+  [
+   "log-ink",
+   "log-bg",
+   4.5
+  ],
+  [
+   "log-dim",
+   "log-bg",
+   4.5
+  ],
+  [
+   "input-mark",
+   "card",
+   3.0
+  ],
+  [
+   "teal",
+   "card",
+   3.0
+  ],
+  [
+   "on-primary",
+   "primary",
+   4.5
+  ],
+  [
+   "on-primary",
+   "primary-2",
+   4.5
+  ]
+ ]
+}

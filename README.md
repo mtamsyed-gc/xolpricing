@@ -10,7 +10,8 @@ and charts (Results workbook). Alteryx is not used from 0.9.0: the stage definit
 folder name) were first written for Designer and are run by the Python executor, which reproduces Designer's own runs
 exactly (`tests/test_designer_twin.py`).
 
-> Status (0.9.0, 2026-11-07): Python only; layers attaching below the fitting cut-off handled by `below_cutoff`
+> Status (0.9.1, 2026-11-09): Python only; browser page on the shared GC UI kit 1.1.1 (`ui/kit`, vendored; edit
+> the Control workbook in the page, Ctrl+K search, glossary, dark theme); layers attaching below the fitting cut-off handled by `below_cutoff`
 > (STOP / EMPIRICAL / IGNORE); browser page with the interactive guide (**How to use**); input help on every Control
 > input; user pack without synthetic data, admin pack with everything (`tools/release/make_packs.py`). All phases
 > built: Control (00), adapters for line, claimant and ETE / Merit data (01a/b/c), experience (02), per-person
@@ -50,8 +51,11 @@ docs/             scope.md, data-contracts.md, methodology.md, XOL_MECHANICS.md,
 tools/alteryx/    workflow builders (build_all.py), xmlkit + strict simulator (vendored from ete-dashboard)
 tools/excel/      Control and Results workbook specs and builders
 tools/python/     sevfit.py: severity fitting, embedded in the 04a Python tool
-tools/run_pipeline.bat   runs every workflow with AlteryxEngineCmd.exe
-tools/run_python.py      runs the same workflows in Python (run_pipeline_python.bat), no Alteryx
+tools/run_pipeline.bat   command-line run of the pipeline (Python)
+tools/run_python.py      the pipeline runner the page and run_pipeline.bat call
+tools/xol_ui.bat         starts the page (ui/xol/serve.py, port 8765)
+ui/kit/           vendored GC UI kit (gc-ui-kit build, VERSION + HASHES.json; never edit here)
+ui/xol/           the page: manifest.json, xol_plugin.py, index.html, guide.html, glossary.json, serve.py
 tools/synth/      synthetic data generator (seeded, reproducible)
 tests/
   run_all.py              every test + structural check of the generated workflows
@@ -59,6 +63,8 @@ tests/
   test_stage00.py … test_stage07.py   simulator runs vs independent oracles, incl. broken-input cases
   test_designer_twin.py   the simulator and oracles reproduce Designer's stored outputs
   test_python_route.py    the Python route's runner, its guard and its outputs against Designer's
+  test_ui.py              the page on the kit server (synthetic book): state, run, editor, tables, lint
+  test_packs.py           user and admin packs; the unpacked user pack served and run on its own
   twin_stage04/05/06.py   compare a Designer run with the numpy oracles
   reconciliation/         synthetic_controls.json (observed totals), synthetic_truth.json (ultimates)
 ```

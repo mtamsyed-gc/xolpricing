@@ -30,7 +30,8 @@ START_USER = f"""XoL Pricing Tool {VERSION} - user pack ({date.today():%Y-%m-%d}
 1. Unzip anywhere (keep the folder structure). Once:  py -m pip install -r requirements-native.txt
 2. Double-click  tools\\xol_ui.bat  -> the page opens at http://127.0.0.1:8765/
 3. Press "How to use" in the page header (or open ui\\xol\\guide.html): the step-by-step guide with screenshots,
-   adapted to your data (line data, claimant listing, Merit outputs).
+   adapted to your data (line data, claimant listing, Merit outputs). Ctrl+K searches the page, the glossary and
+   the documents; the theme button switches to dark. Edit the Control workbook in the page or in Excel.
 Illustrated manual: docs\\manual\\USER_MANUAL.html. Developer notes: docs\\RUNNING.md. Changes: docs\\CHANGELOG.md.
 This pack holds no synthetic data: the page offers the live book only.
 """

@@ -2,6 +2,29 @@
 
 Methodology and data-contract changes, newest first.
 
+## 2026-11-09 — 0.9.1: the page moves onto the GC UI kit 1.1.1 (XU-1.0)
+No methodology or data-contract change. The browser page is now a tool page of the shared **GC UI kit**
+(private repo `mtamsyed-gc/gc-ui-kit`, standard `UI_STANDARD.md` UI-0.3; decisions D-UI1–D-UI6 of 2026-11-08), the
+same kit as Merit's page (MU-1.0): one look, one keyboard (Ctrl+K search), one glossary, light and dark theme.
+- `ui/kit/` is the vendored kit build 1.1.1 (`VERSION`, `HASHES.json`; `tests/test_ui.py` fails on a hand edit):
+  tokens, components, `gc_server.py` (stdlib server: manifest, state, runs, log, tables, workbook editor with backup
+  and Excel-lock refusal, docs, glossary, plugin routes). `tools/ui/serve.py` (0.8–0.9.0 server) is removed.
+- `ui/xol/manifest.json` is in the kit's manifest schema: allowed roots, state dir `data/output/ui_state`, the two
+  editable Control workbooks (`control_live`, `control_synth`; Guide sheet read-only), the `run` action
+  (`tools/run_python.py` with positional `variant adapter first last`, choices from the manifest), `install_control`,
+  the variants, stages, help documents. `ui/xol/xol_plugin.py` carries what is XoL-specific: books, adapters, stage
+  status from the checks files, Params readiness and the fit_cutoff advice (from `tools/excel/control_spec.py`),
+  per-parameter editor help (`sheet_help`), the Input guide (`/api/plugin/spec`). `ui/xol/serve.py` is the entry
+  `tools\xol_ui.bat` starts. `ui/xol/glossary.json`: 16 XoL terms on top of the kit's common glossary.
+- `ui/xol/index.html` rebuilt on the kit shell: Overview (book and adapter, pre-run checklist), Inputs (Control
+  workbook **edited in the page** — yellow / blue cells, per-parameter help, save with backup; Input guide; data
+  files), Run and stages (from / to stage, live log, timeline, one card per stage with checks and tables), Results,
+  Help (guide, manual, documents, glossary, A–Z index). Admin section (Alt+Shift+A or `?admin`).
+- `guide.html` on the kit tokens (dark theme works), its Open buttons on the kit's `/api/open`.
+- Tests: `tests/test_ui.py` rewritten on the kit server (kit hashes, manifest vs repo, state, run 00→03 with
+  positional args, 409 on a second run, tables, spec, Params sheet help, save / stale-mtime refusal / backup, planted
+  STOP, open refusals, page lint); `tests/test_packs.py` serves the unpacked user pack with its own vendored kit.
+
 ## 2026-11-07 — 0.9.0: Python only (Alteryx dropped from the XoL tool); `below_cutoff`
 **Alteryx dropped (owner, 2026-11-07; this tool only — Merit and the ETE pipeline keep Alteryx).** The Python route
 reproduces Designer exactly (laptop checks 2026-11-06/07; Designer baseline in the tests), so the tool no longer
