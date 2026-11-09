@@ -21,6 +21,8 @@ same kit as Merit's page (MU-1.0): one look, one keyboard (Ctrl+K search), one g
   files), Run and stages (from / to stage, live log, timeline, one card per stage with checks and tables), Results,
   Help (guide, manual, documents, glossary, A–Z index). Admin section (Alt+Shift+A or `?admin`).
 - `guide.html` on the kit tokens (dark theme works), its Open buttons on the kit's `/api/open`.
+- Page backups of an edited workbook sit beside it in `_ui_backup/` (kit §2.4); for the synthetic Control that is inside the
+  repo, so `_ui_backup/` is git-ignored and `make_packs.py` leaves it out of both packs.
 - Tests: `tests/test_ui.py` rewritten on the kit server (kit hashes, manifest vs repo, state, run 00→03 with
   positional args, 409 on a second run, tables, spec, Params sheet help, save / stale-mtime refusal / backup, planted
   STOP, open refusals, page lint); `tests/test_packs.py` serves the unpacked user pack with its own vendored kit.

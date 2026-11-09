@@ -36,6 +36,7 @@ def main() -> int:
             "requirements-native.txt", "tools/import_merit.bat"]
     ok &= report("user pack: everything the page and the Python route need", all(n in user for n in need))
     ok &= report("admin pack: every tracked file", set(files) >= set(user) and "data/synthetic/XoL_Control_synthetic.xlsx" in files)
+    ok &= report("no page backups (_ui_backup) in any pack", not any("_ui_backup" in f for f in files))
 
     u = make_packs.build("user", user, make_packs.START_USER)
     with tempfile.TemporaryDirectory() as td:

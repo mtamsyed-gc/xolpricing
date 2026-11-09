@@ -34,3 +34,6 @@ __pycache__/
 
 # ---- release zips ----
 dist/
+
+# ---- GC UI kit: page backups of edited workbooks (never shipped) ----
+_ui_backup/

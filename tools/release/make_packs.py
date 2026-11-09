@@ -46,7 +46,7 @@ The page shows both books (synthetic and live). Use this pack to test a change; 
 
 def tracked() -> list[str]:
     out = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard"], cwd=ROOT, capture_output=True, text=True, check=True).stdout
-    return [ln for ln in out.splitlines() if ln and (ROOT / ln).is_file()]
+    return [ln for ln in out.splitlines() if ln and (ROOT / ln).is_file() and "/_ui_backup/" not in ln]
 
 
 def build(name: str, files: list[str], start: str) -> Path:
