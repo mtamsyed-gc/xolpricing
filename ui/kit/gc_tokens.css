@@ -1,0 +1,28 @@
+/* GC UI kit — design tokens (UI_STANDARD §8). Generated from gc_tokens.json by tools/build_tokens.py; edit the
+   JSON, not this file. Light is the default; [data-theme="dark"] is the second set (D-UI3). Every text /
+   background pair in gc_tokens.json contrast_pairs passes WCAG 2.2 AA (tests/test_kit.py). */
+:root {
+  --navy: #0b2545; --navy-2: #13315c; --teal: #1a8a8a; --teal-2: #0f6b6b; --teal-soft: #e3f2f2; --ink: #1d2733;
+  --ink-2: #4a5663; --ink-3: #5f6c79; --line: #d9dee5; --line-2: #eceff3; --bg: #f4f6f9; --card: #ffffff;
+  --card-2: #f8fafc; --on-navy: #ffffff; --on-navy-2: #c9d6e3; --on-navy-3: #9fb3c8; --ok: #1e7a44;
+  --ok-soft: #e4f3ea; --flag: #8a5a0b; --flag-soft: #fbf0d9; --stop: #a8362b; --stop-soft: #f8e1de; --info: #526273;
+  --info-soft: #eaeef2; --run: #1f5fbf; --run-soft: #e1ebfa; --focus: #1a8a8a; --sel: #d9f0f0; --input-mark: #b7791f;
+  --input-soft: #fff7e0; --check-soft: #f1f3f5; --log-bg: #0f1b2d; --log-ink: #d8e1ea; --log-ok: #7bd88f;
+  --log-bad: #ff8a80; --log-dim: #8fa0b3; --font: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  --mono: Consolas, "Cascadia Mono", "Courier New", monospace; --radius: 8px; --radius-s: 6px;
+  --shadow: 0 1px 2px rgba(11, 37, 69, .08), 0 1px 6px rgba(11, 37, 69, .05); --sp-1: 4px; --sp-2: 8px; --sp-3: 12px;
+  --sp-4: 16px; --sp-5: 24px; --sp-6: 32px; --fs-0: 12px; --fs-1: 13px; --fs-2: 14px; --fs-3: 16px; --fs-4: 20px;
+  --header-h: 48px; --nav-w: 248px; --status-h: 30px; --primary: #0f6b6b; --on-primary: #ffffff; --primary-2: #0b5555;
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  --navy: #0b1a30; --navy-2: #10243f; --teal: #4cc2c2; --teal-2: #7fd6d6; --teal-soft: #163a3f; --ink: #e6edf5;
+  --ink-2: #c3cedb; --ink-3: #9aa9bb; --line: #2b3a52; --line-2: #1f2b3e; --bg: #0f1826; --card: #172235;
+  --card-2: #1c2940; --on-navy: #ffffff; --on-navy-2: #c9d6e3; --on-navy-3: #9fb3c8; --ok: #5ed39a;
+  --ok-soft: #143426; --flag: #f0b84a; --flag-soft: #3a2c0e; --stop: #ff8f84; --stop-soft: #46201c; --info: #a9b8ca;
+  --info-soft: #243247; --run: #7fb3ff; --run-soft: #1b2f4e; --focus: #4cc2c2; --sel: #1f3d44; --input-mark: #f0b84a;
+  --input-soft: #2c2512; --check-soft: #1e2a3a; --log-bg: #0a1220; --log-ink: #d8e1ea; --log-ok: #7bd88f;
+  --log-bad: #ff8a80; --log-dim: #8fa0b3; --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 1px 8px rgba(0, 0, 0, .35);
+  --primary: #4cc2c2; --on-primary: #0b1a30; --primary-2: #7fd6d6;
+  color-scheme: dark;
+}

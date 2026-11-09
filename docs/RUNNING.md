@@ -1,4 +1,4 @@
-# Running the tool (0.9.0: Python only)
+# Running the tool (0.9.1: Python only; page on the GC UI kit)
 
 Users: start with the page's **How to use** guide (`ui/xol/guide.html`) or the illustrated manual
 (`docs/manual/USER_MANUAL.md` / `.html`). This page is the developer's run guide.
@@ -17,14 +17,21 @@ kept from the Alteryx period*). Alteryx is not installed, launched or needed.
 4. The Results workbook (`data/output/live/XoL_Results.xlsx`) is copied from the template on the first run.
 
 ## Running
-- **The page** (normal use): double-click `tools\xol_ui.bat`. A local server (`tools/ui/serve.py`, standard library
-  only) opens `http://127.0.0.1:8765/`: Inputs (Control workbook with Open in Excel and change detection; the data
-  files the chosen adapter needs; a Params readiness check, including fitting cut-off against layer attachments),
-  Input guide, Run (from / to stage, live log, stage chips), one card per stage (checks, reconciliation, result tables),
-  Results workbook (Open in Excel, dated copy). **How to use** in the header opens the interactive guide. Keep the
-  server window open; another port: `tools\xol_ui.bat 9000`. The server opens and reads files only under `data/` and
-  `excel/templates/`, opens only workbook / CSV / text files, never deletes, runs one pipeline at a time and logs every
-  open to `data/output/<variant>/ui_actions.log`. Tests: `tests/test_ui.py`.
+- **The page** (normal use): double-click `tools\xol_ui.bat`. It starts `ui\xol\serve.py`: the vendored **GC UI kit**
+  server (`ui/kit/gc_server.py`, standard library only, kit build in `ui/kit/VERSION`) with this tool's manifest
+  (`ui/xol/manifest.json`) and plugin (`ui/xol/xol_plugin.py`), and opens `http://127.0.0.1:8765/`. Sections:
+  Overview (book and adapter, pre-run checklist), Inputs (the Control workbook edited in the page or in Excel —
+  yellow = required, blue = optional, help per parameter, save keeps a backup in `data/output/ui_state/backups`
+  and is refused while Excel holds the file; Params readiness including the fitting cut-off against layer
+  attachments; the Input guide; the data files the adapter reads), Run and stages (from / to stage, live log,
+  timeline, a card per stage with checks and tables), Results (Open in Excel, dated copy), Help (interactive guide,
+  manual, documents, glossary, A–Z index; Ctrl+K searches everything). Keep the server window open; another port:
+  `tools\xol_ui.bat 9000`. The server reads and opens files only under the manifest's `allowed_roots` (`data/`,
+  `excel/templates/`, `ui/`, `docs/`), opens only workbook / CSV / text files, writes only the two Control workbooks
+  (with backup) and `data/output/ui_state/` (run logs, action audit), never deletes, and runs one pipeline at a time.
+  The kit is vendored from `mtamsyed-gc/gc-ui-kit` with its `tools/vendor.py`; never edit `ui/kit/` by hand
+  (`tests/test_ui.py` checks the hashes). Page spec: `UI_STANDARD.md` in that repo (mirrored in ete-dashboard
+  `docs/UI_STANDARD.md`). Tests: `tests/test_ui.py`.
 - **Command line** (scripted runs): `tools\run_pipeline.bat` (or `py tools\run_python.py`), same stages and outputs:
 
 ```

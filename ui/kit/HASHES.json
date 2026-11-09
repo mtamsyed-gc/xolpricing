@@ -1,0 +1,11 @@
+{
+ "kit": "1.1.1",
+ "files": {
+  "gc_tokens.css": "edbcfb1d6214420c050d2fb02bcc7467e4aaa8f2d2922b51cce59bc4f76441ea",
+  "gc_tokens.json": "ab48ea0de93874f9c0a592529c1526a238ebb304452bcb2bb9cd81457ae6bf91",
+  "gc_ui.css": "2531f513170a646c3bdf0a4038b79833f419e8f957742c0db3e47369539792a0",
+  "gc_ui.js": "b85e7ff8da00cbd8db9102fb60764c2ad91da3e571051032aa0a5d6d5078e419",
+  "gc_server.py": "9d941861a231bc7d326400fca8ec3693bb492a67d94bfa1a9c4ae017d7f2d5da",
+  "common_glossary.json": "877832f91f368754207f8b336e4b3f4bfc9a199a6344382644c60e95adde0cae"
+ }
+}

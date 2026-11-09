@@ -4,18 +4,19 @@
 <meta charset="utf-8">
 <title>XoL Pricing Tool — how to use it</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../kit/gc_tokens.css">
 <link rel="stylesheet" href="../kit/gc_ui.css">
 <script src="../kit/gc_ui.js"></script>
 <style>
   .guide-main { max-width: 1100px; }
   .steps-nav { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 10px; }
-  .steps-nav .step { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: var(--fs-1); cursor: pointer; }
+  .steps-nav .step { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: var(--fs-1); cursor: pointer; }
   .steps-nav .step.done { border-color: var(--ok); color: var(--ok); } .steps-nav .step.done::before { content: "✓"; font-weight: 700; }
-  .steps-nav .step.current { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .steps-nav .step.current { background: var(--navy); color: var(--on-navy); border-color: var(--navy); }
   .progress { height: 6px; background: var(--line-2); border-radius: 3px; overflow: hidden; margin: 6px 0 2px; }
   .progress > div { height: 100%; background: var(--teal); transition: width .3s; }
   .mode-pick { display: flex; gap: 8px; flex-wrap: wrap; }
-  .mode-pick label { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; background: #fff; display: flex; gap: 8px; align-items: flex-start; max-width: 330px; }
+  .mode-pick label { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; background: var(--card); display: flex; gap: 8px; align-items: flex-start; max-width: 330px; }
   .mode-pick label.on { border-color: var(--teal); background: var(--teal-soft); }
   .mode-pick label b { display: block; }
   .mode-pick label span { font-size: var(--fs-1); color: var(--ink-2); }
@@ -37,7 +38,7 @@
   <span class="brand">XoL Pricing Tool <small>how to use it</small></span>
   <span class="meta"><span id="progress-text"></span></span>
   <span class="spacer"></span>
-  <a class="btn sm needs-server" href="index.html" style="color:#fff;border-color:#9fb3c8;background:transparent">Open the tool page →</a>
+  <a class="btn sm needs-server" href="index.html" style="color:var(--on-navy);border-color:var(--on-navy-3);background:transparent">Open the tool page →</a>
 </header>
 <main class="gc-main guide-main">
   <div class="banner info offline">This guide is open as a file: the buttons that open folders and workbooks need the tool page running (double-click <code>tools\xol_ui.bat</code>). Everything else works.</div>
@@ -62,8 +63,11 @@
   const prefs = JSON.parse(localStorage.getItem("xol_guide") || "{}");
   let mode = prefs.mode || "L", done = prefs.done || {};
   const save = () => localStorage.setItem("xol_guide", JSON.stringify({ mode, done }));
+  // what → the kit's /api/open body (paths are the live book's; the page itself handles the synthetic book)
+  const OPEN = { input_dir: { path: "data/input" }, control: { what: "workbook", id: "control_live" }, control_template: { path: "excel/templates/XoL_Control.xlsx" },
+                 results: { path: "data/output/live/XoL_Results.xlsx" }, folder: { path: "data/output/live" } };
   async function open(what, extra) {
-    try { await api(API + "/api/open", Object.assign({ variant: "live", what }, extra || {})); GC.toast("Opened"); }
+    try { await api(API + "/api/open", Object.assign({}, OPEN[what] || { path: what }, extra || {})); GC.toast("Opened"); }
     catch (e) { GC.toast("Start the tool page first (tools\\xol_ui.bat): " + e.message, 5000); }
   }
   const btn = (label, what, extra) => el("button", { class: "btn sm needs-server", onclick: () => open(what, extra) }, label);
